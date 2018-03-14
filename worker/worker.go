@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -36,6 +37,7 @@ type Worker struct {
 	serverAddr       string
 	localRPCAddr     net.Addr
 	workers          map[string]*rpc.Client
+	logger           *log.Logger
 }
 
 type WorkerResponse struct {
@@ -50,14 +52,10 @@ type WorkerRequest struct {
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
 
-var (
-	logger *log.Logger
-)
-
 func main() {
-	logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	gob.Register(&net.TCPAddr{})
 	worker := new(Worker)
+	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
 	worker.listenRPC()
 	worker.registerWithLB()
@@ -90,11 +88,11 @@ func (w *Worker) listenRPC() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err)
 	w.localRPCAddr = listener.Addr()
-	logger.Println("listening on: ", listener.Addr().String())
+	w.logger.Println("listening on: ", listener.Addr().String())
 	go func() {
 		for {
 			conn, _ := listener.Accept()
-			logger.Println("New connection!")
+			w.logger.Println("New connection!")
 			go rpc.ServeConn(conn)
 		}
 	}()
@@ -109,6 +107,7 @@ func (w *Worker) registerWithLB() {
 	w.settings = settings
 	w.workerID = settings.WorkerID
 	go w.startHeartBeat()
+	w.logger.SetPrefix("[Worker: " + strconv.Itoa(w.workerID) + "] ")
 	w.loadBalancerConn = loadBalancerConn
 }
 
@@ -143,7 +142,7 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 		if w.workers[workerAddr.String()] == nil {
 			workerCon, err := rpc.Dial("tcp", workerAddr.String())
 			if err != nil {
-				log.Println(err)
+				w.logger.Println(err)
 				delete(w.workers, workerAddr.String())
 			} else {
 				w.workers[workerAddr.String()] = workerCon
@@ -165,7 +164,7 @@ func (w *Worker) BidirectionalSetup(request *WorkerRequest, response *WorkerResp
 		delete(w.workers, workerAddr)
 	} else {
 		w.workers[workerAddr] = workerConn
-		logger.Println("birectional setup complete")
+		w.logger.Println("birectional setup complete")
 	}
 	return nil
 }
