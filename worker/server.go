@@ -1,16 +1,10 @@
 /*
 
-Implements an example server for the BlockArt project, to be used in
-project 1 of UBC CS 416 2017W2.
-
-This server takes in settings from an input json files and implements
-a simple strategy for GetNodes: return a fixed number of random worker
+Default Port is 12345
 
 Usage:
 
 $ go run server.go
-  -c string
-    	Path to the JSON config
 
 */
 

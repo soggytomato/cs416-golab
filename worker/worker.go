@@ -1,3 +1,12 @@
+/*
+
+Port is dynamic
+
+Usage:
+
+$ go run worker.go [loadbalancer ip:port]
+
+*/
 package main
 
 import (
