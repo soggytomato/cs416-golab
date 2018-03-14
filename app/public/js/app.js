@@ -23,3 +23,42 @@ $(document).ready(function(){
 		}
 	});
 });
+
+$(document).ready(function(){
+	formBindings();
+});
+
+function formBindings() {
+	$('#newUser').on('click',function(){
+		$('.new-user-group').css('display', 'block');
+		$('.select-user-group').css('display', 'none');
+	});
+
+	$('#existingUser').on('click',function(){
+		$('.new-user-group').css('display', 'none');
+		$('.select-user-group').css('display', 'block');
+	});
+
+	$('#newSession').on('click',function(){
+		$('.new-session-group').css('display', 'block');
+		$('.select-session-group').css('display', 'none');
+	});
+
+	$('#existingSession').on('click',function(){
+		$('.new-session-group').css('display', 'none');
+		$('.select-session-group').css('display', 'block');
+	});
+
+	$('#register').submit(function (e) {
+		e.preventDefault();
+
+	 	$('.register').css('display', 'none');
+		$('.main').slideDown('slow');
+
+		setTimeout(function(){
+			editor.refresh();
+		}, 500);
+
+	 	return false;
+	});
+};

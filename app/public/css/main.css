@@ -16,15 +16,18 @@ img {
 	float: left;
 }
 
-.header-text {
-	font-family: Consolas, monaco, monospace;
-	color: cadetblue;
+.title {
+	float: right;
 }
 
-.title {
-	font-size: 50px;
+.editor-text {
+	font-family: Consolas, monaco, monospace;
 	color: #8c8c8c;
-	float: right;
+}
+
+.title-text {
+	font-size: 50px;
+	color: cadetblue;
 }
 
 .input-header, .output-header, .logs-header {
@@ -67,11 +70,9 @@ img {
 
 .output {
 	height: 89%;
-}
-
-.output {
 	background-color: #5f62757a;
 }
+
 
 .output-wrapper {
 	height: 25%;
