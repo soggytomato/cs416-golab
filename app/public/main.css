@@ -1,4 +1,85 @@
+html { 
+	height: 100%; 
+	width: 100%; 
+	margin: 0; 
+}
+
+body { 
+	height: 98%;
+	overflow-y: hidden;
+	width: inherit; 
+	background-color: #333!important;
+} 
+
+img {
+	width: 30px;
+	float: left;
+}
+
+.header-text {
+	font-family: Consolas, monaco, monospace;
+	color: cadetblue;
+}
+
+.title {
+	font-size: 50px;
+	color: #8c8c8c;
+	float: right;
+}
+
+.input-header, .output-header, .logs-header {
+	font-size: 20px;
+}
+
+.main, .left, .right { height: inherit; }
 .main {
-    font-size: 20px;
-    color: red;
+	margin: 10px!important;
+}
+
+.execute, .share {
+	height: 50px;
+	border-radius: 5px;
+	width: 100%;
+}
+
+.logs-wrapper {
+	margin-top: .5rem;
+	height: 75%;
+	border-radius: 10px;
+}
+
+.logs {
+	background-color: #5f62757a;
+	height: 100%;
+}
+
+#code {
+	display: none;
+}
+
+.input-wrapper {
+	height: 75%;
+}
+
+.input {
+	height: 95%;
+}
+
+.output {
+	height: 89%;
+}
+
+.output {
+	background-color: #5f62757a;
+}
+
+.output-wrapper {
+	height: 25%;
+	border-radius: 10px;
+}
+
+.CodeMirror {
+	height: 100%!important;
+	border: solid;
+	border-radius: 10px;
 }

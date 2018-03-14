@@ -4,13 +4,88 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
-    <link rel='stylesheet' href='main.css'>
+    <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="jquery/jquery-ui.min.css">
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="codemirror/lib/codemirror.css">
+    <link rel="stylesheet" href="codemirror/theme/dracula.css">
+    <script src="jquery/jquery-3.3.1.min.js"></script>
+    <script src="jquery/jquery-ui.min.js"></script>
     <script src="app.js"></script>
+    <script src="codemirror/lib/codemirror.js"></script>
+    <script src="codemirror/addon/edit/matchbrackets.js"></script>
+    <script src="codemirror/mode/go/go.js"></script>
 </head>
 
 <body>
-    <div class="main">
-        CS416 GoLab
+    <div class="main row">
+        <div class="left col-10">
+            <div class="input-wrapper mr-1">
+                <span class="input-header header-text">Snippet:</span>
+                <div class="mb-1 input">
+                    <textarea id="code" name="code">
+// Prime Sieve in Go.
+// Taken from the Go specification.
+// Copyright © The Go Authors.
+
+package main
+
+import "fmt"
+
+// Send the sequence 2, 3, 4, ... to channel 'ch'.
+func generate(ch chan&lt;- int) {
+    for i := 2; ; i++ {
+        ch &lt;- i  // Send 'i' to channel 'ch'
+    }
+}
+
+// Copy the values from channel 'src' to channel 'dst',
+// removing those divisible by 'prime'.
+func filter(src &lt;-chan int, dst chan&lt;- int, prime int) {
+    for i := range src {    // Loop over values received from 'src'.
+        if i%prime != 0 {
+            dst &lt;- i  // Send 'i' to channel 'dst'.
+        }
+    }
+}
+
+// The prime sieve: Daisy-chain filter processes together.
+func sieve() {
+    ch := make(chan int)  // Create a new channel.
+    go generate(ch)       // Start generate() as a subprocess.
+    for {
+        prime := &lt;-ch
+        fmt.Print(prime, "\n")
+        ch1 := make(chan int)
+        go filter(ch, ch1, prime)
+        ch = ch1
+    }
+}
+
+func main() {
+    sieve()
+}
+                    </textarea>
+                </div>
+            </div>
+            <div class="output-wrapper mt-3">
+                <span class="output-header header-text">Output:</span>
+                <div class="output"></div>
+            </div>
+        </div>
+        <div class="col right">
+            <span class="title header-text">GoLab</span>
+            <button type="button" class="btn btn-default btn-lg mb-2 execute">
+              <img src="icons/play-circle.svg" alt="play-circle"><span>Execute</span>
+            </button>
+            <button type="button" class="btn btn-default btn-lg mb-2 share">
+              <img src="icons/share-boxed.svg" alt="share-boxed"><span>Share</span>
+            </button>   
+            <div class="logs-wrapper">
+                <span class="logs-header header-text">Logs:</span>
+                <div class="logs"></div>
+            </div>         
+        </div>
     </div>
 </body>
 
