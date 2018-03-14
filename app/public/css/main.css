@@ -46,7 +46,15 @@ html {
 
 .title-text {
   font-size: 50px;
-  color: cadetblue; }
+  color: cadetblue;
+  font-family: Consolas, monaco, monospace; }
+
+.register {
+  background-color: black;
+  border-radius: 10px;
+  margin-top: 15%; }
+  .register #submitForm {
+    margin-bottom: 10px; }
 
 label, .subtitle {
   font-family: Consolas, monaco, monospace;

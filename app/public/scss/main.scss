@@ -50,6 +50,11 @@ html { height: 100%; width: 100%; margin: 0;
 .title-text {
 	font-size: 50px;
 	color: $title-color;
+	font-family: Consolas, monaco, monospace;
+}
+
+.register { background-color: black; border-radius: $border-radius; margin-top: 15%;
+	#submitForm { margin-bottom: 10px; }
 }
 
 label, .subtitle {
