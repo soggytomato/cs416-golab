@@ -18,12 +18,12 @@
 </head>
 
 <body>
-    <div class="main row" style="display:none">
+    <div class="editor row" style="display:none">
         <div class="left col-10">
             <div class="input-wrapper mr-1">
-                <span class="input-header editor-text">Snippet:</span>
+                <span class="subtitle">Snippet:</span>
                 <div class="mb-1 input">
-                    <textarea id="code" name="code">
+                    <textarea id="code" name="code" style="display:none;">
 // Prime Sieve in Go.
 // Taken from the Go specification.
 // Copyright © The Go Authors.
@@ -69,38 +69,35 @@ func main() {
                 </div>
             </div>
             <div class="output-wrapper mt-3">
-                <span class="output-header editor-text">Output:</span>
+                <span class="subtitle">Output:</span>
                 <div class="output"></div>
             </div>
         </div>
         <div class="right col">
             <span class="title title-text">GoLab</span>
             <button type="button" class="btn btn-default btn-lg mb-2 execute">
-              <img src="img/play-circle.svg" alt="play-circle"><span>Execute</span>
-            </button>
-            <button type="button" class="btn btn-default btn-lg mb-2 share">
-              <img src="img/share-boxed.svg" alt="share-boxed"><span>Share</span>
-            </button>   
+              <img src="img/play-circle.svg" alt="play-circle" class="btn-icon"><span>Execute</span>
+            </button>  
             <div class="logs-wrapper">
-                <span class="logs-header editor-text">Logs:</span>
+                <span class="subtitle">Logs:</span>
                 <div class="logs"></div>
             </div>         
         </div>
     </div>
 
     <div class="container register">
-      <h2 class="title-text">Welcome to GoLab</h2>
+      <h2 class="title title-text">Welcome to GoLab</h2>
       <form id="register"> <!--method="POST" action="/register" -->
         <div class="form-group user-group">
-            <label class="editor-text" for="usr">Username:</label>
+            <label for="usr">Username:</label>
             <div class="form-group user-radio-select">
               <div class="form-check form-check-inline">
-                  <label class="form-check-label editor-text">
+                  <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="userRadio" id="newUser" value="new"> New User
                   </label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <label class="form-check-label editor-text">
+                  <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="userRadio" id="existingUser" value="existing" checked> Existing User
                   </label>
                 </div>
@@ -119,15 +116,15 @@ func main() {
         </div>
       
         <div class="form-group session-group">
-            <label class="editor-text" for="usr">Session:</label>
+            <label for="usr">Session:</label>
             <div class="form-group session-radio-select">
               <div class="form-check form-check-inline">
-                  <label class="form-check-label editor-text">
+                  <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="sessionRadio" id="newSession" value="new"> New Session
                   </label>
                 </div>
                 <div class="form-check form-check-inline">
-                  <label class="form-check-label editor-text">
+                  <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="sessionRadio" id="existingSession" value="existing" checked> Existing Session
                   </label>
                 </div>

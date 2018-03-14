@@ -53,7 +53,7 @@ function formBindings() {
 		e.preventDefault();
 
 	 	$('.register').css('display', 'none');
-		$('.main').slideDown('slow');
+		$('.editor').slideDown('slow');
 
 		setTimeout(function(){
 			editor.refresh();
