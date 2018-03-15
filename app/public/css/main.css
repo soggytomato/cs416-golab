@@ -1,0 +1,65 @@
+html {
+  height: 100%;
+  width: 100%;
+  margin: 0; }
+  html body {
+    height: 98%;
+    width: inherit;
+    overflow-y: hidden;
+    background-color: #333 !important; }
+  html .btn-icon {
+    width: 30px;
+    float: left; }
+  html .editor {
+    height: inherit;
+    margin: 10px !important; }
+    html .editor .left, html .editor .right {
+      height: inherit; }
+    html .editor .title {
+      float: right; }
+    html .editor .subtitle {
+      font-size: 20px; }
+    html .editor .logs, html .editor .output {
+      background-color: rgba(95, 98, 117, 0.5); }
+    html .editor .input-wrapper {
+      height: 75%; }
+      html .editor .input-wrapper .input {
+        height: 95%; }
+    html .editor .output-wrapper {
+      height: 25%; }
+      html .editor .output-wrapper .output {
+        height: 89%;
+        border-radius: 10px; }
+    html .editor .logs-wrapper {
+      margin-top: .5rem;
+      height: 82%; }
+      html .editor .logs-wrapper .logs {
+        height: 100%;
+        border-radius: 10px; }
+    html .editor .execute, html .editor .share {
+      height: 50px;
+      border-radius: 5px;
+      width: 100%; }
+    html .editor .CodeMirror {
+      height: 100% !important;
+      border-radius: 10px; }
+
+.title-text {
+  font-size: 50px;
+  color: cadetblue;
+  font-family: Consolas, monaco, monospace; }
+
+.register {
+  background-color: black;
+  border-radius: 10px;
+  margin-top: 15%; }
+  .register #submitForm {
+    margin-bottom: 10px; }
+  .register .title {
+    text-align: center; }
+
+label, .subtitle {
+  font-family: Consolas, monaco, monospace;
+  color: #8c8c8c; }
+
+/*# sourceMappingURL=main.css.map */

@@ -3,14 +3,146 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
-    <link rel='stylesheet' href='main.css'>
-    <script src="app.js"></script>
+    <title>GoLab</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/jquery/jquery-ui.min.css">
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="css/codemirror/codemirror.css">
+    <link rel="stylesheet" href="css/codemirror/theme/dracula.css">
+    <script src="js/jquery/jquery-3.3.1.min.js"></script>
+    <script src="js/jquery/jquery-ui.min.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/codemirror/codemirror.js"></script>
+    <script src="js/codemirror/addon/edit/matchbrackets.js"></script>
+    <script src="js/codemirror/mode/go/go.js"></script>
 </head>
 
 <body>
-    <div class="main">
-        CS416 GoLab
+    <div class="editor row" style="display:none">
+        <div class="left col-10">
+            <div class="input-wrapper mr-1">
+                <span class="subtitle">Snippet:</span>
+                <div class="mb-1 input">
+                    <textarea id="code" name="code" style="display:none;">
+// Prime Sieve in Go.
+// Taken from the Go specification.
+// Copyright © The Go Authors.
+
+package main
+
+import "fmt"
+
+// Send the sequence 2, 3, 4, ... to channel 'ch'.
+func generate(ch chan&lt;- int) {
+    for i := 2; ; i++ {
+        ch &lt;- i  // Send 'i' to channel 'ch'
+    }
+}
+
+// Copy the values from channel 'src' to channel 'dst',
+// removing those divisible by 'prime'.
+func filter(src &lt;-chan int, dst chan&lt;- int, prime int) {
+    for i := range src {    // Loop over values received from 'src'.
+        if i%prime != 0 {
+            dst &lt;- i  // Send 'i' to channel 'dst'.
+        }
+    }
+}
+
+// The prime sieve: Daisy-chain filter processes together.
+func sieve() {
+    ch := make(chan int)  // Create a new channel.
+    go generate(ch)       // Start generate() as a subprocess.
+    for {
+        prime := &lt;-ch
+        fmt.Print(prime, "\n")
+        ch1 := make(chan int)
+        go filter(ch, ch1, prime)
+        ch = ch1
+    }
+}
+
+func main() {
+    sieve()
+}
+                    </textarea>
+                </div>
+            </div>
+            <div class="output-wrapper mt-3">
+                <span class="subtitle">Output:</span>
+                <div class="output"></div>
+            </div>
+        </div>
+        <div class="right col">
+            <span class="title title-text">GoLab</span>
+            <button type="button" class="btn btn-default btn-lg mb-2 execute">
+              <img src="img/play-circle.svg" alt="play-circle" class="btn-icon"><span>Execute</span>
+            </button>  
+            <div class="logs-wrapper">
+                <span class="subtitle">Logs:</span>
+                <div class="logs"></div>
+            </div>         
+        </div>
+    </div>
+
+    <div class="container register">
+      <h2 class="title title-text">Welcome to GoLab</h2>
+      <form id="register"> <!--method="POST" action="/register" -->
+        <div class="form-group user-group">
+            <label for="usr">Username:</label>
+            <div class="form-group user-radio-select">
+              <div class="form-check form-check-inline">
+                  <label class="form-check-label">
+                    <input class="form-check-input" type="radio" name="userRadio" id="newUserRadio" value="new"> New User
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <label class="form-check-label">
+                    <input class="form-check-input" type="radio" name="userRadio" id="existingUserRadio" value="existing" checked> Existing User
+                  </label>
+                </div>
+            </div>
+            <div class="form-group new-user-group" style="display:none">
+                <input type="text" class="form-control" id="userInput" placeholder="Enter Username" name="newUser">
+            </div>
+            <div class="form-group select-user-group">
+                <select name="existingUser" id="userSelect" class="custom-select user-select" autocomplete='tel'>
+                  <option disabled selected placeholder>Select Username</option>
+                  <option value="user1">user1</option>
+                  <option value="user2">user2</option>
+                  <option value="user3">user3</option>
+                </select>
+            </div>
+        </div>
+      
+        <div class="form-group session-group">
+            <label for="usr">Session:</label>
+            <div class="form-group session-radio-select">
+              <div class="form-check form-check-inline">
+                  <label class="form-check-label">
+                    <input class="form-check-input" type="radio" name="sessionRadio" id="newSessionRadio" value="new"> New Session
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <label class="form-check-label">
+                    <input class="form-check-input" type="radio" name="sessionRadio" id="existingSessionRadio" value="existing" checked> Existing Session
+                  </label>
+                </div>
+            </div>
+            <div class="form-group new-session-group" style="display:none">
+                <input type="text" class="form-control" id="sessionInput" placeholder="Enter Session ID" name="session">
+            </div>
+            <div class="form-group select-session-group">
+                <select name="existingSession" id="sessionSelect" class="custom-select user-select" autocomplete='tel'>
+                  <option disabled selected placeholder>Select Session</option>
+                  <option value="session1">session1</option>
+                  <option value="session2">session2</option>
+                  <option value="session3">session3</option>
+                </select>
+            </div>
+        </div>
+        <button id="submitForm" class="btn btn-default">Submit</button>
+      </form>
     </div>
 </body>
 
