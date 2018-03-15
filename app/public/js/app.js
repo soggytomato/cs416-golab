@@ -1,3 +1,7 @@
+// Globals
+userID = "";
+sessionID = "";
+
 $(document).ready(function(){
 	editor = CodeMirror.fromTextArea(document.getElementById("code"), {
         theme: "dracula",
@@ -74,6 +78,8 @@ function verifyRegister() {
 		if ($('#userSelect').find(':selected').attr('placeholder') === "") {
 			alert("Please pick a user name.");
 			valid = false;
+		} else {
+			userID = $('#userSelect').find(':selected').text();
 		}
 	} else {
 		if ($('#userInput').val() == "") {
@@ -82,6 +88,8 @@ function verifyRegister() {
 		} else if ($('#userInput').val().indexOf(' ') >= 0) {
 			alert("User name cannot contain whitespace.");
 			valid = false;
+		} else {
+			userID = $('#userInput').val();
 		}
 	}
 
@@ -93,14 +101,18 @@ function verifyRegister() {
 		if ($('#sessionSelect').find(':selected').attr('placeholder') === "") {
 			alert("Please pick a session name.");
 			valid = false;
+		} else {
+			sessionID = $('#sessionSelect').find(':selected').text();
 		}
 	} else {
 		if ($('#sessionInput').val() == "") {
 			alert("Please enter a session ID.");
 			valid = false;
 		} else if ($('#sessionInput').val().indexOf(' ') >= 0) {
-			alert("Sessiion ID cannot contain whitespace.");
+			alert("Session ID cannot contain whitespace.");
 			valid = false;
+		} else {
+			sessionID = $('#sessionInput').val();
 		}
 	}
 
