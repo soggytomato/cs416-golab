@@ -29,22 +29,22 @@ $(document).ready(function(){
 });
 
 function formBindings() {
-	$('#newUser').on('click',function(){
+	$('#newUserRadio').on('click',function(){
 		$('.new-user-group').css('display', 'block');
 		$('.select-user-group').css('display', 'none');
 	});
 
-	$('#existingUser').on('click',function(){
+	$('#existingUserRadio').on('click',function(){
 		$('.new-user-group').css('display', 'none');
 		$('.select-user-group').css('display', 'block');
 	});
 
-	$('#newSession').on('click',function(){
+	$('#newSessionRadio').on('click',function(){
 		$('.new-session-group').css('display', 'block');
 		$('.select-session-group').css('display', 'none');
 	});
 
-	$('#existingSession').on('click',function(){
+	$('#existingSessionRadio').on('click',function(){
 		$('.new-session-group').css('display', 'none');
 		$('.select-session-group').css('display', 'block');
 	});
@@ -52,13 +52,57 @@ function formBindings() {
 	$('#register').submit(function (e) {
 		e.preventDefault();
 
-	 	$('.register').css('display', 'none');
-		$('.editor').slideDown('slow');
+		var valid = verifyRegister();
 
-		setTimeout(function(){
-			editor.refresh();
-		}, 500);
+		if (valid) {
+			$('.register').css('display', 'none');
+			$('.editor').slideDown('slow');
+
+			setTimeout(function(){
+				editor.refresh();
+			}, 500);
+		}
 
 	 	return false;
 	});
 };
+
+function verifyRegister() {
+	var valid = true;
+
+	if ($('#existingUserRadio').is(':checked')) {
+		if ($('#userSelect').find(':selected').attr('placeholder') === "") {
+			alert("Please pick a user name.");
+			valid = false;
+		}
+	} else {
+		if ($('#userInput').val() == "") {
+			alert("Please enter a user name.");
+			valid = false;
+		} else if ($('#userInput').val().indexOf(' ') >= 0) {
+			alert("User name cannot contain whitespace.");
+			valid = false;
+		}
+	}
+
+	if (valid == false) {
+		return
+	}
+
+	if ($('#existingSessionRadio').is(':checked')) {
+		if ($('#sessionSelect').find(':selected').attr('placeholder') === "") {
+			alert("Please pick a session name.");
+			valid = false;
+		}
+	} else {
+		if ($('#sessionInput').val() == "") {
+			alert("Please enter a session ID.");
+			valid = false;
+		} else if ($('#sessionInput').val().indexOf(' ') >= 0) {
+			alert("Sessiion ID cannot contain whitespace.");
+			valid = false;
+		}
+	}
+
+	return valid;
+}
