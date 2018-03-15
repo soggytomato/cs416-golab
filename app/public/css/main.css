@@ -55,6 +55,8 @@ html {
   margin-top: 15%; }
   .register #submitForm {
     margin-bottom: 10px; }
+  .register .title {
+    text-align: center; }
 
 label, .subtitle {
   font-family: Consolas, monaco, monospace;
