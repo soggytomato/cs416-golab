@@ -49,7 +49,8 @@ type WorkerNetSettings struct {
 
 type AllWorkers struct {
 	sync.RWMutex
-	all map[int]*Worker
+	all   map[int]*Worker
+	queue []*Worker
 }
 
 var (
@@ -57,7 +58,7 @@ var (
 	errLog               *log.Logger          = log.New(os.Stderr, "[serv] ", log.Lshortfile|log.LUTC|log.Lmicroseconds)
 	outLog               *log.Logger          = log.New(os.Stderr, "[serv] ", log.Lshortfile|log.LUTC|log.Lmicroseconds)
 	// Workers in the system.
-	allWorkers              AllWorkers = AllWorkers{all: make(map[int]*Worker)}
+	allWorkers              AllWorkers = AllWorkers{all: make(map[int]*Worker), queue: make([]*Worker, 0)}
 	HeartBeatInterval                  = 2000 // every two second
 	MinNumWorkerConnections            = 2
 	NumWorkerToReturn                  = 4
@@ -109,6 +110,11 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 		if time.Now().UnixNano()-allWorkers.all[workerID].RecentHeartbeat > int64(heartBeatInterval) {
 			outLog.Printf("%s timed out\n", allWorkers.all[workerID].Address.String())
 			delete(allWorkers.all, workerID)
+			for index, worker := range allWorkers.queue {
+				if worker.WorkerID == workerID {
+					allWorkers.queue = append(allWorkers.queue[:index], allWorkers.queue[index+1:]...)
+				}
+			}
 			allWorkers.Unlock()
 			return
 		}
@@ -121,7 +127,7 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 // Registers a new worker with an address for other worker to use to
 // connect to it (returned in GetNodes call below), and an
 // id for this worker. Returns error, or if error is not set,
-// then setting for this canvas instance.
+// then settings for the worker node.
 //
 // Returns:
 // - AddressAlreadyRegisteredError if the server has already registered this address.
@@ -139,11 +145,13 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 
 	newWorkerID := WorkerIDCounter
 
-	allWorkers.all[newWorkerID] = &Worker{
+	newWorker := &Worker{
 		newWorkerID,
 		w.Address,
 		time.Now().UnixNano(),
 	}
+
+	allWorkers.all[newWorkerID] = newWorker
 
 	go monitor(newWorkerID, time.Duration(HeartBeatInterval)*time.Millisecond)
 
@@ -155,6 +163,32 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 
 	outLog.Printf("Got Register from %s\n", w.Address.String())
 	WorkerIDCounter++
+	allWorkers.queue = append(allWorkers.queue, newWorker)
+	return nil
+}
+
+// Registers a new worker with an address for other worker to use to
+// connect to it (returned in GetNodes call below), and an
+// id for this worker. Returns error, or if error is not set,
+// then settings for the worker node.
+//
+// Returns:
+// - AddressAlreadyRegisteredError if the server has already registered this address.
+func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
+
+	allWorkers.Lock()
+	defer allWorkers.Unlock()
+
+	if len(allWorkers.queue) == 0 {
+		return nil
+	}
+
+	nextWorker := allWorkers.queue[0]
+	allWorkers.queue = allWorkers.queue[1:]
+
+	*retWorkerIP = nextWorker.Address.String()
+
+	allWorkers.queue = append(allWorkers.queue, nextWorker)
 	return nil
 }
 
