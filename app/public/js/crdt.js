@@ -1,12 +1,43 @@
+crdt 	= new Array();
+mapping = [];
+
+$(document).ready(function(){
+	editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+		theme: "dracula",
+		matchBrackets: true,
+		indentUnit: 0,
+		tabSize: 4,
+		indentWithTabs: false,
+		electricChars: false,
+		mode: "text/x-go"
+	});
+
+
+	// Handles all user inputs before they are applied to the editor.
+	editor.on('beforeChange', 
+		function(cm, change){
+			handleChange(change);
+		}
+	);
+
+	if (debugMode) {
+		// Verifies snippet after processing handle.
+		editor.on('change', function(cm, change){
+			verifyConsistent();
+		});
+	}
+});
+
 /*
 	Object definition for a CRDT element.
 */
 class Element {
-    constructor(id, prev, next, val) {
+    constructor(id, prev, next, val, del) {
     	this.id = id;
         this.prev = prev;
         this.next = next;
         this.val = val;
+        this.del = del;
     }
 
     // Set previous element ID
@@ -20,17 +51,6 @@ class Element {
 	}
 }
 
-// Globals for CRDT sequence and mappings.
-crdt = new Array();
-crdtMappings = [];
-
-$(document).ready(function(){
-	// Handles all user inputs before they are applied to the editor.
-	editor.on('beforeChange', function(cm, change){
-		handleChange(change);
-	});
-});
-
 /*
 	Dispatches input or delete to 'handleInput' and 'handleRemove'.
 
@@ -39,7 +59,7 @@ $(document).ready(function(){
 */
 function handleChange(change) {
 	const line = change.from.line;
-	const pos = change.from.ch;
+	const pos = getPos(line, change.from.ch);
 
 	if (change.origin == "+input") {
 		var inputChar;
@@ -62,12 +82,27 @@ function handleChange(change) {
 	Handles input events.
 */
 function handleInput(line, pos, val) {
+	var newLine = false;
+
 	// Create UID based on the current time and userID.
 	const id = userID + '_' + Date.now();
 
-	// Add new line to mappings if necessary.
-	if (crdtMappings[line] === undefined) {
-		crdtMappings.push([]);
+	// Add new line to mapping if necessary.
+	if (mapping[line] === undefined) {
+		mapping.push([]);
+	} else {
+		// Check if we are adding another indent.
+		const elem = mapping[line][pos];
+		const thisElem = crdt[elem];
+
+		if (thisElem !== undefined && thisElem.val == '\n' && thisElem.val == val) {
+			newLine = true;
+
+			line = line + 1;
+			pos = 0;
+
+			mapping.splice(line, 0, []);
+		}
 	}
 
 	// Get the previous element and set this to its next element;
@@ -84,22 +119,28 @@ function handleInput(line, pos, val) {
 	if (nextElem != undefined) {
 		nextElem.setPrev(id);
 
-		crdtMappings[line].splice(pos, 0, id);
+		if (newLine == false) {
+			mapping[line].splice(pos, 0, id);
+		}
 	}
 
 	const elem = new Element(id, prev, next, val);
 
 	crdt[id] = elem;
-	crdtMappings[line][pos] = id;
+	mapping[line][pos] = id;
 
-	console.log("Observed input at line: " + line + " pos: " + pos + " char: " + val);
+	if (debugMode) {
+		console.log("Observed input at line: " + line + " pos: " + pos + " char: " + unescape(val));		
+	}
 }
 
 /**
 	TODO
 */
 function handleRemove(line, pos, val) {
-	console.log("Observed remove at line: " + line + " pos: " + pos + " char: " + val);
+	if (debugMode) {
+		console.log("Observed remove at line: " + line + " pos: " + pos + " char: " + unescape(val));
+	}
 }
 
 /**
@@ -107,33 +148,131 @@ function handleRemove(line, pos, val) {
 */
 function getPrevElem(line, pos) {
 	var prev = undefined;
-	var prevElem = undefined;
 
 	if (line == 0 && pos == 0) {
-		prevElem = undefined;
+		// Start of snippet: undefined.
 	} else if (pos > 0) {
-		prev = crdtMappings[line][pos - 1];
-		prevElem = crdt[prev];
+		prev = mapping[line][pos - 1];
 	} else if (line > 0) {
-		prevLine = editor.getLineTokens(line-1);
-		if (prevLine.length > 0) {
-			prev = crdtMappings[line-1][prevLine[0].end];
-			prevElem = crdt[prev];
-		} else {
-			prev = crdtMappings[line-1][0];
-			prevElem = crdt[prev] ;
-		}
+		const _line = mapping[line-1];
+
+		prev = _line[_line.length-1];
 	}
 
-	return prevElem;
+	return crdt[prev];
 }
 
 /**
 	Get the next element based on te insertion at the line and pos.
 */
 function getNextElem(line, pos) {
-	const next = crdtMappings[line][pos];
-	const nextElem = crdt[next];
+	var next = undefined;
+
+	const _line = mapping[line];
+	if (_line.length > 0) {
+		next = _line[pos];
+	} else {
+		if (mapping[line+1] !== undefined) {
+			next = mapping[line+1][0];
+		}
+	}
 	
-	return nextElem;
+	return crdt[next];
 }
+
+function crdtToMapping(_crdt) {
+	var _mapping = [];
+
+	var curElem = getStartElemID();
+	var lastVal, lastPos, lastLine;
+	while (curElem != undefined) {
+		var curLine, curPos;
+		if (lastLine == undefined) {
+			_mapping.push([]);
+			curLine = 0;
+		} else if (lastVal == '\n') {
+			_mapping.push([]);
+			curLine = lastLine + 1;
+		}
+
+		if (lastPos == undefined || lastVal == '\n') { 
+			curPos = 0;
+		} else {
+			curPos = lastPos + 1;
+		}
+
+		_mapping[curLine][curPos] = curElem.id;
+
+		lastVal = curElem.val;
+		lastPos = curPos;
+		lastLine = curLine;
+
+		curElem = _crdt[curElem.next];
+	}
+
+	return _mapping;
+}
+
+function mappingToSnippet(_mapping, _crdt) {
+	var snippet = "";
+
+	_mapping.forEach(function(line){
+		line.forEach(function(id){
+			snippet = snippet + _crdt[id].val;
+		});
+	});
+
+	return snippet;
+}
+
+function crdtToSnippet(_crdt) {
+	var mapping = crdtToMapping(_crdt);
+	var snippet = mappingToSnippet(mapping, _crdt);
+
+	return snippet;
+}
+
+function getStartElemID() {
+	var start = null;
+
+	const ids = Object.keys(crdt);
+	$(ids).each(function(index, id){
+		const elem = crdt[id];
+		if (elem.prev == undefined) {
+			start = elem;
+			return;
+		}
+	});
+
+	return start;
+}
+
+function verifyConsistent() {
+	var snippet = editor.getValue();
+	var _snippet = crdtToSnippet(crdt);
+
+	if (snippet != _snippet) {
+		console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
+	}
+}
+
+function getPos(line, ch) {
+	var pos = 0;
+
+	const _line = mapping[line];
+	if (_line !== undefined && _line.length > 0) {
+		_line.forEach(function(id){
+			const val = crdt[id].val;
+
+			if (val != '\n') pos++;
+			if (val.length >= ch) return;
+		});
+	}
+
+	return pos;
+}
+
+
+
+
+
