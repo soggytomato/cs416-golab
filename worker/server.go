@@ -37,7 +37,8 @@ type LBServer int
 
 type Worker struct {
 	WorkerID        int
-	Address         net.Addr
+	RPCAddress      net.Addr
+	HTTPAddress     net.Addr
 	RecentHeartbeat int64
 }
 
@@ -100,7 +101,8 @@ func main() {
 }
 
 type WorkerInfo struct {
-	Address net.Addr
+	RPCAddress  net.Addr
+	HTTPAddress net.Addr
 }
 
 // Function to delete dead worker (no recent heartbeat)
@@ -108,7 +110,7 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 	for {
 		allWorkers.Lock()
 		if time.Now().UnixNano()-allWorkers.all[workerID].RecentHeartbeat > int64(heartBeatInterval) {
-			outLog.Printf("%s timed out\n", allWorkers.all[workerID].Address.String())
+			outLog.Printf("%s timed out\n", allWorkers.all[workerID].RPCAddress.String())
 			delete(allWorkers.all, workerID)
 			for index, worker := range allWorkers.queue {
 				if worker.WorkerID == workerID {
@@ -118,7 +120,7 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 			allWorkers.Unlock()
 			return
 		}
-		outLog.Printf("%s is alive\n", allWorkers.all[workerID].Address.String())
+		outLog.Printf("%s is alive\n", allWorkers.all[workerID].RPCAddress.String())
 		allWorkers.Unlock()
 		time.Sleep(heartBeatInterval)
 	}
@@ -138,8 +140,8 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 	// fmt.Println(m.Address)
 
 	for _, worker := range allWorkers.all {
-		if worker.Address.Network() == w.Address.Network() && worker.Address.String() == w.Address.String() {
-			return AddressAlreadyRegisteredError(w.Address.String())
+		if worker.RPCAddress.Network() == w.RPCAddress.Network() && worker.RPCAddress.String() == w.RPCAddress.String() {
+			return AddressAlreadyRegisteredError(w.RPCAddress.String())
 		}
 	}
 
@@ -147,7 +149,8 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 
 	newWorker := &Worker{
 		newWorkerID,
-		w.Address,
+		w.RPCAddress,
+		w.HTTPAddress,
 		time.Now().UnixNano(),
 	}
 
@@ -161,7 +164,7 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 		MinNumWorkerConnections,
 	}
 
-	outLog.Printf("Got Register from %s\n", w.Address.String())
+	outLog.Printf("Got Register from %s\n", w.RPCAddress.String())
 	WorkerIDCounter++
 	allWorkers.queue = append(allWorkers.queue, newWorker)
 	return nil
@@ -186,7 +189,7 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 	nextWorker := allWorkers.queue[0]
 	allWorkers.queue = allWorkers.queue[1:]
 
-	*retWorkerIP = nextWorker.Address.String()
+	*retWorkerIP = nextWorker.HTTPAddress.String()
 
 	allWorkers.queue = append(allWorkers.queue, nextWorker)
 	return nil
@@ -217,7 +220,7 @@ func (s *LBServer) GetNodes(workerID int, addrSet *[]net.Addr) error {
 		if workerID == id {
 			continue
 		}
-		workerAddresses = append(workerAddresses, worker.Address)
+		workerAddresses = append(workerAddresses, worker.RPCAddress)
 	}
 
 	sort.Sort(Addresses(workerAddresses))

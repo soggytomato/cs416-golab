@@ -25,8 +25,13 @@ type Sessions struct {
 	ExistingSessions []string `json:"ExistingSessions"`
 }
 
+type Users struct {
+	AllUsernames []string `json:"AllUsernames"`
+}
+
 var LBConn *rpc.Client
 var CurrentSessions []string
+var AllUsernames []string
 var logger *log.Logger
 
 func main() {
@@ -46,10 +51,12 @@ func main() {
 	LBConn = lbConn
 
 	CurrentSessions = make([]string, 0)
+	AllUsernames = make([]string, 0)
 
 	http.Handle("/", http.FileServer(http.Dir("./public")))
 	http.HandleFunc("/register", RegisterHandler)
 	http.HandleFunc("/sessions", SessionHandler)
+	http.HandleFunc("/usernames", UsernameHandler)
 	logger.Println("Listening on: ", PORT)
 	http.ListenAndServe(PORT, nil)
 }
@@ -72,11 +79,28 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		logger.Println("Form: ", r.Form)
 		var sessID string
 		sessRadio := r.FormValue("sessionRadio")
+		userRadio := r.FormValue("userRadio")
 		if sessRadio == "existing" {
 			sessID = r.FormValue("existingSession")
 		} else {
 			sessID = r.FormValue("session")
 		}
+		newUser := true
+		var username string
+		if userRadio == "new" {
+			username = r.FormValue("newUser")
+			for _, recUsername := range AllUsernames {
+				if username == recUsername {
+					newUser = false
+				}
+			}
+			if newUser {
+				AllUsernames = append(AllUsernames, username)
+			}
+		} else {
+			username = r.FormValue("existingUser")
+		}
+
 		var retWorkerIP string
 		err = LBConn.Call("LBServer.RegisterNewClient", sessID, &retWorkerIP)
 		if err != nil {
@@ -97,6 +121,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		if newSession {
 			CurrentSessions = append(CurrentSessions, sessID)
 		}
+
 	}
 }
 
@@ -107,5 +132,15 @@ func SessionHandler(w http.ResponseWriter, r *http.Request) {
 		sessions.ExistingSessions = CurrentSessions
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		json.NewEncoder(w).Encode(sessions)
+	}
+}
+
+// Function to return any active or inactive username for the user to choose from
+func UsernameHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		users := *new(Users)
+		users.AllUsernames = AllUsernames
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		json.NewEncoder(w).Encode(users)
 	}
 }
