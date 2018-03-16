@@ -1,3 +1,5 @@
+INDENT = '\n';
+
 crdt 	= new Array();
 mapping = [];
 
@@ -81,7 +83,7 @@ function handleChange(change) {
 	if (change.origin == "+input") {
 		var inputChar;
 		if (change.text.length == 2 && change.text[0] == '' && change.text[1] == '') {
-			inputChar = '\n';
+			inputChar = INDENT;
 		} else {
 			inputChar = change.text[0];
 		}
@@ -89,10 +91,6 @@ function handleChange(change) {
 		handleInput(line, pos, inputChar);
 	} else if (change.origin == '+delete') {
 		// TODO deal with block deletion, or at least find a way to avoid it
-		// if (change.from.line == change.to.line - 1) {
-		// 	line = change.from.line;
-		// 	pos = change.from.ch;
-		// }
 
 		handleRemove(line, pos);
 	}
@@ -115,7 +113,7 @@ function handleInput(line, pos, val) {
 		const elem = mapping[line][pos];
 		const thisElem = crdt[elem];
 
-		if (thisElem !== undefined && thisElem.val == '\n' && thisElem.val == val) {
+		if (thisElem !== undefined && thisElem.val == INDENT && thisElem.val == val) {
 			newLine = true;
 
 			line = line + 1;
@@ -129,15 +127,15 @@ function handleInput(line, pos, val) {
 	const prevElem = getPrevElem(line, pos);
 	const prev = prevElem ? prevElem.id : undefined;
 	if (prevElem != undefined) {
-		prevElem.setNext(id);
+		prevElem.next = id;
 	}
 
 	// Get next element and set this to its previous element,
-	//	then shift the mappings to add this element.
+	// then shift the mappings to add this element.
 	const nextElem = getNextElem(line, pos);
 	const next = nextElem ? nextElem.id : undefined;
 	if (nextElem != undefined) {
-		nextElem.setPrev(id);
+		nextElem.prev = id;
 
 		if (newLine == false) {
 			mapping[line].splice(pos, 0, id);
@@ -146,6 +144,7 @@ function handleInput(line, pos, val) {
 
 	const elem = new Element(id, prev, next, val, false);
 
+	// Update CRDT and mapping.
 	crdt[id] = elem;
 	mapping[line][pos] = id;
 
@@ -155,7 +154,7 @@ function handleInput(line, pos, val) {
 }
 
 /**
-	TODO
+	Set the CRDT element to deleted and removes the mapping;
 */
 function handleRemove(line, pos) {
 	const id = mapping[line][pos];
@@ -210,6 +209,9 @@ function getNextElem(line, pos) {
 	return crdt[next];
 }
 
+/**
+	Converts the CRDT to a 2D mapping array.
+*/
 function crdtToMapping(_crdt) {
 	var _mapping = [];
 
@@ -221,12 +223,12 @@ function crdtToMapping(_crdt) {
 			if (lastLine == undefined) {
 				_mapping.push([]);
 				curLine = 0;
-			} else if (lastVal == '\n') {
+			} else if (lastVal == INDENT) {
 				_mapping.push([]);
 				curLine = lastLine + 1;
 			}
 
-			if (lastPos == undefined || lastVal == '\n') { 
+			if (lastPos == undefined || lastVal == INDENT) { 
 				curPos = 0;
 			} else {
 				curPos = lastPos + 1;
@@ -245,6 +247,9 @@ function crdtToMapping(_crdt) {
 	return _mapping;
 }
 
+/**
+	Converts a 2D mapping array with its associated crdt to a string.
+*/
 function mappingToSnippet(_mapping, _crdt) {
 	var snippet = "";
 
@@ -257,6 +262,9 @@ function mappingToSnippet(_mapping, _crdt) {
 	return snippet;
 }
 
+/**
+	Converts a CRDT to a string.
+*/
 function crdtToSnippet(_crdt) {
 	var mapping = crdtToMapping(_crdt);
 	var snippet = mappingToSnippet(mapping, _crdt);
@@ -264,6 +272,9 @@ function crdtToSnippet(_crdt) {
 	return snippet;
 }
 
+/**
+	Gets the first element of the sequence CRDT.
+*/
 function getStartElem() {
 	var start = null;
 
@@ -279,6 +290,9 @@ function getStartElem() {
 	return start;
 }
 
+/**
+	Checks if the CRDT matches the editors value.
+*/
 function verifyConsistent() {
 	var snippet = editor.getValue();
 	var _snippet = crdtToSnippet(crdt);
@@ -288,6 +302,7 @@ function verifyConsistent() {
 	}
 }
 
+/** Unused: might delete */
 function getPos(line, ch) {
 	var pos = 0;
 
@@ -298,7 +313,7 @@ function getPos(line, ch) {
 			_line.forEach(function(id){
 				const val = crdt[id].val;
 
-				if (val != '\n') pos++;
+				if (val != INDENT) pos++;
 				if (val.length >= ch) return;
 			});
 		}
