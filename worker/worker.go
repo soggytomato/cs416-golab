@@ -42,7 +42,7 @@ type Worker struct {
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
 	crdt             map[string]*Operation
-	localOps         map[string]*Operation
+	localOps         []Operation
 	nextOpNumber     int
 	crdtLastID       string
 	crdtFirstID      string
@@ -81,6 +81,8 @@ const INITIAL_ID string = "12345"
 
 func main() {
 	gob.Register(&net.TCPAddr{})
+	gob.Register([]Operation{})
+	gob.Register(&Operation{})
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
@@ -95,7 +97,6 @@ func (w *Worker) init() {
 	w.serverAddr = args[0]
 	w.workers = make(map[string]*rpc.Client)
 	w.crdt = make(map[string]*Operation)
-	w.localOps = make(map[string]*Operation)
 	w.nextOpNumber = 1
 }
 
@@ -114,12 +115,12 @@ func (w *Worker) listenRPC() {
 	checkError(err)
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err)
+	rpc.Register(w)
 	w.localRPCAddr = listener.Addr()
 	w.logger.Println("listening on: ", listener.Addr().String())
 	go func() {
 		for {
 			conn, _ := listener.Accept()
-			w.logger.Println("New connection!")
 			go rpc.ServeConn(conn)
 		}
 	}()
@@ -152,7 +153,7 @@ func (w *Worker) getWorkers() {
 	var addrSet []net.Addr
 	for workerAddr, workerCon := range w.workers {
 		isConnected := false
-		workerCon.Call("Worker.PingMiner", "", &isConnected)
+		workerCon.Call("Worker.PingWorker", "", &isConnected)
 		if !isConnected {
 			delete(w.workers, workerAddr)
 		}
@@ -212,20 +213,25 @@ func (w *Worker) addRight(prevID, content string) error {
 	}
 	opID := strconv.Itoa(w.nextOpNumber) + strconv.Itoa(w.workerID)
 	newOperation := &Operation{strconv.Itoa(w.workerID), INSERT, opID, prevID, "", content}
-	if w.firstCRDTEntry(opID) {
-		w.addOpAndIncrementCounter(newOperation, opID)
+	w.addToCRDT(newOperation)
+	return nil
+}
+
+func (w *Worker) addToCRDT(newOperation *Operation) error {
+	if w.firstCRDTEntry(newOperation.ID) {
+		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
 		return nil
 	}
-	if w.replacingFirstOp(newOperation, prevID, opID) {
-		w.addOpAndIncrementCounter(newOperation, opID)
+	if w.replacingFirstOp(newOperation, newOperation.PrevID, newOperation.ID) {
+		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
 		return nil
 	}
-	if w.replacingLastOp(newOperation, prevID, opID) {
-		w.addOpAndIncrementCounter(newOperation, opID)
+	if w.replacingLastOp(newOperation, newOperation.PrevID, newOperation.ID) {
+		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
 		return nil
 	}
-	w.normalInsert(newOperation, prevID, opID)
-	w.addOpAndIncrementCounter(newOperation, opID)
+	w.normalInsert(newOperation, newOperation.PrevID, newOperation.ID)
+	w.addOpAndIncrementCounter(newOperation, newOperation.ID)
 	return nil
 }
 
@@ -279,18 +285,18 @@ func (w *Worker) replacingLastOp(newOperation *Operation, prevID, opID string) b
 
 // Any other insert that doesn't take place at the beginning or end is handled here
 func (w *Worker) normalInsert(newOperation *Operation, prevID, opID string) {
-	fmt.Println("should be a normal insert")
 	prevOp := w.crdt[prevID]
 	newOperation.NextID = prevOp.NextID
 	prevOp.NextID = opID
-	fmt.Println(prevOp)
 }
 
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
 // number can be incremented
 func (w *Worker) addOpAndIncrementCounter(newOperation *Operation, opID string) {
 	w.crdt[opID] = newOperation
+	w.localOps = append(w.localOps, *newOperation)
 	w.nextOpNumber++
+	w.sendLocalOps()
 }
 
 // Establishes RPC connections with workers in addrs array
@@ -313,22 +319,50 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 	}
 }
 
-func (w *Worker) BidirectionalSetup(request *WorkerRequest, response *WorkerResponse) error {
 
+func (w *Worker) sendLocalOps() error {
+	// w.getWorkers() // checks all workers, connects to more if needed
+	request := new(WorkerRequest)
+	request.Payload = make([]interface{}, 1)
+	request.Payload[0] = w.localOps
+	response := new(WorkerResponse)
+	for workerAddr, workerCon := range w.workers {
+		isConnected := false
+		workerCon.Call("Worker.PingWorker", "", &isConnected)
+		if isConnected {
+			go workerCon.Call("Worker.ApplyIncomingOps", request, response)
+		} else {
+			delete(w.workers, workerAddr)
+		}
+	}
+	w.localOps = nil
+	return nil
+}
+
+func (w *Worker) ApplyIncomingOps(request *WorkerRequest, response *WorkerResponse) error {
+	incomingOps := request.Payload[0].([]Operation)
+	for _, op := range incomingOps {
+		if w.crdt[op.ID] == nil {
+			w.addToCRDT(&op)
+		}
+	}
+	return nil
+}
+
+func (w *Worker) BidirectionalSetup(request *WorkerRequest, response *WorkerResponse) error {
 	workerAddr := request.Payload[0].(string)
 	workerConn, err := rpc.Dial("tcp", workerAddr)
 	if err != nil {
 		delete(w.workers, workerAddr)
 	} else {
 		w.workers[workerAddr] = workerConn
-		w.logger.Println("birectional setup complete")
 	}
 	return nil
 }
 
 // Pings all workers currently listed in the worker map
 // If a connected worker fails to reply, that worker should be removed from the map
-func (w *Worker) PingMiner(payload string, reply *bool) error {
+func (w *Worker) PingWorker(payload string, reply *bool) error {
 	*reply = true
 	return nil
 }
