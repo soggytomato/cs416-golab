@@ -1,14 +1,17 @@
 crdt 	= new Array();
 mapping = [];
 
+lastChange = 0;
+
 $(document).ready(function(){
 	editor = CodeMirror.fromTextArea(document.getElementById("code"), {
 		theme: "dracula",
 		matchBrackets: true,
-		indentUnit: 0,
+		indentUnit: 4,
 		tabSize: 4,
-		indentWithTabs: false,
+		indentWithTabs: true,
 		electricChars: false,
+		smartIndent : false,
 		mode: "text/x-go"
 	});
 
@@ -16,15 +19,29 @@ $(document).ready(function(){
 	// Handles all user inputs before they are applied to the editor.
 	editor.on('beforeChange', 
 		function(cm, change){
-			handleChange(change);
+			const curTime = Date.now();
+
+			if (curTime == lastChange) {
+				setTimeout(function(){
+					lastChange = Date.now();
+					handleChange(change);
+				}, 1);
+			} else {
+				lastChange = curTime;
+				handleChange(change);
+			}
 		}
 	);
 
 	if (debugMode) {
 		// Verifies snippet after processing handle.
-		editor.on('change', function(cm, change){
-			verifyConsistent();
-		});
+		editor.on('change', 
+			function(cm, change){
+				setTimeout(function(){
+					verifyConsistent();
+				}, 100);
+			}
+		);
 	}
 });
 
@@ -59,7 +76,7 @@ class Element {
 */
 function handleChange(change) {
 	const line = change.from.line;
-	const pos = getPos(line, change.from.ch);
+	const pos  = change.from.ch;
 
 	if (change.origin == "+input") {
 		var inputChar;
@@ -259,14 +276,19 @@ function verifyConsistent() {
 function getPos(line, ch) {
 	var pos = 0;
 
-	const _line = mapping[line];
-	if (_line !== undefined && _line.length > 0) {
-		_line.forEach(function(id){
-			const val = crdt[id].val;
+	const tokens = editor.getLineTokens(line);
+	if (tokens[0] && tokens[0].end == ch) {
+		const _line = mapping[line];
+		if (_line !== undefined && _line.length > 0) {
+			_line.forEach(function(id){
+				const val = crdt[id].val;
 
-			if (val != '\n') pos++;
-			if (val.length >= ch) return;
-		});
+				if (val != '\n') pos++;
+				if (val.length >= ch) return;
+			});
+		}
+	} else {
+		pos = ch;
 	}
 
 	return pos;
