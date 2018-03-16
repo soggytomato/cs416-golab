@@ -75,8 +75,8 @@ class Element {
 		  entered/removed is always no more than one character. 
 */
 function handleChange(change) {
-	const line = change.from.line;
-	const pos  = change.from.ch;
+	var line = change.from.line;
+	var pos  = change.from.ch;
 
 	if (change.origin == "+input") {
 		var inputChar;
@@ -88,10 +88,13 @@ function handleChange(change) {
 
 		handleInput(line, pos, inputChar);
 	} else if (change.origin == '+delete') {
-		// Temporary hack so that block deletion doesnt complain
-		if (change.removed) {
-			handleRemove(line, pos, change.removed[0]);
-		}
+		// TODO deal with block deletion, or at least find a way to avoid it
+		// if (change.from.line == change.to.line - 1) {
+		// 	line = change.from.line;
+		// 	pos = change.from.ch;
+		// }
+
+		handleRemove(line, pos);
 	}
 }
 
@@ -141,7 +144,7 @@ function handleInput(line, pos, val) {
 		}
 	}
 
-	const elem = new Element(id, prev, next, val);
+	const elem = new Element(id, prev, next, val, false);
 
 	crdt[id] = elem;
 	mapping[line][pos] = id;
@@ -154,9 +157,19 @@ function handleInput(line, pos, val) {
 /**
 	TODO
 */
-function handleRemove(line, pos, val) {
+function handleRemove(line, pos) {
+	const id = mapping[line][pos];
+	const elem = crdt[id];
+
+	elem.del = true;
+	if (mapping[line].length > 0) {
+		mapping[line].splice(pos, 1);
+	} else {
+		delete mapping[line];
+	}
+
 	if (debugMode) {
-		console.log("Observed remove at line: " + line + " pos: " + pos + " char: " + unescape(val));
+		console.log("Observed remove at line: " + line + " pos: " + pos);
 	}
 }
 
@@ -200,29 +213,31 @@ function getNextElem(line, pos) {
 function crdtToMapping(_crdt) {
 	var _mapping = [];
 
-	var curElem = getStartElemID();
+	var curElem = getStartElem();
 	var lastVal, lastPos, lastLine;
 	while (curElem != undefined) {
-		var curLine, curPos;
-		if (lastLine == undefined) {
-			_mapping.push([]);
-			curLine = 0;
-		} else if (lastVal == '\n') {
-			_mapping.push([]);
-			curLine = lastLine + 1;
+		if (curElem.del !== true) {
+			var curLine, curPos;
+			if (lastLine == undefined) {
+				_mapping.push([]);
+				curLine = 0;
+			} else if (lastVal == '\n') {
+				_mapping.push([]);
+				curLine = lastLine + 1;
+			}
+
+			if (lastPos == undefined || lastVal == '\n') { 
+				curPos = 0;
+			} else {
+				curPos = lastPos + 1;
+			}
+
+			_mapping[curLine][curPos] = curElem.id;
+
+			lastVal = curElem.val;
+			lastPos = curPos;
+			lastLine = curLine;
 		}
-
-		if (lastPos == undefined || lastVal == '\n') { 
-			curPos = 0;
-		} else {
-			curPos = lastPos + 1;
-		}
-
-		_mapping[curLine][curPos] = curElem.id;
-
-		lastVal = curElem.val;
-		lastPos = curPos;
-		lastLine = curLine;
 
 		curElem = _crdt[curElem.next];
 	}
@@ -249,7 +264,7 @@ function crdtToSnippet(_crdt) {
 	return snippet;
 }
 
-function getStartElemID() {
+function getStartElem() {
 	var start = null;
 
 	const ids = Object.keys(crdt);
