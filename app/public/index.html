@@ -39,72 +39,67 @@
             <span class="title title-text">GoLab</span>
             <button type="button" class="btn btn-default btn-lg mb-2 execute">
               <img src="img/play-circle.svg" alt="play-circle" class="btn-icon"><span>Execute</span>
-            </button>  
+            </button>
             <div class="logs-wrapper">
                 <span class="subtitle">Logs:</span>
                 <div class="logs"></div>
-            </div>         
+            </div>
         </div>
     </div>
 
     <div class="container register">
-      <h2 class="title title-text">Welcome to GoLab</h2>
-      <form id="register"> <!--method="POST" action="/register" -->
-        <div class="form-group user-group">
-            <label for="usr">Username:</label>
-            <div class="form-group user-radio-select">
-              <div class="form-check form-check-inline">
-                  <label class="form-check-label">
+        <h2 class="title title-text">Welcome to GoLab</h2>
+        <form id="register">
+            <!--method="POST" action="/register" -->
+            <div class="form-group user-group">
+                <label for="usr">Username:</label>
+                <div class="form-group user-radio-select">
+                    <div class="form-check form-check-inline">
+                        <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="userRadio" id="newUserRadio" value="new"> New User
                   </label>
-                </div>
-                <div class="form-check form-check-inline">
-                  <label class="form-check-label">
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="userRadio" id="existingUserRadio" value="existing" checked> Existing User
                   </label>
+                    </div>
+                </div>
+                <div class="form-group new-user-group" style="display:none">
+                    <input type="text" class="form-control" id="userInput" placeholder="Enter Username" name="newUser">
+                </div>
+                <div class="form-group select-user-group">
+                    <select name="existingUser" id="userSelect" class="custom-select user-select" autocomplete='tel'>
+                  <option disabled selected placeholder>Select Username</option>
+                </select>
                 </div>
             </div>
-            <div class="form-group new-user-group" style="display:none">
-                <input type="text" class="form-control" id="userInput" placeholder="Enter Username" name="newUser">
-            </div>
-            <div class="form-group select-user-group">
-                <select name="existingUser" id="userSelect" class="custom-select user-select" autocomplete='tel'>
-                  <option disabled selected placeholder>Select Username</option>
-                  <option value="user1">user1</option>
-                  <option value="user2">user2</option>
-                  <option value="user3">user3</option>
-                </select>
-            </div>
-        </div>
-      
-        <div class="form-group session-group">
-            <label for="usr">Session:</label>
-            <div class="form-group session-radio-select">
-              <div class="form-check form-check-inline">
-                  <label class="form-check-label">
+
+            <div class="form-group session-group">
+                <label for="usr">Session:</label>
+                <div class="form-group session-radio-select">
+                    <div class="form-check form-check-inline">
+                        <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="sessionRadio" id="newSessionRadio" value="new"> New Session
                   </label>
-                </div>
-                <div class="form-check form-check-inline">
-                  <label class="form-check-label">
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <label class="form-check-label">
                     <input class="form-check-input" type="radio" name="sessionRadio" id="existingSessionRadio" value="existing" checked> Existing Session
                   </label>
+                    </div>
+                </div>
+                <div class="form-group new-session-group" style="display:none">
+                    <input type="text" class="form-control" id="sessionInput" placeholder="Enter Session ID" name="session">
+                </div>
+                <div class="form-group select-session-group">
+                    <select name="existingSession" id="sessionSelect" class="custom-select user-select" autocomplete='tel'>
+                  <option disabled selected placeholder>Select Session</option>
+                </select>
                 </div>
             </div>
-            <div class="form-group new-session-group" style="display:none">
-                <input type="text" class="form-control" id="sessionInput" placeholder="Enter Session ID" name="session">
-            </div>
-            <div class="form-group select-session-group">
-                <select name="existingSession" id="sessionSelect" class="custom-select user-select" autocomplete='tel'>
-                  <option disabled selected placeholder>Select Session</option>
-                  <option value="session1">session1</option>
-                  <option value="session2">session2</option>
-                  <option value="session3">session3</option>
-                </select>
-            </div>
-        </div>
-        <button id="submitForm" class="btn btn-default">Submit</button>
-      </form>
+            <button id="submitForm" class="btn btn-default">Submit</button>
+        </form>
     </div>
 </body>
 
