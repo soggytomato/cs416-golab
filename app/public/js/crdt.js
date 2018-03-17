@@ -1,4 +1,5 @@
 RETURN 	= '\n';
+SPACE 	= ' ';
 TAB 	= '\t';
 
 crdt 	= new Array();
@@ -13,7 +14,7 @@ $(document).ready(function(){
 		indentUnit: 4,
 		tabSize: 4,
 		indentWithTabs: true,
-		electricChars: false,
+		electricChars: true,
 		smartIndent : false,
 		mode: "text/x-go"
 	});
@@ -97,6 +98,9 @@ function handleChange(change) {
 			}
 
 			return;
+		} // Some weird CodeMirror shit
+		else if (change.text[0] == '') {
+			return;
 		} // Is this every other case? 
 		else {
 			inputChar = change.text[0];
@@ -116,65 +120,51 @@ function handleChange(change) {
 function handleInput(line, pos, val) {
 	var newLine = false;
 
+	// Assign an ID
 	const id = getID();
 
-	// Update the mapping if we have a non-generic input
-	// (ie. indenting new line or adding a carriage return).
-	const _line = mapping[line];
-	if (_line === undefined) {
-		mapping.push([]);
-	} else {
-		const elem = _line[pos];
-		const thisElem = crdt[elem];
+	if (mapping[line] === undefined) mapping.push([]);
 
-		// If an element exists at this (line, pos), its either a 
-		// carriage return or some part of the line.
-		if (thisElem !== undefined) {
-			if (thisElem.val == RETURN && val == RETURN) {
-				// If we are adding another carriage return at the end the line
-				// then add the line and increment the operating line and pos.
+	var prevElem, nextElem, prev, next;
+	prevElem = getPrevElem(line, pos);
+	if (prevElem !== undefined) {
+		prev = prevElem.id;
+		next = prevElem.next;
 
-				newLine = true;
-
-				line = line + 1;
-				pos = 0;
-
-				mapping.splice(line, 0, []);
-			} else {
-				// Otherwise we are adding a carriage return, which
-				// requires splitting this line and moving down.
-				const chars = _line.splice(pos, _line.length - pos);
-
-				mapping.splice(line + 1, 0, []);
-				mapping[line + 1] = chars;
-			}
-		}
-	}
-
-	// Get the previous element and set this to its next element;
-	const prevElem = getPrevElem(line, pos);
-	const prev = prevElem ? prevElem.id : undefined;
-	if (prevElem != undefined) {
 		prevElem.next = id;
+	} else {
+		next = mapping[line][pos];
 	}
 
-	// Get next element and set this to its previous element,
-	// then shift the mappings to add this element.
-	const nextElem = getNextElem(line, pos);
-	const next = nextElem ? nextElem.id : undefined;
-	if (nextElem != undefined) {
+	if (next !== undefined) {
+		nextElem = crdt[next];
+
 		nextElem.prev = id;
-
-		if (newLine == false) {
-			mapping[line].splice(pos, 0, id);
-		}
 	}
 
+	// Update CRDT
 	const elem = new Element(id, prev, next, val, false);
-
-	// Update CRDT and mapping.
 	crdt[id] = elem;
-	mapping[line][pos] = id;
+
+	// Update the mapping.
+	const _line = mapping[line];
+	const thisElem = crdt[_line[pos]];
+
+	// If an element exists at this (line, pos), its either a 
+	// carriage return or any other type of character.
+	if (thisElem !== undefined && val == RETURN) {
+
+		// Add a new line right after this one.
+		mapping.splice(line + 1, 0, []);
+
+		// Move all elements beyong this position down.
+		const chars = _line.splice(pos, _line.length - pos);
+		mapping[line + 1] = chars;
+		stripLeadingWhitespace(line+1);
+	}
+
+	// Update mapping
+	mapping[line].splice(pos, 0, id);
 
 	if (debugMode) {
 		console.log("Observed input at line: " + line + " pos: " + pos + " char: " + unescape(val));		
@@ -223,14 +213,16 @@ function getPrevElem(line, pos) {
 
 /**
 	Get the next element based on te insertion at the line and pos.
+
+	Assumes the current element is already in the mapping.
 */
 function getNextElem(line, pos) {
 	var next = undefined;
 
 	const _line = mapping[line];
-	if (_line.length > 0 && _line[pos] !== undefined) {
-		next = _line[pos];
-	} else if (_line[pos] == undefined && mapping[line+1] !== undefined) {
+	if (_line.length > 0 && _line[pos + 1] !== undefined) {
+		next = _line[pos + 1];
+	} else if (_line[pos + 1] == undefined && mapping[line+1] !== undefined) {
 		next = mapping[line + 1][0];
 	} else {
 		if (mapping[line+1] !== undefined) {
@@ -356,5 +348,53 @@ function getID() {
 	return id;
 }
 
+/**
+	Converts a mapping line (array of IDs) to an array
+	of values from the CRDT.
+*/
+function mappingLineToValArray(line) {
+	var valArray = [];
+
+	line.forEach(function(id, i){
+		valArray[i] = crdt[id].val;
+	});
+
+	return valArray;
+}
+
+/**
+	Replaces all IDs with values.
+*/
+function getValMapping(_mapping) {
+	var valMapping = [];
+
+	_mapping.forEach(function(line, i){
+		valMapping.push([]);
+		valMapping[i] = mappingLineToValArray(line);
+	});
+
+	return valMapping;
+}
+
+/**
+	Returns array without leading white space.
+*/
+function stripLeadingWhitespace(line) {
+	var arr = [];
+	var nextIndex = 0;
+
+	mapping[line].forEach(function(id, i){
+		const elem = crdt[id];
+		const val = elem.val;
+		if (val.trim().length > 0 || val == RETURN || val == SPACE) {
+			arr[nextIndex] = id;
+			nextIndex++;
+		} else {
+			elem.del = true;
+		}
+	});
+
+	mapping[line] = arr;
+}
 
 
