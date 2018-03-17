@@ -1,4 +1,5 @@
-INDENT = '\n';
+INDENT 	= '\n';
+TAB 	= '\t';
 
 crdt 	= new Array();
 mapping = [];
@@ -84,6 +85,14 @@ function handleChange(change) {
 		var inputChar;
 		if (change.text.length == 2 && change.text[0] == '' && change.text[1] == '') {
 			inputChar = INDENT;
+		} else if (change.text[0].includes(TAB) && change.text[0].length > 1) {
+			for (var i = 0; i < change.text[0].length; i++) {
+				var _pos = 0 + i;
+
+				_.delay(handleInput, i + 1, line, _pos, TAB);
+			}
+
+			return;
 		} else {
 			inputChar = change.text[0];
 		}
@@ -102,8 +111,7 @@ function handleChange(change) {
 function handleInput(line, pos, val) {
 	var newLine = false;
 
-	// Create UID based on the current time and userID.
-	const id = userID + '_' + Date.now();
+	const id = getID();
 
 	// Add new line to mapping if necessary.
 	if (mapping[line] === undefined) {
@@ -159,6 +167,8 @@ function handleInput(line, pos, val) {
 function handleRemove(line, pos) {
 	const id = mapping[line][pos];
 	const elem = crdt[id];
+
+	if (elem === undefined) return;
 
 	elem.del = true;
 	if (mapping[line].length > 0) {
@@ -299,6 +309,9 @@ function verifyConsistent() {
 
 	if (snippet != _snippet) {
 		console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
+		return false;
+	} else {
+		return true;
 	}
 }
 
@@ -324,7 +337,24 @@ function getPos(line, ch) {
 	return pos;
 }
 
+/**
+	Create UID based on the current time and userID.
+*/
+function getID() {
+	var id = userID + '_' + Date.now() + '_0';
 
+	const elem = crdt[id];
+	if (elem !== undefined) {
+		var i = 1;
+		while (crdt[id + '_' + i] !== undefined) {
+			i++;
+		}
+
+		id = id + '_' + i;
+	}
+
+	return id;
+}
 
 
 
