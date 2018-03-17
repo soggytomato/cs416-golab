@@ -44,7 +44,6 @@ type Worker struct {
 	crdt             map[string]*Operation
 	localOps         []Operation
 	nextOpNumber     int
-	crdtLastID       string
 	crdtFirstID      string
 }
 
@@ -89,6 +88,7 @@ func main() {
 	worker.listenRPC()
 	worker.registerWithLB()
 	worker.getWorkers()
+	go worker.sendLocalOps()
 	worker.workerPrompt()
 }
 
@@ -183,8 +183,8 @@ func (w *Worker) getMessage() string {
 	var buffer bytes.Buffer
 	firstOp := w.crdt[w.crdtFirstID]
 	for firstOp != nil {
-		buffer.WriteString(firstOp.Text)
 		fmt.Println(firstOp.ID, "->", firstOp.Text)
+		buffer.WriteString(firstOp.Text)
 		firstOp = w.crdt[firstOp.NextID]
 	}
 	return buffer.String()
@@ -199,6 +199,8 @@ func (w *Worker) handleCommand(cmd string) int {
 		if checkError(err) != nil {
 			return 0
 		}
+	case "refresh":
+		return 0
 	default:
 		fmt.Println(" Invalid command.")
 	}
@@ -226,10 +228,6 @@ func (w *Worker) addToCRDT(newOperation *Operation) error {
 		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
 		return nil
 	}
-	if w.replacingLastOp(newOperation, newOperation.PrevID, newOperation.ID) {
-		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
-		return nil
-	}
 	w.normalInsert(newOperation, newOperation.PrevID, newOperation.ID)
 	w.addOpAndIncrementCounter(newOperation, newOperation.ID)
 	return nil
@@ -248,7 +246,6 @@ func (w *Worker) prevIDExists(prevID string) bool {
 func (w *Worker) firstCRDTEntry(opID string) bool {
 	if len(w.crdt) <= 0 {
 		w.crdtFirstID = opID
-		w.crdtLastID = opID
 		return true
 	} else {
 		return false
@@ -269,20 +266,6 @@ func (w *Worker) replacingFirstOp(newOperation *Operation, prevID, opID string) 
 	}
 }
 
-// If your character is placed at the end of the message, it nees to become the new
-// lastOp to iterate properly (maybe not needed now that I've made it doubly-linked)
-func (w *Worker) replacingLastOp(newOperation *Operation, prevID, opID string) bool {
-	if prevID == w.crdtLastID {
-		lastOp := w.crdt[w.crdtLastID]
-		lastOp.NextID = opID
-		newOperation.PrevID = w.crdtLastID
-		w.crdtLastID = opID
-		return true
-	} else {
-		return false
-	}
-}
-
 // Any other insert that doesn't take place at the beginning or end is handled here
 func (w *Worker) normalInsert(newOperation *Operation, prevID, opID string) {
 	prevOp := w.crdt[prevID]
@@ -293,10 +276,10 @@ func (w *Worker) normalInsert(newOperation *Operation, prevID, opID string) {
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
 // number can be incremented
 func (w *Worker) addOpAndIncrementCounter(newOperation *Operation, opID string) {
-	w.crdt[opID] = newOperation
-	w.localOps = append(w.localOps, *newOperation)
+	deepCopyOp := &Operation{newOperation.ClientID, newOperation.Type, newOperation.ID, newOperation.PrevID, newOperation.NextID, newOperation.Text}
+	w.crdt[opID] = deepCopyOp
+	w.localOps = append(w.localOps, *deepCopyOp)
 	w.nextOpNumber++
-	w.sendLocalOps()
 }
 
 // Establishes RPC connections with workers in addrs array
@@ -321,21 +304,24 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 
 
 func (w *Worker) sendLocalOps() error {
-	// w.getWorkers() // checks all workers, connects to more if needed
-	request := new(WorkerRequest)
-	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = w.localOps
-	response := new(WorkerResponse)
-	for workerAddr, workerCon := range w.workers {
-		isConnected := false
-		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		if isConnected {
-			go workerCon.Call("Worker.ApplyIncomingOps", request, response)
-		} else {
-			delete(w.workers, workerAddr)
+	for {
+		time.Sleep(time.Second * 10)
+		// w.getWorkers() // checks all workers, connects to more if needed
+		request := new(WorkerRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = w.localOps
+		response := new(WorkerResponse)
+		for workerAddr, workerCon := range w.workers {
+			isConnected := false
+			workerCon.Call("Worker.PingWorker", "", &isConnected)
+			if isConnected {
+				workerCon.Call("Worker.ApplyIncomingOps", request, response)
+			} else {
+				delete(w.workers, workerAddr)
+			}
 		}
+		w.localOps = nil
 	}
-	w.localOps = nil
 	return nil
 }
 
