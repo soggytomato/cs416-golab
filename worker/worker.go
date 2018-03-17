@@ -104,6 +104,7 @@ func (w *Worker) listenRPC() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err)
 	w.localRPCAddr = listener.Addr()
+	rpc.Register(w)
 	w.externalIP = externalIP
 	w.logger.Println("listening for RPC on: ", listener.Addr().String())
 	go func() {
