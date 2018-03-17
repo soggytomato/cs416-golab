@@ -1,4 +1,4 @@
-INDENT 	= '\n';
+RETURN 	= '\n';
 TAB 	= '\t';
 
 crdt 	= new Array();
@@ -83,9 +83,13 @@ function handleChange(change) {
 
 	if (change.origin == "+input") {
 		var inputChar;
+
+		// Is this a return case?
 		if (change.text.length == 2 && change.text[0] == '' && change.text[1] == '') {
-			inputChar = INDENT;
-		} else if (change.text[0].includes(TAB) && change.text[0].length > 1) {
+			inputChar = RETURN;
+		} // Is this an indent case? 
+		else if (change.text[0].includes(TAB) && change.text[0].length > 1) {
+			// Break every tab into individual tabs.
 			for (var i = 0; i < change.text[0].length; i++) {
 				var _pos = 0 + i;
 
@@ -93,7 +97,8 @@ function handleChange(change) {
 			}
 
 			return;
-		} else {
+		} // Is this every other case? 
+		else {
 			inputChar = change.text[0];
 		}
 
@@ -113,21 +118,36 @@ function handleInput(line, pos, val) {
 
 	const id = getID();
 
-	// Add new line to mapping if necessary.
-	if (mapping[line] === undefined) {
+	// Update the mapping if we have a non-generic input
+	// (ie. indenting new line or adding a carriage return).
+	const _line = mapping[line];
+	if (_line === undefined) {
 		mapping.push([]);
 	} else {
-		// Check if we are adding another indent.
-		const elem = mapping[line][pos];
+		const elem = _line[pos];
 		const thisElem = crdt[elem];
 
-		if (thisElem !== undefined && thisElem.val == INDENT && thisElem.val == val) {
-			newLine = true;
+		// If an element exists at this (line, pos), its either a 
+		// carriage return or some part of the line.
+		if (thisElem !== undefined) {
+			if (thisElem.val == RETURN && val == RETURN) {
+				// If we are adding another carriage return at the end the line
+				// then add the line and increment the operating line and pos.
 
-			line = line + 1;
-			pos = 0;
+				newLine = true;
 
-			mapping.splice(line, 0, []);
+				line = line + 1;
+				pos = 0;
+
+				mapping.splice(line, 0, []);
+			} else {
+				// Otherwise we are adding a carriage return, which
+				// requires splitting this line and moving down.
+				const chars = _line.splice(pos, _line.length - pos);
+
+				mapping.splice(line + 1, 0, []);
+				mapping[line + 1] = chars;
+			}
 		}
 	}
 
@@ -208,8 +228,10 @@ function getNextElem(line, pos) {
 	var next = undefined;
 
 	const _line = mapping[line];
-	if (_line.length > 0) {
+	if (_line.length > 0 && _line[pos] !== undefined) {
 		next = _line[pos];
+	} else if (_line[pos] == undefined && mapping[line+1] !== undefined) {
+		next = mapping[line + 1][0];
 	} else {
 		if (mapping[line+1] !== undefined) {
 			next = mapping[line+1][0];
@@ -233,12 +255,12 @@ function crdtToMapping(_crdt) {
 			if (lastLine == undefined) {
 				_mapping.push([]);
 				curLine = 0;
-			} else if (lastVal == INDENT) {
+			} else if (lastVal == RETURN) {
 				_mapping.push([]);
 				curLine = lastLine + 1;
 			}
 
-			if (lastPos == undefined || lastVal == INDENT) { 
+			if (lastPos == undefined || lastVal == RETURN) { 
 				curPos = 0;
 			} else {
 				curPos = lastPos + 1;
@@ -313,28 +335,6 @@ function verifyConsistent() {
 	} else {
 		return true;
 	}
-}
-
-/** Unused: might delete */
-function getPos(line, ch) {
-	var pos = 0;
-
-	const tokens = editor.getLineTokens(line);
-	if (tokens[0] && tokens[0].end == ch) {
-		const _line = mapping[line];
-		if (_line !== undefined && _line.length > 0) {
-			_line.forEach(function(id){
-				const val = crdt[id].val;
-
-				if (val != INDENT) pos++;
-				if (val.length >= ch) return;
-			});
-		}
-	} else {
-		pos = ch;
-	}
-
-	return pos;
 }
 
 /**
