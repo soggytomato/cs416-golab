@@ -4,17 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <title>GoLab</title>
-    <link rel="stylesheet" href="css/main.css">
+    <!-- Third Party -->
     <link rel="stylesheet" href="css/jquery/jquery-ui.min.css">
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css">
     <link rel="stylesheet" href="css/codemirror/codemirror.css">
     <link rel="stylesheet" href="css/codemirror/theme/dracula.css">
     <script src="js/jquery/jquery-3.3.1.min.js"></script>
     <script src="js/jquery/jquery-ui.min.js"></script>
-    <script src="js/app.js"></script>
     <script src="js/codemirror/codemirror.js"></script>
     <script src="js/codemirror/addon/edit/matchbrackets.js"></script>
     <script src="js/codemirror/mode/go/go.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.5/lodash.min.js" integrity="sha256-YFhaeQSVBgAFNN5z4I9YRB2jCuqc2nvypz0Q2eQzcx8=" crossorigin="anonymous"></script>
+    <!-- Ours -->
+    <link rel="stylesheet" href="css/main.css">
+    <script src="js/app.js"></script>
+    <script src="js/crdt/crdt.js"></script>
+    <script src="js/crdt/mapping.js"></script>
+    <script src="js/crdt/operation.js"></script>
 </head>
 
 <body>
@@ -23,49 +29,7 @@
             <div class="input-wrapper mr-1">
                 <span class="subtitle">Snippet:</span>
                 <div class="mb-1 input">
-                    <textarea id="code" name="code" style="display:none;">
-// Prime Sieve in Go.
-// Taken from the Go specification.
-// Copyright © The Go Authors.
-
-package main
-
-import "fmt"
-
-// Send the sequence 2, 3, 4, ... to channel 'ch'.
-func generate(ch chan&lt;- int) {
-    for i := 2; ; i++ {
-        ch &lt;- i  // Send 'i' to channel 'ch'
-    }
-}
-
-// Copy the values from channel 'src' to channel 'dst',
-// removing those divisible by 'prime'.
-func filter(src &lt;-chan int, dst chan&lt;- int, prime int) {
-    for i := range src {    // Loop over values received from 'src'.
-        if i%prime != 0 {
-            dst &lt;- i  // Send 'i' to channel 'dst'.
-        }
-    }
-}
-
-// The prime sieve: Daisy-chain filter processes together.
-func sieve() {
-    ch := make(chan int)  // Create a new channel.
-    go generate(ch)       // Start generate() as a subprocess.
-    for {
-        prime := &lt;-ch
-        fmt.Print(prime, "\n")
-        ch1 := make(chan int)
-        go filter(ch, ch1, prime)
-        ch = ch1
-    }
-}
-
-func main() {
-    sieve()
-}
-                    </textarea>
+                    <textarea id="code" name="code" style="display:none;"></textarea>
                 </div>
             </div>
             <div class="output-wrapper mt-3">

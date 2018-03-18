@@ -1,18 +1,10 @@
 // Globals
+debugMode = true;
 userID = "";
 sessionID = "";
 currentSessions = [];
 
-$(document).ready(function() {
-    editor = CodeMirror.fromTextArea(document.getElementById("code"), {
-        theme: "dracula",
-        matchBrackets: true,
-        indentUnit: 8,
-        tabSize: 8,
-        indentWithTabs: true,
-        mode: "text/x-go"
-    });
-
+$(document).ready(function(){
     $('.input-wrapper').resizable({
         handles: 's',
         resize: function() {
@@ -27,6 +19,19 @@ $(document).ready(function() {
             $('.output').height(containerH - curH - $('.output-wrapper').find('span').height());
         }
     });
+
+	// Make my life easier
+	if (debugMode) {
+		userID = "user";
+		sessionID = "session";
+
+		$('.register').css('display', 'none');
+		$('.editor').slideDown('slow');
+
+		setTimeout(function(){
+			editor.refresh();
+		}, 500);
+	}
 });
 
 $(document).ready(function() {
