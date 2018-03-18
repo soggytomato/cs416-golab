@@ -76,7 +76,7 @@ $(document).ready(function(){
 */
 function handleOperation(op) {
 	var line = op.from.line;
-	var pos  = op.from.ch;
+	var ch  = op.from.ch;
 
 	const origin = op.origin;
 	if (origin == INPUT_OP) {
@@ -89,9 +89,9 @@ function handleOperation(op) {
 		else if (op.text[0].includes(TAB) && op.text[0].length > 1) {
 			// Break every tab into individual tabs.
 			for (var i = 0; i < op.text[0].length; i++) {
-				var _pos = 0 + i;
+				var _ch = 0 + i;
 
-				_.delay(handleLocalInput, i + 1, line, _pos, TAB);
+				_.delay(handleLocalInput, i + 1, line, _ch, TAB);
 			}
 
 			return;
@@ -103,32 +103,34 @@ function handleOperation(op) {
 			inputChar = op.text[0];
 		}
 
-		handleLocalInput(line, pos, inputChar);
+		handleLocalInput(line, ch, inputChar);
 	} else if (origin == DELETE_OP) {
 		// TODO deal with block deletion, or at least find a way to avoid it
 
-		handleLocalDelete(line, pos);
+		handleLocalDelete(line, ch);
 	} else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
 		const id = origin.substring(REMOTE_INPUT_OP_PREFIX.length);
 
-		mapping.update(line, pos, id);
+		mapping.update(line, ch, id);
+	} else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
+		mapping.delete(line, ch);
 	}
 }
 
 /******************************* LOCAL HANDLERS *******************************/
 
-function handleLocalInput(line, pos, val) {
+function handleLocalInput(line, ch, val) {
 	const id = CRDT.getNewID();
 
 	var prevElem, nextElem, prev, next;
-	prevElem = CRDT.get(mapping.getPreceding(line, pos));
+	prevElem = CRDT.get(mapping.getPreceding(line, ch));
 	if (prevElem !== undefined) {
 		prev = prevElem.id;
 		next = prevElem.next;
 
 		prevElem.next = id;
 	} else {
-		next = mapping.getLine(line) !== undefined ? mapping.get(line, pos) : undefined;
+		next = mapping.getLine(line) !== undefined ? mapping.get(line, ch) : undefined;
 	}
 
 	if (next !== undefined) {
@@ -140,23 +142,23 @@ function handleLocalInput(line, pos, val) {
 	// Update CRDT
 	CRDT.set(id, new Element(id, prev, next, val, false));
 
-	mapping.update(line, pos, id);
+	mapping.update(line, ch, id);
 }
 
-function handleLocalDelete(line, pos) {
+function handleLocalDelete(line, ch) {
 	if (mapping.length() == 0) return;
 
-	const id = mapping.get(line, pos);
+	const id = mapping.get(line, ch);
 	const elem = CRDT.get(id);
 
 	if (elem === undefined) return;
+	else elem.del = true;
 
-	elem.del = true;
-	if (mapping.lineLength(line) > 0) mapping.delete(line, pos); 
-	if (mapping.lineLength(line) == 0) mapping.deleteLine(line);
+	// Apply to the editor
+	mapping.delete(line, ch);
 
 	if (debugMode) {
-		console.log("Observed remove at line: " + line + " pos: " + pos);
+		console.log("Observed remove at line: " + line + " pos: " + ch);
 	}
 }
 
@@ -195,7 +197,7 @@ function handleRemoteInput(id, prevId, val) {
 
 	// Find the element in the mapping.
 	var line = 0;
-	var pos = 0;
+	var ch = 0;
 	if (prevElem !== undefined) {
 		var stop = false;
 		mapping.getLines().forEach(function(_line, i){
@@ -203,8 +205,8 @@ function handleRemoteInput(id, prevId, val) {
 				if (id == prevId) {
 					stop = true;
 
-					if (prevElem.val === RETURN) pos = 0;
-					else pos = j + 1;
+					if (prevElem.val === RETURN) ch = 0;
+					else ch = j + 1;
 
 					return;
 				}
@@ -219,7 +221,31 @@ function handleRemoteInput(id, prevId, val) {
 		});
 	}
 
-	// Set the value in the editor at the line and position.
-	const _pos = {line: line, ch: pos};
-    editor.getDoc().replaceRange(val, _pos, _pos, REMOTE_INPUT_OP_PREFIX + id);
+	// Apply to the editor
+	const pos = {line: line, ch: ch};
+    editor.getDoc().replaceRange(val, pos, pos, REMOTE_INPUT_OP_PREFIX + id);
+}
+
+function handleRemoteDelete(id) {
+	const elem = CRDT.get(id);
+
+	if (elem === undefined || elem.del == true) return;
+	else elem.del = true;
+
+	// Apply to the editor
+	const pos1 = mapping.getPosition(id);
+	var pos2 = {line: undefined, ch: undefined};
+	if (elem.val == RETURN) {
+		pos2.line = pos1.line + 1;
+		pos2.ch = 0;
+	} else {
+		pos2.line = pos1.line;
+		pos2.ch = pos1.ch + 1;
+	}
+
+	if (pos1.line != undefined && pos1.ch !== undefined) editor.getDoc().replaceRange('', pos1, pos2, REMOTE_DELETE_OP_PREFIX + id);
+
+	if (debugMode) {
+		console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
+	}
 }

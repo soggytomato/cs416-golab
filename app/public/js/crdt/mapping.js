@@ -23,16 +23,20 @@ class Mapping {
 
     // Line + Pos Functions
 
-    get(line, pos) {
-    	return this.arr[line][pos];
+    get(line, ch) {
+    	if (this.arr[line] !== undefined) return this.arr[line][ch];
+    	else return undefined;
     }
 
-    set(line, pos, id) {
-    	this.arr[line].splice(pos, 0, id);
+    set(line, ch, id) {
+    	this.arr[line].splice(ch, 0, id);
     }
 
-    delete(line, pos) {
-    	this.arr[line].splice(pos, 1);
+    delete(line, ch) {
+    	if (line != undefined && ch != undefined) {
+			if (mapping.lineLength(line) > 0) this.arr[line].splice(ch, 1); 
+			if (mapping.lineLength(line) == 0) mapping.deleteLine(line);
+		}
     }
 
     length() {
@@ -73,14 +77,14 @@ class Mapping {
 
     /*
 	Updates the mapping at the given line and pos with provided value.*/
-    update(line, pos, id) {
+    update(line, ch, id) {
 		if (mapping.getLine(line) === undefined) mapping.addLine();
 
 		const val = CRDT.get(id).val;
 		const _line = mapping.getLine(line);
-		const thisElem = CRDT.get(_line[pos]);
+		const thisElem = CRDT.get(_line[ch]);
 
-		// If an element exists at this (line, pos), its either a 
+		// If an element exists at this (line, ch), its either a 
 		// carriage return or any other type of character.
 		if (thisElem !== undefined && val == RETURN) {
 
@@ -88,28 +92,50 @@ class Mapping {
 			mapping.insertLine(line + 1);
 
 			// Move all elements beyond this position down.
-			const chars = _line.splice(pos, _line.length - pos);
+			const chars = _line.splice(ch, _line.length - ch);
 			mapping.setLine(line + 1, chars);
 			mapping.stripWhitespace(line+1);
 		}
 
 		// Update mapping
-		mapping.set(line, pos, id);
+		mapping.set(line, ch, id);
 
 		if (debugMode) {
-			console.log("Observed input at line: " + line + " pos: " + pos + " char: " + unescape(val));		
+			console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));		
 		}
+	}
+
+	getPosition(id) {
+		var line, ch;
+
+		var stop = false;
+		this.getLines().forEach(function(_line, i){
+			_line.forEach(function(_id, j){
+				if (_id == id) {
+					stop = true;
+
+					line = i;
+					ch = j;
+
+					return;
+				}
+			});
+
+			if (stop) return;
+		});
+
+		return {line: line, ch: ch};
 	}
 
 	/*
 	Get the previous element based on a line and position.*/
-	getPreceding(line, pos) {
+	getPreceding(line, ch) {
 		var prev = undefined;
 
-		if (line == 0 && pos == 0) {
+		if (line == 0 && ch == 0) {
 			// Start of snippet: undefined.
-		} else if (pos > 0) {
-			prev = mapping.get(line, pos - 1);
+		} else if (ch > 0) {
+			prev = mapping.get(line, ch - 1);
 		} else if (line > 0) {
 			const _line = mapping.getLine(line-1);
 
