@@ -149,6 +149,8 @@ function handleLocalInput(line, pos, val) {
 }
 
 function handleLocalDelete(line, pos) {
+	if (mapping.length == 0) return;
+
 	const id = mapping[line][pos];
 	const elem = CRDT[id];
 
