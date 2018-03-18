@@ -41,8 +41,9 @@ $(document).ready(function(){
 	// Handles all user inputs before they are applied to the editor.
 	editor.on('beforeChange', 
 		function(cm, change){
-			const curTime = Date.now();
+			if (change.from.hitSide) return;
 
+			const curTime = Date.now();
 			if (curTime == lastChange) {
 				setTimeout(function(){
 					lastChange = Date.now();
@@ -60,6 +61,8 @@ $(document).ready(function(){
 		// Verifies snippet after processing handle.
 		editor.on('change', 
 			function(cm, change){
+				if (change.from.hitSide) return;
+				
 				setTimeout(function(){
 					CRDT.verify();
 				}, 100);
