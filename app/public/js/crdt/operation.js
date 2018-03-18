@@ -1,7 +1,3 @@
-/* =============================================================================
-								OPERATION HANDLERS
-   =============================================================================*/
-
 // String constants
 RETURN 	= '\n';
 SPACE 	= ' ';
@@ -192,12 +188,9 @@ function handleRemoteInput(id, prevId, val) {
 	}
 
 	// Update CRDT
-	const elem = new Element(id, prev, next, val, false);
-	CRDT.get(id) = elem;
+	CRDT.set(id, new Element(id, prev, next, val, false));
 
-	/***** Determine where to apply the operation *****/
-
-	// Do a backward traversal until you find a non-deleted element.
+	// Do a backward traversal until a non-deleted element is found.
 	while (prevElem !== undefined && prevElem.del == true) prevElem = CRDT.get(prevElem.prev);
 
 	// Find the element in the mapping.
@@ -226,6 +219,7 @@ function handleRemoteInput(id, prevId, val) {
 		});
 	}
 
+	// Set the value in the editor at the line and position.
 	const _pos = {line: line, ch: pos};
     editor.getDoc().replaceRange(val, _pos, _pos, REMOTE_INPUT_OP_PREFIX + id);
 }

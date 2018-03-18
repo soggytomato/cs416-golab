@@ -1,6 +1,9 @@
 /* =============================================================================
 							ELEMENT CLASS DEFINITION
    =============================================================================*/
+/*
+	An Element is simply an entry in the sequence CRDT.
+*/
 class Element {
     constructor(id, prev, next, val, del) {
     	this.id = id;
@@ -14,6 +17,9 @@ class Element {
 /* =============================================================================
 							CRDT CLASS DEFINITION
    =============================================================================*/
+/*
+	A SeqCRDT is a local list of all elements that comprise a snippet.
+*/
 class SeqCRDT {
 	constructor(seqCRDT = new Array()) {
     	this.seq = seqCRDT;

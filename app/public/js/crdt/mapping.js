@@ -1,6 +1,21 @@
 /* =============================================================================
 							MAPPING CLASS DEFINITION
    =============================================================================*/
+/*
+	A Mapping is a record of all non-deleted elements' IDs present in the snippet
+	mapped to their respective locations in the snippet.
+
+	For instance, a snippet as follows:
+	"abc
+	 xyz"
+
+	would have two lines, where the first line contains the element IDs
+	for "abc\n" and the second line "xyz". The object would be as such:
+		[ 	[id1, id2, id3]
+			[id4, id5]		]
+
+	Once an element is deleted, it is removed from the mapping.
+*/
 class Mapping {
 	constructor() {
     	this.arr = [];
