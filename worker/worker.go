@@ -268,9 +268,30 @@ func (w *Worker) replacingFirstOp(newOperation *Operation, prevID, opID string) 
 
 // Any other insert that doesn't take place at the beginning or end is handled here
 func (w *Worker) normalInsert(newOperation *Operation, prevID, opID string) {
-	prevOp := w.crdt[prevID]
+	newPrevID := w.samePlaceInsertCheck(newOperation, prevID, opID)
+	prevOp := w.crdt[newPrevID]
 	newOperation.NextID = prevOp.NextID
 	prevOp.NextID = opID
+}
+
+// Checks if any other clients have made inserts to the same prevID. The algorithm
+// compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
+// will move further down the message until it is greater than the nextID
+func (w *Worker) samePlaceInsertCheck(newOperation *Operation, prevID, opID string) string {
+	var nextOpID int
+	prevOp := w.crdt[prevID]
+	if prevOp.NextID != "" {
+		nextOpID, _ = strconv.Atoi(prevOp.NextID)
+		newOpID, _ := strconv.Atoi(opID)
+		for nextOpID >= newOpID && newOperation.ClientID != w.crdt[prevOp.NextID].ClientID {
+			prevOp = w.crdt[strconv.Itoa(nextOpID)]
+			nextOpID, _ = strconv.Atoi(prevOp.NextID)
+		}
+		return prevOp.ID
+	} else {
+		return prevID
+	}
+
 }
 
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
