@@ -122,12 +122,7 @@ function handleOperation(op) {
 /******************************* LOCAL HANDLERS *******************************/
 
 function handleLocalInput(line, pos, val) {
-	var newLine = false;
-
-	// Assign an ID
 	const id = getID();
-
-	if (mapping[line] === undefined) mapping.push([]);
 
 	var prevElem, nextElem, prev, next;
 	prevElem = getPrevElem(line, pos);
@@ -137,7 +132,7 @@ function handleLocalInput(line, pos, val) {
 
 		prevElem.next = id;
 	} else {
-		next = mapping[line][pos];
+		next = mapping[line] !== undefined ? mapping[line][pos] : undefined;
 	}
 
 	if (next !== undefined) {
@@ -209,19 +204,23 @@ function handleRemoteInput(id, prevId, val) {
 	var pos = 0;
 	if (prevElem !== undefined) {
 		var stop = false;
-		mapping.forEach(function(line, i){
-			line.forEach(function(id, j){
+		mapping.forEach(function(_line, i){
+			_line.forEach(function(id, j){
 				if (id == prevId) {
 					stop = true;
-					pos = j + 1;
+
+					if (prevElem.val === RETURN) pos = 0;
+					else pos = j + 1;
 
 					return;
 				}
 			});
 
 			if (stop) {
-				line = i;
-				return
+				if (prevElem.val === RETURN) line = i + 1;
+				else line = i;
+
+				return;
 			}
 		});
 	}
@@ -324,6 +323,8 @@ mapping = [];
 	with provided value.
 */
 function updateMapping(line, pos, id) {
+	if (mapping[line] === undefined) mapping.push([]);
+
 	const val = CRDT[id].val;
 	const _line = mapping[line];
 	const thisElem = CRDT[_line[pos]];
