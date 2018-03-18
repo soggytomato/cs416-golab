@@ -79,6 +79,7 @@ const TIME_BUFFER int = 500
 const INITIAL_ID string = "12345"
 
 func main() {
+	gob.Register(map[string]*Operation{})
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]Operation{})
 	gob.Register(&Operation{})
@@ -88,6 +89,7 @@ func main() {
 	worker.listenRPC()
 	worker.registerWithLB()
 	worker.getWorkers()
+	worker.getCRDT()
 	go worker.sendLocalOps()
 	worker.workerPrompt()
 }
@@ -162,6 +164,27 @@ func (w *Worker) getWorkers() {
 		w.loadBalancerConn.Call("LBServer.GetNodes", w.workerID, &addrSet)
 		w.connectToWorkers(addrSet)
 	}
+}
+
+func (w *Worker) getCRDT() {
+	response := new(WorkerResponse)
+	for _, workerCon := range w.workers {
+		err := workerCon.Call("Worker.SendCRDT", "", response)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			w.crdt = response.Payload[0].(map[string]*Operation)
+			w.crdtFirstID = response.Payload[1].(string)
+			return
+		}
+	}
+}
+
+func (w *Worker) SendCRDT(payload string, response *WorkerResponse) error {
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = w.crdt
+	response.Payload[1] = w.crdtFirstID
+	return nil
 }
 
 func (w *Worker) workerPrompt() {
