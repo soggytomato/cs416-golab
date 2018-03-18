@@ -62,7 +62,7 @@ $(document).ready(function(){
 		editor.on('change', 
 			function(cm, change){
 				if (change.from.hitSide) return;
-				
+
 				setTimeout(function(){
 					CRDT.verify();
 				}, 100);
@@ -78,6 +78,8 @@ $(document).ready(function(){
 		  entered/removed is always no more than one 'character'. 
 */
 function handleOperation(op) {
+	if (debugMode) ops.push(op);
+
 	var line = op.from.line;
 	var ch  = op.from.ch;
 
@@ -251,4 +253,47 @@ function handleRemoteDelete(id) {
 	if (debugMode) {
 		console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
 	}
+}
+
+/******************************* UTILITY *******************************/
+
+// Array of all changes -- only for debug purposing to replay until
+// a sync problem is observed
+ops = []
+
+function replayOperations(ops, rate = 500) {
+	if (typeof ops == "string") {
+		ops = getOpsFromString(ops);
+	}
+
+
+	const keys = Object.keys(ops);
+	var i = 0;
+
+	var interval = setInterval(function(){
+		if (keys[i] == undefined) {
+			clearInterval(interval);
+			return;
+		}
+
+		const key = keys[i];
+		const op = ops[key];
+		const origin = op.origin;
+		if (origin == INPUT_OP || origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
+			editor.getDoc().replaceRange(op.text, op.from, op.to, INPUT_OP);
+		} else if (origin == DELETE_OP || origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
+			editor.getDoc().replaceRange(op.text, op.from, op.to, DELETE_OP);
+		}
+
+		i++;
+	}, rate);
+}
+
+function logOpsString() {
+	const opsString = "'" + JSON.stringify(ops) + "'";
+	console.log("Operation string: \n" + opsString);
+}
+
+function getOpsFromString(opsString) {
+	return JSON.parse(opsString);
 }

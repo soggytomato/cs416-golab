@@ -129,6 +129,8 @@ class SeqCRDT {
 			alert('CRDT and editor fell out of sync! Check console for details.');
 			console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
 
+			logOpsString();
+
 			return false;
 		} else {
 			return true;
