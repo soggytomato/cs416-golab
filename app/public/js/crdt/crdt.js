@@ -1,7 +1,19 @@
 /* =============================================================================
-							SEQUENCE CRDT/ELEMENT
+							ELEMENT CLASS DEFINITION
    =============================================================================*/
+class Element {
+    constructor(id, prev, next, val, del) {
+    	this.id = id;
+        this.prev = prev;
+        this.next = next;
+        this.val = val;
+        this.del = del;
+    }
+}
 
+/* =============================================================================
+							CRDT CLASS DEFINITION
+   =============================================================================*/
 class SeqCRDT {
 	constructor(seqCRDT = new Array()) {
     	this.seq = seqCRDT;
@@ -59,7 +71,7 @@ class SeqCRDT {
 	Converts CRDT to a snippet string.*/
 	toSnippet() {
 		var _mapping = this.toMapping();
-		var snippet = mappingToSnippet(this, _mapping);
+		var snippet = mapping.toSnippet();
 
 		return snippet;
 	}
@@ -67,7 +79,7 @@ class SeqCRDT {
 	/*
 	Converts the CRDT to a mapping.*/
 	toMapping() {
-		var _mapping = [];
+		var _mapping = new Mapping();
 
 		var curElem = this.getFirstElement();
 		var lastVal, lastPos, lastLine;
@@ -75,10 +87,10 @@ class SeqCRDT {
 			if (curElem.del !== true) {
 				var curLine, curPos;
 				if (lastLine == undefined) {
-					_mapping.push([]);
+					_mapping.addLine();
 					curLine = 0;
 				} else if (lastVal == RETURN) {
-					_mapping.push([]);
+					_mapping.addLine();
 					curLine = lastLine + 1;
 				}
 
@@ -88,49 +100,33 @@ class SeqCRDT {
 					curPos = lastPos + 1;
 				}
 
-				_mapping[curLine][curPos] = curElem.id;
+				_mapping.set(curLine, curPos, curElem.id);
 
 				lastVal = curElem.val;
 				lastPos = curPos;
 				lastLine = curLine;
 			}
 
-			curElem = this.seq[curElem.next];
+			curElem = this.get(curElem.next);
 		}
 
 		return _mapping;
 	}
+
+	/*
+	Checks if the current sequence CRDT matches the editors value. */
+	verify() {
+		var snippet = editor.getValue();
+		var _snippet = this.toSnippet();
+
+		if (snippet != _snippet) {
+			alert('CRDT and editor fell out of sync! Check console for details.');
+			console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
+
+			return false;
+		} else {
+			return true;
+		}
+	}
 }
 CRDT = new SeqCRDT();
-
-/*
-	Object definition for a CRDT element.
-*/
-class Element {
-    constructor(id, prev, next, val, del) {
-    	this.id = id;
-        this.prev = prev;
-        this.next = next;
-        this.val = val;
-        this.del = del;
-    }
-}
-
-/*
-	Get the previous element based on a line and position.
-*/
-function getPrevElem(line, pos) {
-	var prev = undefined;
-
-	if (line == 0 && pos == 0) {
-		// Start of snippet: undefined.
-	} else if (pos > 0) {
-		prev = mapping[line][pos - 1];
-	} else if (line > 0) {
-		const _line = mapping[line-1];
-
-		prev = _line[_line.length-1];
-	}
-
-	return CRDT.get(prev);
-}

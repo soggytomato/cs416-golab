@@ -65,7 +65,7 @@ $(document).ready(function(){
 		editor.on('change', 
 			function(cm, change){
 				setTimeout(function(){
-					verifyConsistent();
+					CRDT.verify();
 				}, 100);
 			}
 		);
@@ -115,7 +115,7 @@ function handleOperation(op) {
 	} else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
 		const id = origin.substring(REMOTE_INPUT_OP_PREFIX.length);
 
-		updateMapping(line, pos, id);
+		mapping.update(line, pos, id);
 	}
 }
 
@@ -125,14 +125,14 @@ function handleLocalInput(line, pos, val) {
 	const id = CRDT.getNewID();
 
 	var prevElem, nextElem, prev, next;
-	prevElem = getPrevElem(line, pos);
+	prevElem = CRDT.get(mapping.getPreceding(line, pos));
 	if (prevElem !== undefined) {
 		prev = prevElem.id;
 		next = prevElem.next;
 
 		prevElem.next = id;
 	} else {
-		next = mapping[line] !== undefined ? mapping[line][pos] : undefined;
+		next = mapping.getLine(line) !== undefined ? mapping.get(line, pos) : undefined;
 	}
 
 	if (next !== undefined) {
@@ -144,20 +144,20 @@ function handleLocalInput(line, pos, val) {
 	// Update CRDT
 	CRDT.set(id, new Element(id, prev, next, val, false));
 
-	updateMapping(line, pos, id);
+	mapping.update(line, pos, id);
 }
 
 function handleLocalDelete(line, pos) {
-	if (mapping.length == 0) return;
+	if (mapping.length() == 0) return;
 
-	const id = mapping[line][pos];
+	const id = mapping.get(line, pos);
 	const elem = CRDT.get(id);
 
 	if (elem === undefined) return;
 
 	elem.del = true;
-	if (mapping[line].length > 0) mapping[line].splice(pos, 1); 
-	if (mapping[line].length == 0) mapping.splice(line, 1);
+	if (mapping.lineLength(line) > 0) mapping.delete(line, pos); 
+	if (mapping.lineLength(line) == 0) mapping.deleteLine(line);
 
 	if (debugMode) {
 		console.log("Observed remove at line: " + line + " pos: " + pos);
@@ -205,7 +205,7 @@ function handleRemoteInput(id, prevId, val) {
 	var pos = 0;
 	if (prevElem !== undefined) {
 		var stop = false;
-		mapping.forEach(function(_line, i){
+		mapping.getLines().forEach(function(_line, i){
 			_line.forEach(function(id, j){
 				if (id == prevId) {
 					stop = true;
