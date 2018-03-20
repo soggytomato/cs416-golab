@@ -262,6 +262,38 @@ func (s *LBServer) HeartBeat(workerID int, _ignored *bool) error {
 	return nil
 }
 
+// This function is called when a worker receives a run request by their client
+// The worker will save the job
+func (s *LBServer) NewJob(jobID int, _ignored *bool) error {
+	allWorkers.Lock()
+	defer allWorkers.Unlock()
+
+	if len(allWorkers.queue) == 0 {
+		return nil
+	}
+
+	nextWorker := allWorkers.queue[0]
+	allWorkers.queue = allWorkers.queue[1:]
+
+	nextWorkerIP := nextWorker.RPCAddress.String()
+
+	allWorkers.queue = append(allWorkers.queue, nextWorker)
+
+	workerCon, err := rpc.Dial("tcp", nextWorkerIP)
+	defer workerCon.Close()
+	if err != nil {
+		fmt.Println("Error connecting to worker to run job")
+	} else {
+		response := new(WorkerResponse)
+		request := new(WorkerRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = jobID
+		workerCon.Call("Worker.RunJob", request, response)
+	}
+
+	return nil
+}
+
 func handleErrorFatal(msg string, e error) {
 	if e != nil {
 		errLog.Fatalf("%s, err = %s\n", msg, e.Error())
