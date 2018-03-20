@@ -4,7 +4,7 @@ userID = "";
 sessionID = "";
 currentSessions = [];
 
-$(document).ready(function(){
+$(document).ready(function() {
     $('.input-wrapper').resizable({
         handles: 's',
         resize: function() {
@@ -20,18 +20,18 @@ $(document).ready(function(){
         }
     });
 
-	// Make my life easier
-	if (debugMode) {
-		userID = "user";
-		sessionID = "session";
+    // Make my life easier
+    if (debugMode) {
+        userID = "user";
+        sessionID = "session";
 
-		$('.register').css('display', 'none');
-		$('.editor').slideDown('slow');
+        $('.register').css('display', 'none');
+        $('.editor').slideDown('slow');
 
-		setTimeout(function(){
-			editor.refresh();
-		}, 500);
-	}
+        setTimeout(function() {
+            editor.refresh();
+        }, 500);
+    }
 });
 
 $(document).ready(function() {

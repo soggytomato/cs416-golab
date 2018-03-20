@@ -12,6 +12,7 @@ package main
 import (
 	// "bufio"
 	// "bytes"
+
 	"bytes"
 	"encoding/gob"
 	"fmt"
@@ -111,6 +112,7 @@ func main() {
 	worker.getWorkers()
 	worker.getCRDT()
 	go worker.sendLocalOps()
+	worker.handleRun()
 	for {
 
 	}
@@ -472,7 +474,7 @@ func (w *Worker) reader(conn *websocket.Conn, userID string) {
 		if m.Command == "GetSessCRDT" {
 			w.getSessCRDT(m)
 		} else if m.Command == "RunJob" {
-			w.runJob(m)
+			w.handleRun(m)
 		}
 	}
 }
@@ -499,20 +501,22 @@ func (w *Worker) handleRun(msg browserMsg) {
 	//		- return to client with jobID
 	var jobID int
 	var ignored bool
-	w.loadBalancerConn.Call("LBServer.newJob", jobID, &ignored)
+
+	// Don't wait for return, just call and return back to client
+	go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
 	msg.Payload = strconv.Itoa(jobID)
 	w.writer(msg)
 }
 
 // Runs a job called by the load balancer
-func (w *Worker) runJob(request *WorkerRequest, response *WorkerResponse) error {
+func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
 	// TODO Steps:
 	//		- Gets log from File System
 	// 		- saves and compiles the file locally
 	//		- Runs the job
 	//		- saves the log to File system
 	//		- Acks back to Load Balancer that it is done
-
+	w.logger.Println("RunJob")
 	var fsResponse string
 	t := time.Now()
 	fileName := "runSnippet_" + t.Format("20060102150405") + ".go"
@@ -532,6 +536,7 @@ func (w *Worker) runJob(request *WorkerRequest, response *WorkerResponse) error 
 	} else {
 		// There was a compile or runtime error
 	}
+
 	return nil
 }
 
