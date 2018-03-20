@@ -21,17 +21,17 @@ $(document).ready(function(){
     });
 
 	// Make my life easier
-	if (debugMode) {
-		userID = "user";
-		sessionID = "session";
+	// if (debugMode) {
+	// 	userID = "user";
+	// 	sessionID = "session";
 
-		$('.register').css('display', 'none');
-		$('.editor').slideDown('slow');
+	// 	$('.register').css('display', 'none');
+	// 	$('.editor').slideDown('slow');
 
-		setTimeout(function(){
-			editor.refresh();
-		}, 500);
-	}
+	// 	setTimeout(function(){
+	// 		editor.refresh();
+	// 	}, 500);
+	// }
 });
 
 $(document).ready(function() {
@@ -103,7 +103,7 @@ function formBindings() {
                     if (data.WorkerIP.length == 0) {
                         alert("No available Workers, please try again later")
                     } else {
-                        ws = initWS(data.WorkerIP)
+                        initWS(data.WorkerIP)
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
 
@@ -118,23 +118,6 @@ function formBindings() {
         return false;
     });
 };
-
-function initWS(workerIP) {
-    console.log("Trying to connect to: " + "ws://" + workerIP + "/ws")
-    var socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID)
-    statusHTML = $('#status')
-    socket.onopen = function() {
-        ws.send(JSON.stringify({ SessionID: sessionID, Username: userID, Command: "GetSessCRDT", Operations: "delete d1, insert a3" }));
-    };
-    socket.onmessage = function(e) {
-        console.log(e.data)
-    }
-    socket.onclose = function() {
-        console.log("Socket Close")
-            // TODO, connect to new worker if possible
-    }
-    return socket;
-}
 
 function verifyRegister() {
     var valid = true;

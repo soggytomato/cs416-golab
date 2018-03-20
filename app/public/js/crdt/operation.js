@@ -144,10 +144,13 @@ function handleLocalInput(line, ch, val) {
 		nextElem.prev = id;
 	}
 
-	// Update CRDT
+	// Update CRDT and mapping
 	CRDT.set(id, new Element(id, prev, next, val, false));
-
 	mapping.update(line, ch, id);
+
+	sendInput(id, prev, val);
+
+	if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
 
 function handleLocalDelete(line, ch) {
@@ -162,9 +165,9 @@ function handleLocalDelete(line, ch) {
 	// Apply to the editor
 	mapping.delete(line, ch);
 
-	if (debugMode) {
-		console.log("Observed remove at line: " + line + " pos: " + ch);
-	}
+	sendDelete(id);
+
+	if (debugMode) console.log("Observed remove at line: " + line + " pos: " + ch);
 }
 
 /******************************* REMOTE HANDLERS *******************************/
@@ -229,6 +232,8 @@ function handleRemoteInput(id, prevId, val) {
 	// Apply to the editor
 	const pos = {line: line, ch: ch};
     editor.getDoc().replaceRange(val, pos, pos, REMOTE_INPUT_OP_PREFIX + id);
+
+    if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
 
 function handleRemoteDelete(id) {
@@ -250,9 +255,7 @@ function handleRemoteDelete(id) {
 
 	if (pos1.line != undefined && pos1.ch !== undefined) editor.getDoc().replaceRange('', pos1, pos2, REMOTE_DELETE_OP_PREFIX + id);
 
-	if (debugMode) {
-		console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
-	}
+	if (debugMode) console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
 }
 
 /******************************* UTILITY *******************************/
@@ -296,4 +299,8 @@ function logOpsString() {
 
 function getOpsFromString(opsString) {
 	return JSON.parse(opsString);
+}
+
+function handleOp(op) {
+
 }

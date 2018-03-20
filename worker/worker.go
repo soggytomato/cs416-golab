@@ -57,11 +57,10 @@ type WorkerRequest struct {
 }
 
 type browserMsg struct {
-	SessionID  string
-	Username   string
-	Command    string
-	Operations string
-	Payload    string
+	SessionID  	string
+	Username   	string
+	Command    	string
+	Payload 	interface{}
 }
 
 // Used to send heartbeat to the server just shy of 1 second each beat
@@ -265,7 +264,7 @@ func (w *Worker) writer(msg browserMsg) {
 func (w *Worker) getSessCRDT(msg browserMsg) {
 	// TODO:
 	//	File System RPC Call to get CRDT
-	msg.Payload = "This is suppose to be the CRDT"
+	//msg.Payload = "This is suppose to be the CRDT"
 	w.writer(msg)
 }
 
