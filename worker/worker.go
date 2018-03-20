@@ -10,8 +10,8 @@ $ go run worker.go [loadbalancer ip:port]
 package main
 
 import (
-	"bufio"
-	"bytes"
+	// "bufio"
+	// "bytes"
 	"encoding/gob"
 	"fmt"
 	"log"
@@ -20,7 +20,7 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
-	"strings"
+	// "strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -77,6 +77,7 @@ type Operation struct {
 	PrevID   string
 	NextID   string
 	Text     string
+}
 
 type browserMsg struct {
 	SessionID  string
