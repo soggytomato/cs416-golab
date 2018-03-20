@@ -37,7 +37,8 @@ type LBServer int
 
 type Worker struct {
 	WorkerID        int
-	Address         net.Addr
+	RPCAddress      net.Addr
+	HTTPAddress     net.Addr
 	RecentHeartbeat int64
 }
 
@@ -49,7 +50,8 @@ type WorkerNetSettings struct {
 
 type AllWorkers struct {
 	sync.RWMutex
-	all map[int]*Worker
+	all   map[int]*Worker
+	queue []*Worker
 }
 
 var (
@@ -57,7 +59,7 @@ var (
 	errLog               *log.Logger          = log.New(os.Stderr, "[serv] ", log.Lshortfile|log.LUTC|log.Lmicroseconds)
 	outLog               *log.Logger          = log.New(os.Stderr, "[serv] ", log.Lshortfile|log.LUTC|log.Lmicroseconds)
 	// Workers in the system.
-	allWorkers              AllWorkers = AllWorkers{all: make(map[int]*Worker)}
+	allWorkers              AllWorkers = AllWorkers{all: make(map[int]*Worker), queue: make([]*Worker, 0)}
 	HeartBeatInterval                  = 2000 // every two second
 	MinNumWorkerConnections            = 2
 	NumWorkerToReturn                  = 4
@@ -99,7 +101,8 @@ func main() {
 }
 
 type WorkerInfo struct {
-	Address net.Addr
+	RPCAddress  net.Addr
+	HTTPAddress net.Addr
 }
 
 // Function to delete dead worker (no recent heartbeat)
@@ -107,12 +110,17 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 	for {
 		allWorkers.Lock()
 		if time.Now().UnixNano()-allWorkers.all[workerID].RecentHeartbeat > int64(heartBeatInterval) {
-			outLog.Printf("%s timed out\n", allWorkers.all[workerID].Address.String())
+			outLog.Printf("%s timed out\n", allWorkers.all[workerID].RPCAddress.String())
 			delete(allWorkers.all, workerID)
+			for index, worker := range allWorkers.queue {
+				if worker.WorkerID == workerID {
+					allWorkers.queue = append(allWorkers.queue[:index], allWorkers.queue[index+1:]...)
+				}
+			}
 			allWorkers.Unlock()
 			return
 		}
-		outLog.Printf("%s is alive\n", allWorkers.all[workerID].Address.String())
+		outLog.Printf("%s is alive\n", allWorkers.all[workerID].RPCAddress.String())
 		allWorkers.Unlock()
 		time.Sleep(heartBeatInterval)
 	}
@@ -121,7 +129,7 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 // Registers a new worker with an address for other worker to use to
 // connect to it (returned in GetNodes call below), and an
 // id for this worker. Returns error, or if error is not set,
-// then setting for this canvas instance.
+// then settings for the worker node.
 //
 // Returns:
 // - AddressAlreadyRegisteredError if the server has already registered this address.
@@ -132,18 +140,21 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 	// fmt.Println(m.Address)
 
 	for _, worker := range allWorkers.all {
-		if worker.Address.Network() == w.Address.Network() && worker.Address.String() == w.Address.String() {
-			return AddressAlreadyRegisteredError(w.Address.String())
+		if worker.RPCAddress.Network() == w.RPCAddress.Network() && worker.RPCAddress.String() == w.RPCAddress.String() {
+			return AddressAlreadyRegisteredError(w.RPCAddress.String())
 		}
 	}
 
 	newWorkerID := WorkerIDCounter
 
-	allWorkers.all[newWorkerID] = &Worker{
+	newWorker := &Worker{
 		newWorkerID,
-		w.Address,
+		w.RPCAddress,
+		w.HTTPAddress,
 		time.Now().UnixNano(),
 	}
+
+	allWorkers.all[newWorkerID] = newWorker
 
 	go monitor(newWorkerID, time.Duration(HeartBeatInterval)*time.Millisecond)
 
@@ -153,8 +164,34 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 		MinNumWorkerConnections,
 	}
 
-	outLog.Printf("Got Register from %s\n", w.Address.String())
+	outLog.Printf("Got Register from %s\n", w.RPCAddress.String())
 	WorkerIDCounter++
+	allWorkers.queue = append(allWorkers.queue, newWorker)
+	return nil
+}
+
+// Registers a new worker with an address for other worker to use to
+// connect to it (returned in GetNodes call below), and an
+// id for this worker. Returns error, or if error is not set,
+// then settings for the worker node.
+//
+// Returns:
+// - AddressAlreadyRegisteredError if the server has already registered this address.
+func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
+
+	allWorkers.Lock()
+	defer allWorkers.Unlock()
+
+	if len(allWorkers.queue) == 0 {
+		return nil
+	}
+
+	nextWorker := allWorkers.queue[0]
+	allWorkers.queue = allWorkers.queue[1:]
+
+	*retWorkerIP = nextWorker.HTTPAddress.String()
+
+	allWorkers.queue = append(allWorkers.queue, nextWorker)
 	return nil
 }
 
@@ -183,7 +220,7 @@ func (s *LBServer) GetNodes(workerID int, addrSet *[]net.Addr) error {
 		if workerID == id {
 			continue
 		}
-		workerAddresses = append(workerAddresses, worker.Address)
+		workerAddresses = append(workerAddresses, worker.RPCAddress)
 	}
 
 	sort.Sort(Addresses(workerAddresses))
