@@ -12,13 +12,16 @@ package main
 import (
 	// "bufio"
 	// "bytes"
+	"bytes"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
+	"os/exec"
 	"strconv"
 	// "strings"
 	"time"
@@ -89,6 +92,7 @@ type browserMsg struct {
 
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
+
 // Since we are adding a character to the right of another character, we need
 // a fake INITIAL_ID to use to place the first character in an empty message
 const INITIAL_ID string = "12345"
@@ -380,7 +384,6 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 	}
 }
 
-
 func (w *Worker) sendLocalOps() error {
 	for {
 		time.Sleep(time.Second * 10)
@@ -468,6 +471,8 @@ func (w *Worker) reader(conn *websocket.Conn, userID string) {
 		// Handle different commands here
 		if m.Command == "GetSessCRDT" {
 			w.getSessCRDT(m)
+		} else if m.Command == "RunJob" {
+			w.runJob(m)
 		}
 	}
 }
@@ -484,6 +489,50 @@ func (w *Worker) writer(msg browserMsg) {
 		delete(w.clients, msg.Username)
 		return
 	}
+}
+
+// Handles when a client issues a run command for a session and snippet
+func (w *Worker) handleRun(msg browserMsg) {
+	// TODO Steps:
+	//		- Save to file system for jobID
+	//		- call Load Balancer with jobID
+	//		- return to client with jobID
+	var jobID int
+	var ignored bool
+	w.loadBalancerConn.Call("LBServer.newJob", jobID, &ignored)
+	msg.Payload = strconv.Itoa(jobID)
+	w.writer(msg)
+}
+
+// Runs a job called by the load balancer
+func (w *Worker) runJob(request *WorkerRequest, response *WorkerResponse) error {
+	// TODO Steps:
+	//		- Gets log from File System
+	// 		- saves and compiles the file locally
+	//		- Runs the job
+	//		- saves the log to File system
+	//		- Acks back to Load Balancer that it is done
+
+	var fsResponse string
+	t := time.Now()
+	fileName := "runSnippet_" + t.Format("20060102150405") + ".go"
+	err := ioutil.WriteFile(fileName, []byte(fsResponse), 0777)
+	checkError(err)
+
+	cmd := exec.Command("go", "run", fileName)
+	var output, stderr bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+	checkError(err)
+
+	// Write the proper output to the log file
+	if len(stderr.String()) == 0 {
+		// No errors case
+	} else {
+		// There was a compile or runtime error
+	}
+	return nil
 }
 
 // Gets the Session CRDT from File System to send to client
