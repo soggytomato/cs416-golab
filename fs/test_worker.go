@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	. "../util/types"
+	. "../lib/types"
 )
 
 func main() {

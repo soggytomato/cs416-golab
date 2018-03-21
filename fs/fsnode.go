@@ -14,7 +14,7 @@ import (
 	"path"
 	"io/ioutil"
 
-	. "../util/types"
+	. "../lib/types"
 )
 
 const SESS_DIR = "./session"
@@ -115,13 +115,16 @@ func (f *FSNode) registerWithServer() {
 	response := new(FSResponse)
 
 	serverConn.Call("Server.RegisterNode", request, response)
-	if len(response.Payload) > 0 {
-		nodeID = response.Payload[0].(string)
-		storeNodeID(nodeID)
-
-		f.logger.Println("Registered as new node")
+	if len(response.Payload) == 2 && response.Payload[0].(bool) {
+		if response.Payload[1] != nil {
+			nodeID = response.Payload[1].(string)
+			storeNodeID(nodeID)
+			f.logger.Println("Registered as new node")
+		} else {
+			f.logger.Println("Registered as existing node")
+		}
 	} else {
-		f.logger.Println("Registered as existing node")
+		f.logger.Println("Rejected - failed to register with server")
 	}
 
 	f.serverConn = serverConn
@@ -147,96 +150,120 @@ func (f *FSNode) heartbeat() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 // <RPC METHODS>
 
-func (f *FSNode) SaveSession(request *FSRequest, ok *bool) error {
+func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
 	session := request.Payload[0].(Session)
 	f.logger.Println("Saving session [" + session.ID + "] to disk")
 
+	*ok = false
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(session)
 
 	filePath := path.Join(SESS_DIR, session.ID)
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
+
 	defer file.Close()
 	err = file.Truncate(0)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
 
 	_, err = file.Write(buffer.Bytes())
-	*ok = checkError(err) == nil
+	if checkError(err) != nil {
+		return
+	}
 
 	file.Sync()
+	*ok = true
 
-	return nil
+	return
 }
 
-func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) error {
+func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) {
 	sessionID := request.Payload[0].(string)
 	f.logger.Println("Retrieving session [" + sessionID + "] from disk")
 	filePath := path.Join(SESS_DIR, sessionID)
 	sessionExists, err := checkFileOrDirectory(filePath)
-	checkError(err)
-	if !sessionExists {
-		return nil
+	if checkError(err) != nil || !sessionExists {
+		return
 	}
 
 	sessionBytes, err := ioutil.ReadFile(filePath)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
+
 	dec := gob.NewDecoder(bytes.NewReader(sessionBytes))
 	session := new(Session)
 	err = dec.Decode(session)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
 
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = *session
 
-	return nil
+	return
 }
 
-func (f *FSNode) SaveLog(request *FSRequest, ok *bool) error {
+func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
 	_log := request.Payload[0].(Log)
 	f.logger.Println("Saving log [" + _log.Job.JobID + "] to disk")
 
+	*ok = false
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(_log)
 
 	filePath := path.Join(LOG_DIR, _log.Job.JobID)
 	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
 	defer file.Close()
 	err = file.Truncate(0)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
 
 	_, err = file.Write(buffer.Bytes())
-	*ok = checkError(err) == nil
+	if checkError(err) != nil {
+		return
+	}
 
 	file.Sync()
+	*ok = true
 
-	return nil
+	return
 }
 
-func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) error {
+func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	jobID := request.Payload[0].(string)
 	f.logger.Println("Retrieving log [" + jobID + "] from disk")
 	filePath := path.Join(LOG_DIR, jobID)
 	logExists, err := checkFileOrDirectory(filePath)
-	checkError(err)
-	if !logExists {
-		return nil
+	if checkError(err) != nil || !logExists {
+		return
 	}
 
 	logBytes, err := ioutil.ReadFile(filePath)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
 	dec := gob.NewDecoder(bytes.NewReader(logBytes))
 	_log := new(Log)
 	err = dec.Decode(_log)
-	checkError(err)
+	if checkError(err) != nil {
+		return
+	}
 
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = *_log
 
-	return nil
+	return
 }
 
 // </RPC METHODS>

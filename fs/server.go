@@ -12,11 +12,19 @@ import (
 	"time"
 	"math/rand"
 
-	. "../util/types"
+	. "../lib/types"
 )
 
+// The maximum time in milliseconds since the most recent heartbeat
+// for a node to be considered disconnected.
+//
 const HEARTBEAT_INTERVAL = 2000
 
+// nodes:    All known FS nodes, connected or not
+// sessions: All known sessions
+// logs:     All known logs
+// index:    A structure mapping sessionIDs to logs
+//
 type Server struct {
 	logger   *log.Logger
 	nodes    FSNodes
@@ -25,21 +33,32 @@ type Server struct {
 	index    Index
 }
 
+// A map of node IDs to file system nodes.
+//
 type FSNodes struct {
 	sync.RWMutex
 	all map[string]*FSNode
 }
 
+// A map of session IDs to collections of node IDs which are known to
+// have saved the session.
+//
 type Sessions struct {
 	sync.RWMutex
 	all map[string]map[string]bool
 }
 
+// A map of job IDs to collections of node IDs which are known to have
+// saved the log (containing the job).
+//
 type Logs struct {
 	sync.RWMutex
 	all map[string]map[string]bool
 }
 
+// A map of session IDs to collections of job IDs associated with the
+// session.
+//
 type Index struct {
 	sync.RWMutex
 	logs map[string]map[string]bool
@@ -114,6 +133,13 @@ func (s *Server) listenRPC() {
 	}()
 }
 
+// Saves a session to a specified node. If the session is saved
+// successfully, the node will be added to the map (s.sessions) so
+// that the session can be retrieved from this node at a later time.
+// If the session cannot be saved, then the node is removed from that
+// map (since, if it was previously known to contain that session, it
+// now has an outdated version).
+//
 func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	s.logger.Println("Saving session [" + session.ID + "] to node [" + node.nodeID + "]")
 	s.sessions.Lock()
@@ -139,6 +165,8 @@ func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	}
 }
 
+// Attempts to retrieve a session from a specified node.
+//
 func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
 	s.logger.Println("Retrieving session [" + sessionID + "] from node [" + node.nodeID + "]")
 
@@ -159,6 +187,11 @@ func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
 	}
 }
 
+// A helper function for retrieving a single log specified by the
+// given job ID. An attempt will be made to retrieve the log from any
+// node which is known to have it, and if any retrieval fails, that
+// node will be removed from the log map (s.logs).
+//
 func (s *Server) getLog(jobID string) *Log {
 	s.nodes.RLock()
 	s.logs.Lock()
@@ -182,6 +215,13 @@ func (s *Server) getLog(jobID string) *Log {
 	return nil
 }
 
+// Saves a log to a specified node. If the log is saved successfully,
+// the node will be added to the map (s.logs) so that the log can be
+// retrieved from this node at a later time. If the log cannot be
+// saved, then the node is removed from that map (since, if it was
+// previously known to contain that log, it now has an outdated
+// version).
+//
 func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	s.logger.Println("Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]")
 	s.logs.Lock()
@@ -207,6 +247,8 @@ func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	}
 }
 
+// Attempts to retrieve a log from a specified node.
+//
 func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
 	s.logger.Println("Retrieving log [" + jobID + "] from node [" + node.nodeID + "]")
 
@@ -235,7 +277,9 @@ func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
 ////////////////////////////////////////////////////////////////////////////////////////////
 // <RPC METHODS>
 
-func (s *Server) Heartbeat(nodeID string, _ *bool) error {
+// Hearbeat function - updates the node's most recent heartbeat.
+//
+func (s *Server) Heartbeat(nodeID string, _ *bool) (_ error) {
 	s.nodes.Lock()
 	defer s.nodes.Unlock()
 
@@ -243,15 +287,21 @@ func (s *Server) Heartbeat(nodeID string, _ *bool) error {
 		s.nodes.all[nodeID].lastHeartbeat = time.Now().UnixNano()
 	}
 
-	return nil
+	return
 }
 
-func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) error {
+// Register a new or existing node. New nodes will be assigned a node
+// ID, and existing nodes will have their node ID checked in the nodes
+// map. Invalid nodes will be rejected.
+//
+func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error) {
 	s.nodes.Lock()
 	defer s.nodes.Unlock()
 
 	nodeID := request.Payload[0].(string)
 	nodeAddr := request.Payload[1].(string)
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = false
 
 	if len(nodeID) == 0 {
 		nodeID = generateNodeID(16)
@@ -259,16 +309,17 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) error {
 			nodeID: nodeID,
 			nodeAddr: nodeAddr}
 
-		response.Payload = make([]interface{}, 1)
-		response.Payload[0] = nodeID
+		response.Payload[0] = true
+		response.Payload[1] = nodeID
 
 		s.logger.Println("New node [" + nodeID + "] registered")
 	} else {
 		if s.nodes.all[nodeID] != nil {
+			response.Payload[0] = true
 			s.logger.Println("Existing node [" + nodeID + "] registered")
 		} else {
 			s.logger.Println("Node [" + nodeID + "] rejected")
-			return nil
+			return
 		}
 	}
 
@@ -276,10 +327,13 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) error {
 	checkError(err)
 	s.nodes.all[nodeID].nodeConn = nodeConn
 
-	return nil
+	return
 }
 
-func (s *Server) SaveSession(request *FSRequest, _ *bool) error {
+// Save a session to the file system. The file server will attempt to
+// save the session to all connected file system nodes.
+//
+func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 	s.nodes.RLock()
 	s.sessions.Lock()
 	defer s.nodes.RUnlock()
@@ -295,10 +349,12 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) error {
 		}
 	}
 
-	return nil
+	return
 }
 
-func (s *Server) GetSession(request *FSRequest, response *FSResponse) error {
+// Get a session from the file system, given a session ID.
+//
+func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) {
 	s.nodes.RLock()
 	s.sessions.Lock()
 	defer s.nodes.RUnlock()
@@ -321,10 +377,13 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) error {
 		}
 	}
 
-	return nil
+	return
 }
 
-func (s *Server) SaveLog(request *FSRequest, _ *bool) error {
+// Save a log to the file system. The file server will attempt to save
+// the log to all connected file system nodes.
+//
+func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
 	s.nodes.RLock()
 	s.logs.Lock()
 	s.index.Lock()
@@ -347,10 +406,12 @@ func (s *Server) SaveLog(request *FSRequest, _ *bool) error {
 	}
 	s.index.logs[_log.Job.SessionID][_log.Job.JobID] = true
 
-	return nil
+	return
 }
 
-func (s *Server) GetLog(request *FSRequest, response *FSResponse) error {
+// Get a log from the file system, given a job ID.
+//
+func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	jobID := request.Payload[0].(string)
 	_log := s.getLog(jobID)
 	if _log != nil {
@@ -358,17 +419,19 @@ func (s *Server) GetLog(request *FSRequest, response *FSResponse) error {
 		response.Payload[0] = *_log
 	}
 
-	return nil
+	return
 }
 
-func (s *Server) GetLogs(request *FSRequest, response *FSResponse) error {
+// Get a list of logs from the file system, given a session ID.
+//
+func (s *Server) GetLogs(request *FSRequest, response *FSResponse) (_ error) {
 	s.index.RLock()
 	defer s.index.RUnlock()
 
 	sessionID := request.Payload[0].(string)
 	jobIDs := s.index.logs[sessionID]
 	if jobIDs == nil {
-		return nil
+		return
 	}
 
 	logsMap := make(map[string]*Log)
@@ -379,7 +442,7 @@ func (s *Server) GetLogs(request *FSRequest, response *FSResponse) error {
 		}
 	}
 	if len(logsMap) == 0 {
-		return nil
+		return
 	}
 
 	logs := make([]Log, len(logsMap))
@@ -392,7 +455,7 @@ func (s *Server) GetLogs(request *FSRequest, response *FSResponse) error {
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = logs
 
-	return nil
+	return
 }
 
 // </RPC METHODS>
