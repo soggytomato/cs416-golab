@@ -172,14 +172,19 @@ function handleLocalDelete(line, ch) {
 
 /******************************* REMOTE HANDLERS *******************************/
 
-function handleRemoteOperation(id, prevId, type, val) {
-	if (CRDT.get(id) !== undefined) return;
+function handleRemoteOperation(op) {
+	const id = op.ID;
+	const prevId = op.PrevID;
+	const type = op.Type;
+	const val = op.Val;
 
 	if (type == INPUT_OP) handleRemoteInput(id, prevId, val);
-	else if (type == DELETE_OP) handleDeleteOperations(id);
+	else if (type == DELETE_OP) handleRemoteDelete(id);
 }
 
 function handleRemoteInput(id, prevId, val) {
+	if (CRDT.get(id) !== undefined) return;
+
 	var prevElem, nextElem, prev, next;
 	prevElem = CRDT.get(prevId);
 	if (prevElem !== undefined) {
@@ -208,7 +213,11 @@ function handleRemoteInput(id, prevId, val) {
 	var ch = 0;
 	if (prevElem !== undefined) {
 		var stop = false;
-		mapping.getLines().forEach(function(_line, i){
+
+		const lines = mapping.getLines();
+		for (var i = 0; i < lines.length; i++) {
+			const _line = lines[i];
+
 			_line.forEach(function(id, j){
 				if (id == prevId) {
 					stop = true;
@@ -224,9 +233,9 @@ function handleRemoteInput(id, prevId, val) {
 				if (prevElem.val === RETURN) line = i + 1;
 				else line = i;
 
-				return;
+				break;
 			}
-		});
+		}
 	}
 
 	// Apply to the editor
@@ -239,6 +248,7 @@ function handleRemoteInput(id, prevId, val) {
 function handleRemoteDelete(id) {
 	const elem = CRDT.get(id);
 
+	// TODO: if undefined, deal with it
 	if (elem === undefined || elem.del == true) return;
 	else elem.del = true;
 
