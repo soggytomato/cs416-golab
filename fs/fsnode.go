@@ -160,7 +160,7 @@ func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
 	err := enc.Encode(session)
 
 	filePath := path.Join(SESS_DIR, session.ID)
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
+	file, err := openFile(filePath)
 	if checkError(err) != nil {
 		return
 	}
@@ -219,7 +219,7 @@ func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
 	err := enc.Encode(_log)
 
 	filePath := path.Join(LOG_DIR, _log.Job.JobID)
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
+	file, err := openFile(filePath)
 	if checkError(err) != nil {
 		return
 	}
@@ -288,7 +288,7 @@ func getNodeID() (nodeID string) {
 }
 
 func storeNodeID(nodeID string) {
-	f, err := os.Create(NODE_ID_PATH)
+	f, err := openFile(NODE_ID_PATH)
 	checkError(err)
 	defer f.Close()
 
@@ -309,6 +309,10 @@ func checkFileOrDirectory(path string) (exists bool, err error) {
 	}
 
 	return exists, err
+}
+
+func openFile(path string) (file *os.File, err error) {
+	return os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0755)
 }
 
 func usage() {
