@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 	"os"
 	"time"
+	"sync"
 	"encoding/gob"
 	"bytes"
 	"path"
@@ -44,8 +45,9 @@ func main() {
 	fsnode.listenRPC()
 	fsnode.registerWithServer()
 
-	for {
-	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	wg.Wait()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
