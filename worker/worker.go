@@ -20,7 +20,13 @@ import (
 	"strconv"
 	"time"
 
+	. "../lib/types"
 	"github.com/gorilla/websocket"
+	// POC(CLI) relevant
+	// "bufio"
+	// "bytes"
+	// "math/rand"
+	// "strings"
 )
 
 type WorkerNetSettings struct {
@@ -45,11 +51,8 @@ type Worker struct {
 	clients          map[string]*websocket.Conn
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
-	crdt             map[string]*Operation
-	localOps         []Operation
-	nextOpNumber     int
-	crdtFirstID      string
-	receivedOps 	 []string
+	crdt             map[string]*CRDT
+	localElements    []Element
 }
 
 type WorkerResponse struct {
@@ -68,37 +71,39 @@ const (
 	DELETE
 )
 
-type Operation struct {
-	ClientID string
-	Type     OpType
-	ID       string
-	PrevID   string
-	NextID   string
-	Text     string
+type CRDT struct { // For now, this is CRDT but will probably change to Session like type.go
+	Elements     map[string]*Element
+	CrdtFirstID  string
+	NextOpNumber int
 }
 
-type WSMessage struct {
-	SessionID  	string
-	Username   	string
-	Command    	string
-	Type 		string
-	ID 			string
-	PrevID 		string
-	Val 		string
+type browserMsg struct {
+	SessionID string
+	Username  string
+	Command   string
+	Elements  string
+	Payload   string
+}
+
+type NoCRDTError string
+
+func (e NoCRDTError) Error() string {
+	return fmt.Sprintf("Worker doesn't have sessionID [%s]", string(e))
 }
 
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
+
 // Since we are adding a character to the right of another character, we need
 // a fake INITIAL_ID to use to place the first character in an empty message
 const INITIAL_ID string = "12345"
 
 func main() {
-	gob.Register(map[string]*Operation{})
+	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
-	gob.Register([]Operation{})
-	gob.Register(&Operation{})
-	gob.Register(WSMessage{})
+	gob.Register([]Element{})
+	gob.Register(&Element{})
+	gob.Register(&CRDT{})
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
@@ -106,8 +111,8 @@ func main() {
 	worker.listenHTTP()
 	worker.registerWithLB()
 	worker.getWorkers()
-	worker.getCRDT()
-	go worker.sendLocalOps()
+	go worker.sendlocalElements()
+	// worker.workerPrompt() //POC(CLI)
 	for {
 
 	}
@@ -117,10 +122,260 @@ func (w *Worker) init() {
 	args := os.Args[1:]
 	w.serverAddr = args[0]
 	w.workers = make(map[string]*rpc.Client)
-	w.crdt = make(map[string]*Operation)
-	w.nextOpNumber = 1
+	w.crdt = make(map[string]*CRDT)
 	w.clients = make(map[string]*websocket.Conn)
 }
+
+//****POC(CLI) CODE***//
+
+// func (w *Worker) workerPrompt() {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleIntroCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// func (w *Worker) handleIntroCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "newSession":
+// 		w.newSession()
+// 	case "getSession":
+// 		w.getSession(args[1])
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+//
+// func (w *Worker) newSession() {
+// 	sessionID := String(5)
+// 	w.crdt[sessionID] = &CRDT{make(map[string]*Element),"",1}
+// 	w.crdtPrompt(sessionID)
+// }
+//
+// func (w *Worker) crdtPrompt(sessionID string) {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		message := w.getMessage(w.crdt[sessionID])
+// 		fmt.Println("SessionID:", sessionID)
+// 		fmt.Println("Message:", message)
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// // Iterate through the beginning of the CRDT to the end to show the message and
+// // specify the mapping of each character
+// func (w *Worker) getMessage(crdt *CRDT) string {
+// 	var buffer bytes.Buffer
+// 	firstOp := crdt.Elements[crdt.CrdtFirstID]
+// 	for firstOp != nil {
+// 		fmt.Println(firstOp.ID, "->", firstOp.Text)
+// 		buffer.WriteString(firstOp.Text)
+// 		firstOp = crdt.Elements[firstOp.NextID]
+// 	}
+// 	return buffer.String()
+// }
+//
+// func (w *Worker) handleCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "addRight":
+// 		err := w.addRight(args[1], args[2], args[3])
+// 		if checkError(err) != nil {
+// 			return 0
+// 		}
+// 	case "exit":
+// 		return 1
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+
+//**CRDT CODE**//
+
+// Adds a character to the right of the prevID specified in the args
+func (w *Worker) addRight(prevID, content, sessionID string) error {
+	if !w.prevIDExists(prevID, sessionID) {
+		return nil
+	}
+	crdt := w.crdt[sessionID]
+	opID := strconv.Itoa(crdt.NextOpNumber) + strconv.Itoa(w.workerID)
+	newElement := &Element{sessionID, strconv.Itoa(w.workerID), opID, prevID, "", content, false}
+	w.addToCRDT(newElement, crdt)
+	return nil
+}
+
+func (w *Worker) addToCRDT(newElement *Element, crdt *CRDT) error {
+	if w.firstCRDTEntry(newElement.ID, crdt) {
+		w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
+		return nil
+	}
+	if w.replacingFirstOp(newElement, newElement.PrevID, newElement.ID, crdt) {
+		w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
+		return nil
+	}
+	w.normalInsert(newElement, newElement.PrevID, newElement.ID, crdt)
+	w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
+	return nil
+}
+
+// Check if the prevID actually exists; if true, continue with addRight
+func (w *Worker) prevIDExists(prevID, sessionID string) bool {
+	crdt := w.crdt[sessionID]
+	if crdt != nil {
+		if _, ok := crdt.Elements[prevID]; ok || prevID == INITIAL_ID {
+			return true
+		} else {
+			return false
+		}
+	} else {
+		return false
+	}
+}
+
+// The case where the first content is entered into a CRDT
+func (w *Worker) firstCRDTEntry(opID string, crdt *CRDT) bool {
+	if len(crdt.Elements) <= 0 {
+		crdt.CrdtFirstID = opID
+		return true
+	} else {
+		return false
+	}
+}
+
+// If your character is placed at the beginning of the message, it needs to become
+// the new firstOp so we can iterate through the CRDT properly
+func (w *Worker) replacingFirstOp(newElement *Element, prevID, opID string, crdt *CRDT) bool {
+	if prevID == INITIAL_ID {
+		firstOp := crdt.Elements[crdt.CrdtFirstID]
+		newElement.NextID = crdt.CrdtFirstID
+		firstOp.PrevID = opID
+		crdt.CrdtFirstID = opID
+		return true
+	} else {
+		return false
+	}
+}
+
+// Any other insert that doesn't take place at the beginning or end is handled here
+func (w *Worker) normalInsert(newElement *Element, prevID, opID string, crdt *CRDT) {
+	newPrevID := w.samePlaceInsertCheck(newElement, prevID, opID, crdt)
+	prevOp := crdt.Elements[newPrevID]
+	newElement.NextID = prevOp.NextID
+	prevOp.NextID = opID
+}
+
+// Checks if any other clients have made inserts to the same prevID. The algorithm
+// compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
+// will move further down the message until it is greater than the nextID
+func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, opID string, crdt *CRDT) string {
+	var nextOpID int
+	prevOp := crdt.Elements[prevID]
+	if prevOp.NextID != "" {
+		nextOpID, _ = strconv.Atoi(prevOp.NextID)
+		newOpID, _ := strconv.Atoi(opID)
+		for nextOpID >= newOpID && newElement.ClientID != crdt.Elements[prevOp.NextID].ClientID {
+			prevOp = crdt.Elements[strconv.Itoa(nextOpID)]
+			nextOpID, _ = strconv.Atoi(prevOp.NextID)
+		}
+		return prevOp.ID
+	} else {
+		return prevID
+	}
+
+}
+
+// Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
+// number can be incremented
+func (w *Worker) addOpAndIncrementCounter(newElement *Element, opID string, crdt *CRDT) {
+	deepCopyOp := &Element{newElement.SessionID, newElement.ClientID, newElement.ID, newElement.PrevID, newElement.NextID, newElement.Text, newElement.Deleted}
+	crdt.Elements[opID] = deepCopyOp
+	w.localElements = append(w.localElements, *deepCopyOp)
+	fmt.Println(crdt.NextOpNumber)
+	crdt.NextOpNumber++
+}
+
+// Send all of the ops made locally on this worker to all other connected workers
+// After sending, wipe all localElements from the worker
+func (w *Worker) sendlocalElements() error {
+	for {
+		time.Sleep(time.Second * 10)
+		// w.getWorkers() // checks all workers, connects to more if needed
+		request := new(WorkerRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = w.localElements
+		response := new(WorkerResponse)
+		for workerAddr, workerCon := range w.workers {
+			isConnected := false
+			workerCon.Call("Worker.PingWorker", "", &isConnected)
+			if isConnected {
+				workerCon.Call("Worker.applyIncomingElements", request, response)
+			} else {
+				delete(w.workers, workerAddr)
+			}
+		}
+		w.localElements = nil
+	}
+	return nil
+}
+
+// If the worker has the session in it's CRDT map, apply the op
+// If it doesn't, skip over applying the op
+// If it has applied these ops already, skip over applying the op
+func (w *Worker) applyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
+	incomingOps := request.Payload[0].([]Element)
+	for _, op := range incomingOps {
+		crdt := w.crdt[op.SessionID]
+		if crdt != nil {
+			if crdt.Elements[op.ID] == nil {
+				w.addToCRDT(&op, crdt)
+			}
+		}
+	}
+	return nil
+}
+
+// Client can provide the sessionID to get session from another worker
+func (w *Worker) getSession(sessionID string) {
+	response := new(WorkerResponse)
+	for _, workerCon := range w.workers {
+		err := workerCon.Call("Worker.SendCRDT", sessionID, response)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			w.crdt[sessionID] = response.Payload[0].(*CRDT)
+			// w.crdtPrompt(sessionID) // Used in POC(CLI)
+			return
+		}
+	}
+}
+
+// If client tries to get a session, this function can be used to get that session
+// if the worker has it in its CRDT map
+func (w *Worker) SendCRDT(sessionID string, response *WorkerResponse) error {
+	if w.crdt[sessionID] == nil {
+		return NoCRDTError(sessionID)
+	}
+	response.Payload = make([]interface{}, 1)
+	response.Payload[0] = w.crdt[sessionID]
+	return nil
+}
+
+//**RPC SETUP CODE**//
 
 func (w *Worker) listenRPC() {
 	addrs, _ := net.InterfaceAddrs()
@@ -150,6 +405,17 @@ func (w *Worker) listenRPC() {
 	}()
 }
 
+func (w *Worker) listenHTTP() {
+	http.HandleFunc("/ws", w.wsHandler)
+	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
+	checkError(err)
+	listener, err := net.ListenTCP("tcp", httpAddr)
+	checkError(err)
+	w.localHTTPAddr = listener.Addr()
+	go http.Serve(listener, nil)
+	w.logger.Println("listening for HTTP on: ", listener.Addr().String())
+}
+
 func (w *Worker) registerWithLB() {
 	loadBalancerConn, err := rpc.Dial("tcp", w.serverAddr)
 	checkError(err)
@@ -172,7 +438,7 @@ func (w *Worker) startHeartBeat() {
 	}
 }
 
-// Gets miners from server if below MinNumMinerConnections
+// Gets workers from server if below MinNumMinerConnections
 func (w *Worker) getWorkers() {
 	var addrSet []net.Addr
 	for workerAddr, workerCon := range w.workers {
@@ -208,39 +474,6 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 	}
 }
 
-
-func (w *Worker) sendLocalOps() error {
-	for {
-		time.Sleep(time.Second * 10)
-		// w.getWorkers() // checks all workers, connects to more if needed
-		request := new(WorkerRequest)
-		request.Payload = make([]interface{}, 1)
-		request.Payload[0] = w.localOps
-		response := new(WorkerResponse)
-		for workerAddr, workerCon := range w.workers {
-			isConnected := false
-			workerCon.Call("Worker.PingWorker", "", &isConnected)
-			if isConnected {
-				workerCon.Call("Worker.ApplyIncomingOps", request, response)
-			} else {
-				delete(w.workers, workerAddr)
-			}
-		}
-		w.localOps = nil
-	}
-	return nil
-}
-
-func (w *Worker) ApplyIncomingOps(request *WorkerRequest, response *WorkerResponse) error {
-	incomingOps := request.Payload[0].([]Operation)
-	for _, op := range incomingOps {
-		if w.crdt[op.ID] == nil {
-			w.addToCRDT(&op)
-		}
-	}
-	return nil
-}
-
 func (w *Worker) BidirectionalSetup(request *WorkerRequest, response *WorkerResponse) error {
 	workerAddr := request.Payload[0].(string)
 	workerConn, err := rpc.Dial("tcp", workerAddr)
@@ -259,43 +492,7 @@ func (w *Worker) PingWorker(payload string, reply *bool) error {
 	return nil
 }
 
-
-// Gets the Session CRDT from File System to send to client
-// Constructs the msg and calls w.writer(msg) to write to client
-func (w *Worker) getSessCRDT(msg WSMessage) {
-	// TODO:
-	//	File System RPC Call to get CRDT
-	//msg.Payload = "This is suppose to be the CRDT"
-	w.sendToClient(msg)
-}
-
-func checkError(err error) error {
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	return nil
-}
-
-/*==========================================================================================
-								CLIENT TO WORKER/WORKER TO CLIENT
-  ==========================================================================================*/
-
-func (w *Worker) listenHTTP() {
-	http.HandleFunc("/ws", w.wsHandler)
-
-	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
-	checkError(err)
-
-	listener, err := net.ListenTCP("tcp", httpAddr)
-	checkError(err)
-
-	w.localHTTPAddr = listener.Addr()
-
-	go http.Serve(listener, nil)
-
-	w.logger.Println("Listening for WebSocket connections on: ", listener.Addr().String())
-}
+//**WEBSOCKET CODE**//
 
 // HTTP point to bootstrap websocket connection between client and worker
 // Client should send their userID in a Get Request URL Parameter
@@ -322,25 +519,18 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 // Different commands should be handled here.
 func (w *Worker) reader(conn *websocket.Conn, userID string) {
 	for {
-		m := WSMessage{}
-
+		m := browserMsg{}
 		err := conn.ReadJSON(&m)
 		if err != nil {
 			w.logger.Println("Error reading from websocket: ", err)
-
 			delete(w.clients, userID)
 			return
-		} else {
-			w.logger.Println("Got message from "+userID+": ", m)
 		}
+		w.logger.Println("Got message from "+userID+": ", m)
 
 		// Handle different commands here
 		if m.Command == "GetSessCRDT" {
 			w.getSessCRDT(m)
-		} else if m.Command == "HandleOp" {
-			w.receivedOps = append(w.receivedOps, m.ID)
-			w.sendToClients(m);
-			w.broadcastOp(m)
 		}
 	}
 }
@@ -348,9 +538,9 @@ func (w *Worker) reader(conn *websocket.Conn, userID string) {
 // Write function, it is only called when the worker needs to write to worker
 // If a write fails, the websocket will be closed.
 // Assumes an already constructed msg when called as an argument.
-func (w *Worker) sendToClient(msg WSMessage) {
+func (w *Worker) writer(msg browserMsg) {
+	// Write to Socket
 	conn := w.clients[msg.Username]
-
 	err := conn.WriteJSON(msg)
 	if err != nil {
 		w.logger.Println("Error writing to websocket: ", err)
@@ -359,218 +549,40 @@ func (w *Worker) sendToClient(msg WSMessage) {
 	}
 }
 
-func (w *Worker) sendToClients(msg WSMessage) {
-	for username, conn := range w.clients {
-		err := conn.WriteJSON(msg)
-		if err != nil {
-			w.logger.Println("Failed to send message to client '" + username + "':", err)
-		}
-	}
+// Gets the Session CRDT from File System to send to client
+// Constructs the msg and calls w.writer(msg) to write to client
+func (w *Worker) getSessCRDT(msg browserMsg) {
+	// TODO:
+	//	File System RPC Call to get CRDT
+	msg.Payload = "This is suppose to be the CRDT"
+	w.writer(msg)
 }
 
-/*==========================================================================================
-										OPERATIONS
-  ==========================================================================================*/
+//**UTIL CODE**//
 
-func (w *Worker) broadcastOp(msg WSMessage) error {
-	request := new(WorkerRequest)
-	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = msg
-	response := new(WorkerResponse)
-	for workerAddr, workerCon := range w.workers {
-		isConnected := false
-		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		if isConnected {
-			workerCon.Call("Worker.NewOp", request, response)
-		} else {
-			delete(w.workers, workerAddr)
-		}
+func checkError(err error) error {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
 	}
-
 	return nil
 }
 
-func (w *Worker) NewOp(request *WorkerRequest, response *WorkerResponse) error {
-	msg := request.Payload[0].(WSMessage)
-
-	var seen bool = false
-	for _, op := range w.receivedOps {
-		if op == msg.ID {
-			seen = true
-			break
-		}
-	}
-
-	if seen == false {
-		w.broadcastOp(msg);
-		w.sendToClients(msg);
-	}
-
-	return nil
-}
-
-/*==========================================================================================
-											CRDT
-  ==========================================================================================*/
-
-func (w *Worker) getCRDT() {
-	response := new(WorkerResponse)
-	for _, workerCon := range w.workers {
-		err := workerCon.Call("Worker.SendCRDT", "", response)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			w.crdt = response.Payload[0].(map[string]*Operation)
-			w.crdtFirstID = response.Payload[1].(string)
-			return
-		}
-	}
-}
-
-func (w *Worker) SendCRDT(payload string, response *WorkerResponse) error {
-	response.Payload = make([]interface{}, 2)
-	response.Payload[0] = w.crdt
-	response.Payload[1] = w.crdtFirstID
-	return nil
-}
-
-//****POC CODE***//
-
-// func (w *Worker) workerPrompt() {
-// 	reader := bufio.NewReader(os.Stdin)
-// 	for {
-// 		message := w.getMessage()
-// 		fmt.Println("Message:", message)
-// 		fmt.Print("Worker> ")
-// 		cmd, _ := reader.ReadString('\n')
-// 		if w.handleCommand(cmd) == 1 {
-// 			return
-// 		}
-// 	}
+// Code for creating random strings: only for POC(CLI)
+// const charset = "abcdefghijklmnopqrstuvwxyz" +
+//   "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+//
+// var seededRand *rand.Rand = rand.New(
+//   rand.NewSource(time.Now().UnixNano()))
+//
+// func StringWithCharset(length int, charset string) string {
+//   b := make([]byte, length)
+//   for i := range b {
+//     b[i] = charset[seededRand.Intn(len(charset))]
+//   }
+//   return string(b)
 // }
 //
-// // Iterate through the beginning of the CRDT to the end to show the message and
-// // specify the mapping of each character
-// func (w *Worker) getMessage() string {
-// 	var buffer bytes.Buffer
-// 	firstOp := w.crdt[w.crdtFirstID]
-// 	for firstOp != nil {
-// 		fmt.Println(firstOp.ID, "->", firstOp.Text)
-// 		buffer.WriteString(firstOp.Text)
-// 		firstOp = w.crdt[firstOp.NextID]
-// 	}
-// 	return buffer.String()
+// func String(length int) string {
+//   return StringWithCharset(length, charset)
 // }
-//
-// func (w *Worker) handleCommand(cmd string) int {
-// 	args := strings.Split(strings.TrimSpace(cmd), ",")
-//
-// 	switch args[0] {
-// 	case "addRight":
-// 		err := w.addRight(args[1], args[2])
-// 		if checkError(err) != nil {
-// 			return 0
-// 		}
-// 	case "refresh":
-// 		return 0
-// 	default:
-// 		fmt.Println(" Invalid command.")
-// 	}
-//
-// 	return 0
-// }
-
-// Adds a character to the right of the prevID specified in the args
-func (w *Worker) addRight(prevID, content string) error {
-	if !w.prevIDExists(prevID) {
-		return nil
-	}
-	opID := strconv.Itoa(w.nextOpNumber) + strconv.Itoa(w.workerID)
-	newOperation := &Operation{strconv.Itoa(w.workerID), INSERT, opID, prevID, "", content}
-	w.addToCRDT(newOperation)
-	return nil
-}
-
-func (w *Worker) addToCRDT(newOperation *Operation) error {
-	if w.firstCRDTEntry(newOperation.ID) {
-		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
-		return nil
-	}
-	if w.replacingFirstOp(newOperation, newOperation.PrevID, newOperation.ID) {
-		w.addOpAndIncrementCounter(newOperation, newOperation.ID)
-		return nil
-	}
-	w.normalInsert(newOperation, newOperation.PrevID, newOperation.ID)
-	w.addOpAndIncrementCounter(newOperation, newOperation.ID)
-	return nil
-}
-
-// Check if the prevID actually exists; if true, continue with addRight
-func (w *Worker) prevIDExists(prevID string) bool {
-	if _, ok := w.crdt[prevID]; ok || prevID == INITIAL_ID {
-		return true
-	} else {
-		return false
-	}
-}
-
-// The case where the first content is entered into a CRDT
-func (w *Worker) firstCRDTEntry(opID string) bool {
-	if len(w.crdt) <= 0 {
-		w.crdtFirstID = opID
-		return true
-	} else {
-		return false
-	}
-}
-
-// If your character is placed at the beginning of the message, it needs to become
-// the new firstOp so we can iterate through the CRDT properly
-func (w *Worker) replacingFirstOp(newOperation *Operation, prevID, opID string) bool {
-	if prevID == INITIAL_ID {
-		firstOp := w.crdt[w.crdtFirstID]
-		newOperation.NextID = w.crdtFirstID
-		firstOp.PrevID = opID
-		w.crdtFirstID = opID
-		return true
-	} else {
-		return false
-	}
-}
-
-// Any other insert that doesn't take place at the beginning or end is handled here
-func (w *Worker) normalInsert(newOperation *Operation, prevID, opID string) {
-	newPrevID := w.samePlaceInsertCheck(newOperation, prevID, opID)
-	prevOp := w.crdt[newPrevID]
-	newOperation.NextID = prevOp.NextID
-	prevOp.NextID = opID
-}
-
-// Checks if any other clients have made inserts to the same prevID. The algorithm
-// compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
-// will move further down the message until it is greater than the nextID
-func (w *Worker) samePlaceInsertCheck(newOperation *Operation, prevID, opID string) string {
-	var nextOpID int
-	prevOp := w.crdt[prevID]
-	if prevOp.NextID != "" {
-		nextOpID, _ = strconv.Atoi(prevOp.NextID)
-		newOpID, _ := strconv.Atoi(opID)
-		for nextOpID >= newOpID && newOperation.ClientID != w.crdt[prevOp.NextID].ClientID {
-			prevOp = w.crdt[strconv.Itoa(nextOpID)]
-			nextOpID, _ = strconv.Atoi(prevOp.NextID)
-		}
-		return prevOp.ID
-	} else {
-		return prevID
-	}
-
-}
-
-// Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
-// number can be incremented
-func (w *Worker) addOpAndIncrementCounter(newOperation *Operation, opID string) {
-	deepCopyOp := &Operation{newOperation.ClientID, newOperation.Type, newOperation.ID, newOperation.PrevID, newOperation.NextID, newOperation.Text}
-	w.crdt[opID] = deepCopyOp
-	w.localOps = append(w.localOps, *deepCopyOp)
-	w.nextOpNumber++
-}
