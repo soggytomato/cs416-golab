@@ -52,7 +52,7 @@ type Worker struct {
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
 	crdt             map[string]*CRDT
-	localOps         []Element
+	localElements         []Element
 }
 
 type WorkerResponse struct {
@@ -111,7 +111,7 @@ func main() {
 	worker.listenHTTP()
 	worker.registerWithLB()
 	worker.getWorkers()
-	go worker.sendLocalOps()
+	go worker.sendlocalElements()
 	// worker.workerPrompt() //POC(CLI)
 	for {
 
@@ -304,31 +304,31 @@ func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, opID string, 
 func (w *Worker) addOpAndIncrementCounter(newElement *Element, opID string, crdt *CRDT) {
 	deepCopyOp := &Element{newElement.SessionID, newElement.ClientID, newElement.ID, newElement.PrevID, newElement.NextID, newElement.Text, newElement.Deleted}
 	crdt.Elements[opID] = deepCopyOp
-	w.localOps = append(w.localOps, *deepCopyOp)
+	w.localElements = append(w.localElements, *deepCopyOp)
 	fmt.Println(crdt.NextOpNumber)
 	crdt.NextOpNumber++
 }
 
 // Send all of the ops made locally on this worker to all other connected workers
-// After sending, wipe all localOps from the worker
-func (w *Worker) sendLocalOps() error {
+// After sending, wipe all localElements from the worker
+func (w *Worker) sendlocalElements() error {
 	for {
 		time.Sleep(time.Second * 10)
 		// w.getWorkers() // checks all workers, connects to more if needed
 		request := new(WorkerRequest)
 		request.Payload = make([]interface{}, 1)
-		request.Payload[0] = w.localOps
+		request.Payload[0] = w.localElements
 		response := new(WorkerResponse)
 		for workerAddr, workerCon := range w.workers {
 			isConnected := false
 			workerCon.Call("Worker.PingWorker", "", &isConnected)
 			if isConnected {
-				workerCon.Call("Worker.ApplyIncomingOps", request, response)
+				workerCon.Call("Worker.applyIncomingElements", request, response)
 			} else {
 				delete(w.workers, workerAddr)
 			}
 		}
-		w.localOps = nil
+		w.localElements = nil
 	}
 	return nil
 }
@@ -336,7 +336,7 @@ func (w *Worker) sendLocalOps() error {
 // If the worker has the session in it's CRDT map, apply the op
 // If it doesn't, skip over applying the op
 // If it has applied these ops already, skip over applying the op
-func (w *Worker) ApplyIncomingOps(request *WorkerRequest, response *WorkerResponse) error {
+func (w *Worker) applyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
 	incomingOps := request.Payload[0].([]Element)
 	for _, op := range incomingOps {
 		crdt := w.crdt[op.SessionID]
@@ -438,7 +438,7 @@ func (w *Worker) startHeartBeat() {
 	}
 }
 
-// Gets miners from server if below MinNumMinerConnections
+// Gets workers from server if below MinNumMinerConnections
 func (w *Worker) getWorkers() {
 	var addrSet []net.Addr
 	for workerAddr, workerCon := range w.workers {
