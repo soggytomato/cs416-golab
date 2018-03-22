@@ -1,4 +1,4 @@
-/*
+	/*
 
 Port is dynamic
 
@@ -50,7 +50,7 @@ type Worker struct {
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
 	crdt             map[string]*CRDT
-	localOps         []Operation
+	localOps         []Element
 }
 
 type WorkerResponse struct {
@@ -70,15 +70,15 @@ const (
 )
 
 type CRDT struct {
-	Operations map[string]*Operation
+	Elements map[string]*Element
 	CrdtFirstID string
 	NextOpNumber int
 }
 
-type Operation struct {
+type Element struct {
 	SessionID string
 	ClientID string
-	Type     OpType
+	Deleted  bool
 	ID       string
 	PrevID   string
 	NextID   string
@@ -89,7 +89,7 @@ type browserMsg struct {
 	SessionID  string
 	Username   string
 	Command    string
-	Operations string
+	Elements string
 	Payload    string
 }
 
@@ -107,10 +107,10 @@ const TIME_BUFFER int = 500
 const INITIAL_ID string = "12345"
 
 func main() {
-	gob.Register(map[string]*Operation{})
+	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
-	gob.Register([]Operation{})
-	gob.Register(&Operation{})
+	gob.Register([]Element{})
+	gob.Register(&Element{})
 	gob.Register(&CRDT{})
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
@@ -119,7 +119,6 @@ func main() {
 	worker.listenHTTP()
 	worker.registerWithLB()
 	worker.getWorkers()
-	// worker.getCRDT()
 	go worker.sendLocalOps()
 	worker.workerPrompt()
 	for {
@@ -252,11 +251,11 @@ func (w *Worker) workerPrompt() {
 // specify the mapping of each character
 func (w *Worker) getMessage(crdt *CRDT) string {
 	var buffer bytes.Buffer
-	firstOp := crdt.Operations[crdt.CrdtFirstID]
+	firstOp := crdt.Elements[crdt.CrdtFirstID]
 	for firstOp != nil {
 		fmt.Println(firstOp.ID, "->", firstOp.Text)
 		buffer.WriteString(firstOp.Text)
-		firstOp = crdt.Operations[firstOp.NextID]
+		firstOp = crdt.Elements[firstOp.NextID]
 	}
 	return buffer.String()
 }
@@ -278,7 +277,7 @@ func (w *Worker) handleIntroCommand(cmd string) int {
 
 func (w *Worker) newSession() {
 	sessionID := String(5)
-	w.crdt[sessionID] = &CRDT{make(map[string]*Operation),"",1}
+	w.crdt[sessionID] = &CRDT{make(map[string]*Element),"",1}
 	w.crdtPrompt(sessionID)
 }
 
@@ -321,22 +320,22 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 	}
 	crdt := w.crdt[sessionID]
 	opID := strconv.Itoa(crdt.NextOpNumber) + strconv.Itoa(w.workerID)
-	newOperation := &Operation{sessionID, strconv.Itoa(w.workerID), INSERT, opID, prevID, "", content}
-	w.addToCRDT(newOperation, crdt)
+	newElement := &Element{sessionID, strconv.Itoa(w.workerID), false, opID, prevID, "", content}
+	w.addToCRDT(newElement, crdt)
 	return nil
 }
 
-func (w *Worker) addToCRDT(newOperation *Operation, crdt *CRDT) error {
-	if w.firstCRDTEntry(newOperation.ID, crdt) {
-		w.addOpAndIncrementCounter(newOperation, newOperation.ID, crdt)
+func (w *Worker) addToCRDT(newElement *Element, crdt *CRDT) error {
+	if w.firstCRDTEntry(newElement.ID, crdt) {
+		w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
 		return nil
 	}
-	if w.replacingFirstOp(newOperation, newOperation.PrevID, newOperation.ID, crdt) {
-		w.addOpAndIncrementCounter(newOperation, newOperation.ID, crdt)
+	if w.replacingFirstOp(newElement, newElement.PrevID, newElement.ID, crdt) {
+		w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
 		return nil
 	}
-	w.normalInsert(newOperation, newOperation.PrevID, newOperation.ID, crdt)
-	w.addOpAndIncrementCounter(newOperation, newOperation.ID,crdt)
+	w.normalInsert(newElement, newElement.PrevID, newElement.ID, crdt)
+	w.addOpAndIncrementCounter(newElement, newElement.ID,crdt)
 	return nil
 }
 
@@ -344,7 +343,7 @@ func (w *Worker) addToCRDT(newOperation *Operation, crdt *CRDT) error {
 func (w *Worker) prevIDExists(prevID, sessionID string) bool {
 	crdt := w.crdt[sessionID]
 	if crdt != nil {
-		if _, ok := crdt.Operations[prevID]; ok || prevID == INITIAL_ID {
+		if _, ok := crdt.Elements[prevID]; ok || prevID == INITIAL_ID {
 			return true
 		} else {
 			return false
@@ -356,7 +355,7 @@ func (w *Worker) prevIDExists(prevID, sessionID string) bool {
 
 // The case where the first content is entered into a CRDT
 func (w *Worker) firstCRDTEntry(opID string, crdt *CRDT) bool {
-	if len(crdt.Operations) <= 0 {
+	if len(crdt.Elements) <= 0 {
 		crdt.CrdtFirstID = opID
 		return true
 	} else {
@@ -366,10 +365,10 @@ func (w *Worker) firstCRDTEntry(opID string, crdt *CRDT) bool {
 
 // If your character is placed at the beginning of the message, it needs to become
 // the new firstOp so we can iterate through the CRDT properly
-func (w *Worker) replacingFirstOp(newOperation *Operation, prevID, opID string, crdt *CRDT) bool {
+func (w *Worker) replacingFirstOp(newElement *Element, prevID, opID string, crdt *CRDT) bool {
 	if prevID == INITIAL_ID {
-		firstOp := crdt.Operations[crdt.CrdtFirstID]
-		newOperation.NextID = crdt.CrdtFirstID
+		firstOp := crdt.Elements[crdt.CrdtFirstID]
+		newElement.NextID = crdt.CrdtFirstID
 		firstOp.PrevID = opID
 		crdt.CrdtFirstID = opID
 		return true
@@ -379,24 +378,24 @@ func (w *Worker) replacingFirstOp(newOperation *Operation, prevID, opID string, 
 }
 
 // Any other insert that doesn't take place at the beginning or end is handled here
-func (w *Worker) normalInsert(newOperation *Operation, prevID, opID string, crdt *CRDT) {
-	newPrevID := w.samePlaceInsertCheck(newOperation, prevID, opID, crdt)
-	prevOp := crdt.Operations[newPrevID]
-	newOperation.NextID = prevOp.NextID
+func (w *Worker) normalInsert(newElement *Element, prevID, opID string, crdt *CRDT) {
+	newPrevID := w.samePlaceInsertCheck(newElement, prevID, opID, crdt)
+	prevOp := crdt.Elements[newPrevID]
+	newElement.NextID = prevOp.NextID
 	prevOp.NextID = opID
 }
 
 // Checks if any other clients have made inserts to the same prevID. The algorithm
 // compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
 // will move further down the message until it is greater than the nextID
-func (w *Worker) samePlaceInsertCheck(newOperation *Operation, prevID, opID string, crdt *CRDT) string {
+func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, opID string, crdt *CRDT) string {
 	var nextOpID int
-	prevOp := crdt.Operations[prevID]
+	prevOp := crdt.Elements[prevID]
 	if prevOp.NextID != "" {
 		nextOpID, _ = strconv.Atoi(prevOp.NextID)
 		newOpID, _ := strconv.Atoi(opID)
-		for nextOpID >= newOpID && newOperation.ClientID != crdt.Operations[prevOp.NextID].ClientID {
-			prevOp = crdt.Operations[strconv.Itoa(nextOpID)]
+		for nextOpID >= newOpID && newElement.ClientID != crdt.Elements[prevOp.NextID].ClientID {
+			prevOp = crdt.Elements[strconv.Itoa(nextOpID)]
 			nextOpID, _ = strconv.Atoi(prevOp.NextID)
 		}
 		return prevOp.ID
@@ -408,9 +407,9 @@ func (w *Worker) samePlaceInsertCheck(newOperation *Operation, prevID, opID stri
 
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
 // number can be incremented
-func (w *Worker) addOpAndIncrementCounter(newOperation *Operation, opID string, crdt *CRDT) {
-	deepCopyOp := &Operation{newOperation.SessionID, newOperation.ClientID, newOperation.Type, newOperation.ID, newOperation.PrevID, newOperation.NextID, newOperation.Text}
-	crdt.Operations[opID] = deepCopyOp
+func (w *Worker) addOpAndIncrementCounter(newElement *Element, opID string, crdt *CRDT) {
+	deepCopyOp := &Element{newElement.SessionID, newElement.ClientID, newElement.Deleted, newElement.ID, newElement.PrevID, newElement.NextID, newElement.Text}
+	crdt.Elements[opID] = deepCopyOp
 	w.localOps = append(w.localOps, *deepCopyOp)
 	fmt.Println(crdt.NextOpNumber)
 	crdt.NextOpNumber++
@@ -460,11 +459,11 @@ func (w *Worker) sendLocalOps() error {
 }
 
 func (w *Worker) ApplyIncomingOps(request *WorkerRequest, response *WorkerResponse) error {
-	incomingOps := request.Payload[0].([]Operation)
+	incomingOps := request.Payload[0].([]Element)
 	for _, op := range incomingOps {
 		crdt := w.crdt[op.SessionID]
 		if crdt != nil {
-			if crdt.Operations[op.ID] == nil {
+			if crdt.Elements[op.ID] == nil {
 				w.addToCRDT(&op, crdt)
 			}
 		}
