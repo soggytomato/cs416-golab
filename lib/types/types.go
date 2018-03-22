@@ -17,15 +17,17 @@ type Session struct {
 }
 
 type Element struct {
-	ClientID string
-	ID       string
-	PrevID   string
-	Text     string
-	Deleted  bool
+	SessionID string
+	ClientID  string
+	ID        string
+	NextID    string
+	PrevID    string
+	Text      string
+	Deleted   bool
 }
 
 type Log struct {
-	Job	   Job
+	Job    Job
 	Output string
 }
 
