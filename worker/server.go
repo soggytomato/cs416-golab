@@ -22,6 +22,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	. "proj2_b0z8_b4n0b_i5n8_m9r8/lib/types"
 )
 
 // Errors that the server could return.
@@ -40,12 +42,6 @@ type Worker struct {
 	RPCAddress      net.Addr
 	HTTPAddress     net.Addr
 	RecentHeartbeat int64
-}
-
-type WorkerNetSettings struct {
-	WorkerID                int `json:"workerID"`
-	HeartBeat               int `json:"heartbeat"`
-	MinNumWorkerConnections int `json:"min-num-worker-connections"`
 }
 
 type AllWorkers struct {

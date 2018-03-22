@@ -29,30 +29,25 @@ import (
 	// "strings"
 )
 
-type WorkerNetSettings struct {
-	WorkerID                int `json:"workerID"`
-	HeartBeat               int `json:"heartbeat"`
-	MinNumWorkerConnections int `json:"min-num-worker-connections"`
-}
-
 type WorkerInfo struct {
 	RPCAddress  net.Addr
 	HTTPAddress net.Addr
 }
 
 type Worker struct {
-	workerID         int
-	loadBalancerConn *rpc.Client
-	settings         *WorkerNetSettings
-	serverAddr       string
-	localRPCAddr     net.Addr
-	localHTTPAddr    net.Addr
-	externalIP       string
-	clients          map[string]*websocket.Conn
-	workers          map[string]*rpc.Client
-	logger           *log.Logger
-	crdt             map[string]*CRDT
-	localElements    []Element
+	logger *log.Logger
+
+	workerID      int
+	settings      *WorkerNetSettings
+	serverAddr    string
+	localRPCAddr  net.Addr
+	localHTTPAddr net.Addr
+	externalIP    string
+	clients       map[string]*websocket.Conn
+	workers       map[string]*rpc.Client
+	logger        *log.Logger
+	crdt          map[string]*CRDT
+	localElements []Element
 }
 
 type WorkerResponse struct {
@@ -77,12 +72,14 @@ type CRDT struct { // For now, this is CRDT but will probably change to Session 
 	NextOpNumber int
 }
 
-type browserMsg struct {
+type WSMessage struct {
 	SessionID string
 	Username  string
 	Command   string
-	Elements  string
-	Payload   string
+	Type      string
+	ID        string
+	PrevID    string
+	Val       string
 }
 
 type NoCRDTError string
@@ -511,6 +508,7 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	}
 	w.logger.Println("New socket connection from: ", userID)
 	w.clients[userID[0]] = conn
+
 	go w.reader(conn, userID[0])
 }
 
@@ -519,7 +517,7 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 // Different commands should be handled here.
 func (w *Worker) reader(conn *websocket.Conn, userID string) {
 	for {
-		m := browserMsg{}
+		m := WSMessage{}
 		err := conn.ReadJSON(&m)
 		if err != nil {
 			w.logger.Println("Error reading from websocket: ", err)
@@ -531,6 +529,10 @@ func (w *Worker) reader(conn *websocket.Conn, userID string) {
 		// Handle different commands here
 		if m.Command == "GetSessCRDT" {
 			w.getSessCRDT(m)
+		} else if m.Command == "HandleOp" {
+			w.receivedOps = append(w.receivedOps, m.ID)
+			w.sendToClients(m)
+			w.broadcastOp(m)
 		}
 	}
 }
@@ -538,7 +540,7 @@ func (w *Worker) reader(conn *websocket.Conn, userID string) {
 // Write function, it is only called when the worker needs to write to worker
 // If a write fails, the websocket will be closed.
 // Assumes an already constructed msg when called as an argument.
-func (w *Worker) writer(msg browserMsg) {
+func (w *Worker) writer(msg WSMessage) {
 	// Write to Socket
 	conn := w.clients[msg.Username]
 	err := conn.WriteJSON(msg)
@@ -549,13 +551,64 @@ func (w *Worker) writer(msg browserMsg) {
 	}
 }
 
+func (w *Worker) sendToClients(msg WSMessage) {
+	for username, conn := range w.clients {
+		err := conn.WriteJSON(msg)
+		if err != nil {
+			w.logger.Println("Failed to send message to client '"+username+"':", err)
+		}
+	}
+}
+
+/*==========================================================================================
+										OPERATIONS
+  ==========================================================================================*/
+
+func (w *Worker) broadcastOp(msg WSMessage) error {
+	request := new(WorkerRequest)
+	request.Payload = make([]interface{}, 1)
+	request.Payload[0] = msg
+	response := new(WorkerResponse)
+	for workerAddr, workerCon := range w.workers {
+		isConnected := false
+		workerCon.Call("Worker.PingWorker", "", &isConnected)
+		if isConnected {
+			workerCon.Call("Worker.NewOp", request, response)
+		} else {
+			delete(w.workers, workerAddr)
+		}
+	}
+
+	return nil
+}
+
+func (w *Worker) NewOp(request *WorkerRequest, response *WorkerResponse) error {
+	msg := request.Payload[0].(WSMessage)
+
+	var seen bool = false
+	for _, op := range w.receivedOps {
+		if op == msg.ID {
+			seen = true
+			break
+		}
+	}
+
+	if seen == false {
+		w.broadcastOp(msg)
+		w.sendToClients(msg)
+	}
+
+	return nil
+}
+
 // Gets the Session CRDT from File System to send to client
 // Constructs the msg and calls w.writer(msg) to write to client
-func (w *Worker) getSessCRDT(msg browserMsg) {
+func (w *Worker) getSessCRDT(msg WSMessage) {
 	// TODO:
 	//	File System RPC Call to get CRDT
 	msg.Payload = "This is suppose to be the CRDT"
 	w.writer(msg)
+
 }
 
 //**UTIL CODE**//

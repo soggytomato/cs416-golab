@@ -310,7 +310,3 @@ function logOpsString() {
 function getOpsFromString(opsString) {
 	return JSON.parse(opsString);
 }
-
-function handleOp(op) {
-
-}
