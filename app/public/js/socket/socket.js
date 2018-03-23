@@ -3,9 +3,7 @@ socket = undefined;
 HANDLE_OP_CMD = 'HandleOp';
 
 function initWS(workerIP) {
-    console.log("Trying to connect to: " + "ws://" + workerIP + "/ws");
-
-    socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID);
+    socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID='+sessionID);
     statusHTML = $('#status');
 
     socket.onopen = onOpen;
