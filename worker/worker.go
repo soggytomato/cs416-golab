@@ -41,6 +41,7 @@ type Worker struct {
 	localRPCAddr  net.Addr
 	localHTTPAddr net.Addr
 	externalIP    string
+	sessions 	  map[string][]string
 	clients       map[string]*websocket.Conn
 	workers       map[string]*rpc.Client
 	logger        *log.Logger

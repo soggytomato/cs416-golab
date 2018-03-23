@@ -36,7 +36,7 @@ function sendElement(id) {
     const element = {
         SessionID: sessionID,
         ClientID: userID,
-        ID: _element.id,
+        ID: _element.id.toString(),
         PrevID: _element.prevId,
         Text: _element.val,
         Deleted: _element.del

@@ -21,9 +21,10 @@ class Element {
 	A SeqCRDT is a local list of all elements that comprise a snippet.
 */
 class SeqCRDT {
-	constructor(seqCRDT = new Array(), first) {
+	constructor(seqCRDT = new Array(), first, length) {
     	this.seq = seqCRDT;
     	this.first = first;
+    	this.length = Object.keys(seqCRDT).length;
     }
 
     get(id) {
@@ -32,6 +33,8 @@ class SeqCRDT {
 
     set(id, elem) {
     	this.seq[id] = elem;
+
+  		this.length++;
     }
 
     length() {
@@ -41,7 +44,7 @@ class SeqCRDT {
     /* 
     Creates UID based on increment. */
 	getNewID() {
-		return this.length();
+		return this.length + "_" + userID;
 	}
 
 	/*
