@@ -186,7 +186,18 @@ function handleRemoteInput(id, prevId, val) {
 	if (CRDT.get(id) !== undefined) return;
 
 	var prevElem, nextElem, prev, next;
+
 	prevElem = CRDT.get(prevId);
+	while (prevElem !== undefined) {
+		next = prevElem.next;
+
+		if (next === undefined || next < id) {
+			break;
+		} else {
+			prevElem = CRDT.get(next);
+		}
+	}
+
 	if (prevElem !== undefined) {
 		prev = prevElem.id;
 		next = prevElem.next;
@@ -195,6 +206,8 @@ function handleRemoteInput(id, prevId, val) {
 	} else {
 		// WHAT THE FUCK DO I DO?!?!??!
 	}
+
+
 
 	if (next !== undefined) {
 		nextElem = CRDT.get(next);
