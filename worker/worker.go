@@ -113,6 +113,7 @@ func (w *Worker) init() {
 	w.workers = make(map[string]*rpc.Client)
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
+	w.clientSessions = make(map[string][]string)
 }
 
 //****POC(CLI) CODE***//
