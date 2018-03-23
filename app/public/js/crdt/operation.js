@@ -148,7 +148,7 @@ function handleLocalInput(line, ch, val) {
 	CRDT.set(id, new Element(id, prev, next, val, false));
 	mapping.update(line, ch, id);
 
-	sendInput(id, prev, val);
+	sendElement(id);
 
 	if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
@@ -165,7 +165,7 @@ function handleLocalDelete(line, ch) {
 	// Apply to the editor
 	mapping.delete(line, ch);
 
-	sendDelete(id);
+	sendElement(id);
 
 	if (debugMode) console.log("Observed remove at line: " + line + " pos: " + ch);
 }

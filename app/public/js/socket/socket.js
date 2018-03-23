@@ -14,18 +14,12 @@ function initWS(workerIP) {
 }
 
 function onOpen() {
-    const msg = { 
-        SessionID: sessionID, 
-        Username: userID, 
-        Command: "GetSessCRDT"
-    };
-
-    socket.send(JSON.stringify(msg));
+    // GET THE SESS CRDT THROUGH A GET
 }
 
 function onClose() {
     console.log("Socket Close")
-        // TODO, connect to new worker if possible
+    // TODO, connect to new worker if possible
 }
 
 function onMessage(_msg) {
@@ -37,28 +31,16 @@ function onMessage(_msg) {
     }
 }
 
-function sendInput(id, prevId, val) {
-    const msg = {
+function sendElement(id) {
+    const _element = CRDT.get(id);
+    const element = {
         SessionID: sessionID,
-        Username: userID,
-        Command: HANDLE_OP_CMD,
-        Type: INPUT_OP,
-        ID: id,
-        PrevID: prevId,
-        Val: val
+        ClientID: userID,
+        ID: _element.id,
+        PrevID: _element.prevId,
+        Text: _element.val,
+        Deleted: _element.del
     };
 
-    socket.send(JSON.stringify(msg));
-}
-
-function sendDelete(id) {
-    const msg = {
-        SessionID: sessionID,
-        Username: userID,
-        Command: HANDLE_OP_CMD,
-        Type: DELETE_OP,
-        ID: id
-    };
-
-    socket.send(JSON.stringify(msg));
+    socket.send(JSON.stringify(element));
 }

@@ -21,8 +21,9 @@ class Element {
 	A SeqCRDT is a local list of all elements that comprise a snippet.
 */
 class SeqCRDT {
-	constructor(seqCRDT = new Array()) {
+	constructor(seqCRDT = new Array(), first) {
     	this.seq = seqCRDT;
+    	this.first = first;
     }
 
     get(id) {

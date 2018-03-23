@@ -35,8 +35,6 @@ type WorkerInfo struct {
 }
 
 type Worker struct {
-	logger *log.Logger
-
 	workerID      int
 	settings      *WorkerNetSettings
 	serverAddr    string
@@ -48,6 +46,7 @@ type Worker struct {
 	logger        *log.Logger
 	crdt          map[string]*CRDT
 	localElements []Element
+	loadBalancerConn *rpc.Client
 }
 
 type WorkerResponse struct {
@@ -59,27 +58,10 @@ type WorkerRequest struct {
 	Payload []interface{}
 }
 
-type OpType int
-
-const (
-	INSERT OpType = iota
-	DELETE
-)
-
 type CRDT struct { // For now, this is CRDT but will probably change to Session like type.go
 	Elements     map[string]*Element
 	CrdtFirstID  string
 	NextOpNumber int
-}
-
-type WSMessage struct {
-	SessionID string
-	Username  string
-	Command   string
-	Type      string
-	ID        string
-	PrevID    string
-	Val       string
 }
 
 type NoCRDTError string
@@ -517,99 +499,90 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 // Different commands should be handled here.
 func (w *Worker) reader(conn *websocket.Conn, userID string) {
 	for {
-		m := WSMessage{}
-		err := conn.ReadJSON(&m)
+		element := Element{}
+		err := conn.ReadJSON(&element)
 		if err != nil {
 			w.logger.Println("Error reading from websocket: ", err)
 			delete(w.clients, userID)
 			return
 		}
-		w.logger.Println("Got message from "+userID+": ", m)
-
-		// Handle different commands here
-		if m.Command == "GetSessCRDT" {
-			w.getSessCRDT(m)
-		} else if m.Command == "HandleOp" {
-			w.receivedOps = append(w.receivedOps, m.ID)
-			w.sendToClients(m)
-			w.broadcastOp(m)
-		}
+		w.logger.Println("Got message from "+userID+": ", element)
 	}
 }
 
 // Write function, it is only called when the worker needs to write to worker
 // If a write fails, the websocket will be closed.
 // Assumes an already constructed msg when called as an argument.
-func (w *Worker) writer(msg WSMessage) {
+func (w *Worker) writer(element Element) {
 	// Write to Socket
-	conn := w.clients[msg.Username]
-	err := conn.WriteJSON(msg)
+	conn := w.clients[element.ClientID]
+	err := conn.WriteJSON(element)
 	if err != nil {
 		w.logger.Println("Error writing to websocket: ", err)
-		delete(w.clients, msg.Username)
+		delete(w.clients, element.ClientID)
 		return
 	}
 }
 
-func (w *Worker) sendToClients(msg WSMessage) {
+func (w *Worker) sendToClients(element Element) {
 	for username, conn := range w.clients {
-		err := conn.WriteJSON(msg)
+		err := conn.WriteJSON(element)
 		if err != nil {
 			w.logger.Println("Failed to send message to client '"+username+"':", err)
 		}
 	}
 }
 
-/*==========================================================================================
-										OPERATIONS
-  ==========================================================================================*/
+// /*==========================================================================================
+// 										OPERATIONS
+//   ==========================================================================================*/
 
-func (w *Worker) broadcastOp(msg WSMessage) error {
-	request := new(WorkerRequest)
-	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = msg
-	response := new(WorkerResponse)
-	for workerAddr, workerCon := range w.workers {
-		isConnected := false
-		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		if isConnected {
-			workerCon.Call("Worker.NewOp", request, response)
-		} else {
-			delete(w.workers, workerAddr)
-		}
-	}
+// func (w *Worker) broadcastOp(msg WSMessage) error {
+// 	request := new(WorkerRequest)
+// 	request.Payload = make([]interface{}, 1)
+// 	request.Payload[0] = msg
+// 	response := new(WorkerResponse)
+// 	for workerAddr, workerCon := range w.workers {
+// 		isConnected := false
+// 		workerCon.Call("Worker.PingWorker", "", &isConnected)
+// 		if isConnected {
+// 			workerCon.Call("Worker.NewOp", request, response)
+// 		} else {
+// 			delete(w.workers, workerAddr)
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (w *Worker) NewOp(request *WorkerRequest, response *WorkerResponse) error {
-	msg := request.Payload[0].(WSMessage)
+// func (w *Worker) NewOp(request *WorkerRequest, response *WorkerResponse) error {
+// 	msg := request.Payload[0].(WSMessage)
 
-	var seen bool = false
-	for _, op := range w.receivedOps {
-		if op == msg.ID {
-			seen = true
-			break
-		}
-	}
+// 	var seen bool = false
+// 	for _, op := range w.receivedOps {
+// 		if op == msg.ID {
+// 			seen = true
+// 			break
+// 		}
+// 	}
 
-	if seen == false {
-		w.broadcastOp(msg)
-		w.sendToClients(msg)
-	}
+// 	if seen == false {
+// 		w.broadcastOp(msg)
+// 		w.sendToClients(msg)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-// Gets the Session CRDT from File System to send to client
-// Constructs the msg and calls w.writer(msg) to write to client
-func (w *Worker) getSessCRDT(msg WSMessage) {
-	// TODO:
-	//	File System RPC Call to get CRDT
-	msg.Payload = "This is suppose to be the CRDT"
-	w.writer(msg)
+// // Gets the Session CRDT from File System to send to client
+// // Constructs the msg and calls w.writer(msg) to write to client
+// func (w *Worker) getSessCRDT(msg WSMessage) {
+// 	// TODO:
+// 	//	File System RPC Call to get CRDT
+// 	msg.Payload = "This is suppose to be the CRDT"
+// 	w.writer(msg)
 
-}
+// }
 
 //**UTIL CODE**//
 
