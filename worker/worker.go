@@ -273,6 +273,7 @@ func (w *Worker) replacingFirstOp(newElement *Element, prevID, opID string, crdt
 
 // Any other insert that doesn't take place at the beginning or end is handled here
 func (w *Worker) normalInsert(newElement *Element, prevID, opID string, crdt *CRDT) {
+	fmt.Println("prevID:", prevID)
 	newPrevID := w.samePlaceInsertCheck(newElement, prevID, opID, crdt)
 	prevOp := crdt.Elements[newPrevID]
 	newElement.NextID = prevOp.NextID
@@ -323,7 +324,7 @@ func (w *Worker) sendlocalElements() error {
 			isConnected := false
 			workerCon.Call("Worker.PingWorker", "", &isConnected)
 			if isConnected {
-				workerCon.Call("Worker.applyIncomingElements", request, response)
+				workerCon.Call("Worker.ApplyIncomingElements", request, response)
 			} else {
 				delete(w.workers, workerAddr)
 			}
@@ -336,7 +337,7 @@ func (w *Worker) sendlocalElements() error {
 // If the worker has the session in it's CRDT map, apply the op
 // If it doesn't, skip over applying the op
 // If it has applied these ops already, skip over applying the op
-func (w *Worker) applyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
+func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
 	incomingOps := request.Payload[0].([]Element)
 	for _, op := range incomingOps {
 		crdt := w.crdt[op.SessionID]
