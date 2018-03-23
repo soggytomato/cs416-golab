@@ -505,6 +505,7 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		logSettings := *new(LogSettings)
 		logSettings.JobID = jobID
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
 		json.NewEncoder(wr).Encode(logSettings)
 
 		go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
@@ -566,7 +567,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 
 	err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
 	checkError(err)
-	log := response.Payload[0].(Log)
+	log := fsResponse.Payload[0].(Log)
 
 	fileName := "runSnippet_" + jobID + ".go"
 	err = ioutil.WriteFile(fileName, []byte(log.Job.Snippet), 0777)
@@ -576,6 +577,8 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	var output, stderr bytes.Buffer
 	cmd.Stdout = &output
 	cmd.Stderr = &stderr
+
+	// TODO: add timeout, probably don't needa check err of cmd.Run
 	err = cmd.Run()
 	checkError(err)
 
