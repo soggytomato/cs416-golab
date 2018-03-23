@@ -19,19 +19,6 @@ $(document).ready(function(){
             $('.output').height(containerH - curH - $('.output-wrapper').find('span').height());
         }
     });
-
-	// Make my life easier
-	if (debugMode) {
-		userID = "user";
-		sessionID = "session";
-
-		$('.register').css('display', 'none');
-		$('.editor').slideDown('slow');
-
-		setTimeout(function(){
-			editor.refresh();
-		}, 500);
-	}
 });
 
 $(document).ready(function() {
