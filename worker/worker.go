@@ -15,18 +15,22 @@ import (
 
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	// "strings"
 	"time"
 
+	. "../lib/types"
 	"github.com/gorilla/websocket"
 )
 
@@ -46,6 +50,8 @@ type Worker struct {
 	loadBalancerConn *rpc.Client
 	settings         *WorkerNetSettings
 	serverAddr       string
+	fserverAddr      string
+	fsServerConn     *rpc.Client
 	localRPCAddr     net.Addr
 	localHTTPAddr    net.Addr
 	externalIP       string
@@ -58,13 +64,9 @@ type Worker struct {
 	crdtFirstID      string
 }
 
-type WorkerResponse struct {
-	Error   error
-	Payload []interface{}
-}
-
-type WorkerRequest struct {
-	Payload []interface{}
+type LogSettings struct {
+	JobID  string `json:"JobID"`
+	Output string `json:"Output"`
 }
 
 type OpType int
@@ -99,28 +101,34 @@ const TIME_BUFFER int = 500
 const INITIAL_ID string = "12345"
 
 func main() {
+	if len(os.Args) != 3 {
+		usage()
+	}
 	gob.Register(map[string]*Operation{})
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]Operation{})
 	gob.Register(&Operation{})
+	RegisterGob()
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
 	worker.listenRPC()
 	worker.listenHTTP()
 	worker.registerWithLB()
+	worker.connectToFS()
 	worker.getWorkers()
 	worker.getCRDT()
 	go worker.sendLocalOps()
-	worker.handleRun()
-	for {
 
-	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	wg.Wait()
 }
 
 func (w *Worker) init() {
 	args := os.Args[1:]
 	w.serverAddr = args[0]
+	w.fserverAddr = args[1]
 	w.workers = make(map[string]*rpc.Client)
 	w.crdt = make(map[string]*Operation)
 	w.nextOpNumber = 1
@@ -157,6 +165,7 @@ func (w *Worker) listenRPC() {
 
 func (w *Worker) listenHTTP() {
 	http.HandleFunc("/ws", w.wsHandler)
+	http.HandleFunc("/execute", w.executeJob)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
 	checkError(err)
 	listener, err := net.ListenTCP("tcp", httpAddr)
@@ -177,6 +186,12 @@ func (w *Worker) registerWithLB() {
 	go w.startHeartBeat()
 	w.logger.SetPrefix("[Worker: " + strconv.Itoa(w.workerID) + "] ")
 	w.loadBalancerConn = loadBalancerConn
+}
+
+func (w *Worker) connectToFS() {
+	fsServerConn, err := rpc.Dial("tcp", w.fserverAddr)
+	checkError(err)
+	w.fsServerConn = fsServerConn
 }
 
 func (w *Worker) startHeartBeat() {
@@ -456,6 +471,47 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	go w.reader(conn, userID[0])
 }
 
+// HTTP point to handle an execute job from client
+// Assumption is the client will send a JSON object with the sessionID and code snippet in string form
+// Returns a log ID for the browser to store
+// Steps:
+//		- Construct and save the log to the file system
+//		- call Load Balancer with jobID
+//		- return to client with jobID
+func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
+
+	if r.Method == "POST" {
+		w.logger.Println("Got a /execute POST Request")
+		err := r.ParseForm()
+		checkError(err)
+		sessionID := r.FormValue("sessionID")
+		snippet := r.FormValue("snippet")
+
+		log := new(Log)
+		log.Job = *new(Job)
+		log.Job.SessionID = sessionID
+		log.Job.Snippet = snippet
+		jobID := generateLogID(16)
+		log.Job.JobID = jobID
+
+		// Save to FileSystem
+		request := new(FSRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = log
+		var ignored bool
+		err = w.fsServerConn.Call("Server.SaveLog", request, &ignored)
+		checkError(err)
+		// Sending back jobID
+		logSettings := *new(LogSettings)
+		logSettings.JobID = jobID
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		json.NewEncoder(wr).Encode(logSettings)
+
+		go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
+	}
+
+}
+
 // Read function to always listen for messages from the browser
 // If read fails, the websocket will be closed.
 // Different commands should be handled here.
@@ -473,8 +529,6 @@ func (w *Worker) reader(conn *websocket.Conn, userID string) {
 		// Handle different commands here
 		if m.Command == "GetSessCRDT" {
 			w.getSessCRDT(m)
-		} else if m.Command == "RunJob" {
-			w.handleRun(m)
 		}
 	}
 }
@@ -493,34 +547,29 @@ func (w *Worker) writer(msg browserMsg) {
 	}
 }
 
-// Handles when a client issues a run command for a session and snippet
-func (w *Worker) handleRun(msg browserMsg) {
-	// TODO Steps:
-	//		- Save to file system for jobID
-	//		- call Load Balancer with jobID
-	//		- return to client with jobID
-	var jobID int
-	var ignored bool
-
-	// Don't wait for return, just call and return back to client
-	go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
-	msg.Payload = strconv.Itoa(jobID)
-	w.writer(msg)
-}
-
 // Runs a job called by the load balancer
+//  Steps:
+//		- Gets log from File System
+// 		- saves and compiles the file locally
+//		- Runs the job
+//		- saves the log to File system
+//		- Acks back to Load Balancer that it is done
 func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
-	// TODO Steps:
-	//		- Gets log from File System
-	// 		- saves and compiles the file locally
-	//		- Runs the job
-	//		- saves the log to File system
-	//		- Acks back to Load Balancer that it is done
+
 	w.logger.Println("RunJob")
-	var fsResponse string
-	t := time.Now()
-	fileName := "runSnippet_" + t.Format("20060102150405") + ".go"
-	err := ioutil.WriteFile(fileName, []byte(fsResponse), 0777)
+	jobID := request.Payload[0].(string)
+
+	fsRequest := new(FSRequest)
+	fsRequest.Payload = make([]interface{}, 1)
+	fsRequest.Payload[0] = jobID
+	fsResponse := new(FSResponse)
+
+	err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
+	checkError(err)
+	log := response.Payload[0].(Log)
+
+	fileName := "runSnippet_" + jobID + ".go"
+	err = ioutil.WriteFile(fileName, []byte(log.Job.Snippet), 0777)
 	checkError(err)
 
 	cmd := exec.Command("go", "run", fileName)
@@ -533,9 +582,15 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Write the proper output to the log file
 	if len(stderr.String()) == 0 {
 		// No errors case
+		log.Output = output.String()
 	} else {
 		// There was a compile or runtime error
+		log.Output = stderr.String()
 	}
+	log.Job.Done = true
+	var ignored bool
+	fsRequest.Payload[0] = log
+	w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
 
 	return nil
 }
@@ -555,4 +610,19 @@ func checkError(err error) error {
 		return err
 	}
 	return nil
+}
+
+var ALPHABET = []rune("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+
+func generateLogID(length int) string {
+	id := make([]rune, length)
+	for i := range id {
+		id[i] = ALPHABET[rand.Intn(len(ALPHABET))]
+	}
+	return string(id)
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "Usage: go run worker.go [LBServer ip:port] [FSServer ip:port]\n")
+	os.Exit(1)
 }

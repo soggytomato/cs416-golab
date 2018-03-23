@@ -22,6 +22,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	. "../lib/types"
 )
 
 // Errors that the server could return.
@@ -264,7 +266,7 @@ func (s *LBServer) HeartBeat(workerID int, _ignored *bool) error {
 
 // This function is called when a worker receives a run request by their client
 // The worker will save the job
-func (s *LBServer) NewJob(jobID int, _ignored *bool) error {
+func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 	allWorkers.Lock()
 	defer allWorkers.Unlock()
 
@@ -288,7 +290,12 @@ func (s *LBServer) NewJob(jobID int, _ignored *bool) error {
 		request := new(WorkerRequest)
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = jobID
-		workerCon.Call("Worker.RunJob", request, response)
+		err = workerCon.Call("Worker.RunJob", request, response)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			// Send out the new log
+		}
 	}
 
 	return nil

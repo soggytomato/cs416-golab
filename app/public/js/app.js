@@ -1,8 +1,10 @@
 // Globals
-debugMode = true;
+debugMode = false;
 userID = "";
 sessionID = "";
 currentSessions = [];
+currentWorkerIP = ""
+jobIDs = []
 
 $(document).ready(function() {
     $('.input-wrapper').resizable({
@@ -67,6 +69,31 @@ $(document).ready(function() {
     formBindings();
 });
 
+function execute() {
+    var newForm = jQuery('<form>', {}).append(jQuery('<input>', {
+        'name': 'sessionID',
+        'value': sessionID,
+        'type': 'hidden'
+    }));
+    newForm.append(jQuery('<input>', {
+        'name': 'snippet',
+        'value': "This is a snippet",
+        'type': 'hidden'
+    }));
+    newForm.append()
+    $.ajax({
+        type: 'post',
+        url: "http://" + currentWorkerIP + '/execute',
+        dataType: 'json',
+        data: newForm.serialize(),
+        success: function(data) {
+            jobIDs.push(data.JobID);
+            console.log(jobIDs)
+            $(".logs").append("<span>" + data.JobID + "</span>")
+        }
+    })
+}
+
 function formBindings() {
     $('#newUserRadio').on('click', function() {
         $('.new-user-group').css('display', 'block');
@@ -106,7 +133,7 @@ function formBindings() {
                         ws = initWS(data.WorkerIP)
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
-
+                        currentWorkerIP = data.WorkerIP
                         setTimeout(function() {
                             editor.refresh();
                         }, 500);

@@ -10,6 +10,15 @@ type FSResponse struct {
 	Payload []interface{}
 }
 
+type WorkerResponse struct {
+	Error   error
+	Payload []interface{}
+}
+
+type WorkerRequest struct {
+	Payload []interface{}
+}
+
 type Session struct {
 	ID       string
 	Elements []Element
