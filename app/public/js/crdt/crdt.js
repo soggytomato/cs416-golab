@@ -34,25 +34,14 @@ class SeqCRDT {
     	this.seq[id] = elem;
     }
 
+    length() {
+    	return this.seq.length;
+    }
+
     /* 
-    Creates UID based on the current time and userID.
-
-	Its possible that the timestamp is not unique, so we append a counter to the end of the ID.
-	(Note: This will come in handle if we want to do block operations).	*/
+    Creates UID based on increment. */
 	getNewID() {
-		var id = userID + '_' + Date.now() + '_0';
-
-		const elem = this.seq[id];
-		if (elem !== undefined) {
-			var i = 1;
-			while (this.seq[id + '_' + i] !== undefined) {
-				i++;
-			}
-
-			id = id + '_' + i;
-		}
-
-		return id;
+		return this.length();
 	}
 
 	/*
