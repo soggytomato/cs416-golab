@@ -11,9 +11,10 @@ type FSResponse struct {
 }
 
 type Session struct {
-	ID       string
-	Elements []Element
-	Head     string
+	ID   string
+	CRDT map[string]*Element
+	Head string
+	Next int
 }
 
 type Element struct {
