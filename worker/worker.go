@@ -36,18 +36,18 @@ type WorkerInfo struct {
 
 type Worker struct {
 	workerID         int
+	loadBalancerConn *rpc.Client
 	settings         *WorkerNetSettings
 	serverAddr       string
 	localRPCAddr     net.Addr
 	localHTTPAddr    net.Addr
 	externalIP       string
-	sessions         map[string][]string
 	clients          map[string]*websocket.Conn
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
-	crdt             map[string]*CRDT
-	localElements    []Element
-	loadBalancerConn *rpc.Client
+	sessions         map[string]*Session
+	clientSessions   map[string][]string
+	localElements    []*Element
 }
 
 type WorkerResponse struct {
@@ -57,12 +57,6 @@ type WorkerResponse struct {
 
 type WorkerRequest struct {
 	Payload []interface{}
-}
-
-type CRDT struct { // For now, this is CRDT but will probably change to Session like type.go
-	Elements     map[string]*Element
-	CrdtFirstID  string
-	NextOpNumber int
 }
 
 type NoCRDTError string
@@ -81,9 +75,9 @@ const INITIAL_ID string = "12345"
 func main() {
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
-	gob.Register([]Element{})
+	gob.Register([]*Element{})
 	gob.Register(&Element{})
-	gob.Register(&CRDT{})
+	gob.Register(&Session{})
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
@@ -102,9 +96,9 @@ func (w *Worker) init() {
 	args := os.Args[1:]
 	w.serverAddr = args[0]
 	w.workers = make(map[string]*rpc.Client)
-	w.crdt = make(map[string]*CRDT)
+	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
-	w.sessions = make(map[string][]string)
+	w.clientSessions = make(map[string][]string)
 }
 
 //****POC(CLI) CODE***//
@@ -137,14 +131,14 @@ func (w *Worker) init() {
 //
 // func (w *Worker) newSession() {
 // 	sessionID := String(5)
-// 	w.crdt[sessionID] = &CRDT{make(map[string]*Element),"",1}
+// 	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
 // 	w.crdtPrompt(sessionID)
 // }
 //
 // func (w *Worker) crdtPrompt(sessionID string) {
 // 	reader := bufio.NewReader(os.Stdin)
 // 	for {
-// 		message := w.getMessage(w.crdt[sessionID])
+// 		message := w.getMessage(w.sessions[sessionID])
 // 		fmt.Println("SessionID:", sessionID)
 // 		fmt.Println("Message:", message)
 // 		fmt.Print("Worker> ")
@@ -157,13 +151,14 @@ func (w *Worker) init() {
 //
 // // Iterate through the beginning of the CRDT to the end to show the message and
 // // specify the mapping of each character
-// func (w *Worker) getMessage(crdt *CRDT) string {
+// func (w *Worker) getMessage(session *Session) string {
 // 	var buffer bytes.Buffer
-// 	firstOp := crdt.Elements[crdt.CrdtFirstID]
-// 	for firstOp != nil {
-// 		fmt.Println(firstOp.ID, "->", firstOp.Text)
-// 		buffer.WriteString(firstOp.Text)
-// 		firstOp = crdt.Elements[firstOp.NextID]
+// 	crdt := session.CRDT
+// 	firstElement := crdt[session.Head]
+// 	for firstElement != nil {
+// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
+// 		buffer.WriteString(firstElement.Text)
+// 		firstElement = crdt[firstElement.NextID]
 // 	}
 // 	return buffer.String()
 // }
@@ -193,38 +188,38 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 	if !w.prevIDExists(prevID, sessionID) {
 		return nil
 	}
-	crdt := w.crdt[sessionID]
-	opID := strconv.Itoa(crdt.NextOpNumber) + strconv.Itoa(w.workerID)
-	newElement := &Element{sessionID, strconv.Itoa(w.workerID), opID, prevID, "", content, false}
-	w.addToCRDT(newElement, crdt)
+	session := w.sessions[sessionID]
+	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
+	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false}
+	w.addToCRDT(newElement, session)
 	return nil
 }
 
-func (w *Worker) addToCRDT(newElement *Element, crdt *CRDT) error {
-	if w.firstCRDTEntry(newElement.ID, crdt) {
-		w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
+func (w *Worker) addToCRDT(newElement *Element, session *Session) error {
+	if w.firstCRDTEntry(newElement.ID, session) {
+		w.addElementAndIncrementCounter(newElement, session)
 		return nil
 	}
-	if w.replacingFirstOp(newElement, newElement.PrevID, newElement.ID, crdt) {
-		w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
+	if w.replacingFirstElement(newElement, newElement.PrevID, newElement.ID, session) {
+		w.addElementAndIncrementCounter(newElement, session)
 		return nil
 	}
-	w.normalInsert(newElement, newElement.PrevID, newElement.ID, crdt)
-	w.addOpAndIncrementCounter(newElement, newElement.ID, crdt)
+	w.normalInsert(newElement, newElement.PrevID, newElement.ID, session)
+	w.addElementAndIncrementCounter(newElement, session)
 	return nil
 }
 
-func (w *Worker) deleteFromCRDT(newElement *Element, crdt *CRDT) error {
-	crdt.Elements[newElement.ID].Deleted = true
+func (w *Worker) deleteFromCRDT(element *Element, session *Session) error {
+	session.CRDT[element.ID].Deleted = true
 
 	return nil
 }
 
 // Check if the prevID actually exists; if true, continue with addRight
 func (w *Worker) prevIDExists(prevID, sessionID string) bool {
-	crdt := w.crdt[sessionID]
-	if crdt != nil {
-		if _, ok := crdt.Elements[prevID]; ok || prevID == INITIAL_ID {
+	session := w.sessions[sessionID]
+	if session != nil {
+		if _, ok := session.CRDT[prevID]; ok || prevID == INITIAL_ID {
 			return true
 		} else {
 			return false
@@ -235,9 +230,9 @@ func (w *Worker) prevIDExists(prevID, sessionID string) bool {
 }
 
 // The case where the first content is entered into a CRDT
-func (w *Worker) firstCRDTEntry(opID string, crdt *CRDT) bool {
-	if len(crdt.Elements) <= 0 {
-		crdt.CrdtFirstID = opID
+func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
+	if len(session.CRDT) <= 0 {
+		session.Head = elementID
 		return true
 	} else {
 		return false
@@ -246,12 +241,12 @@ func (w *Worker) firstCRDTEntry(opID string, crdt *CRDT) bool {
 
 // If your character is placed at the beginning of the message, it needs to become
 // the new firstOp so we can iterate through the CRDT properly
-func (w *Worker) replacingFirstOp(newElement *Element, prevID, opID string, crdt *CRDT) bool {
-	if prevID == INITIAL_ID {
-		firstOp := crdt.Elements[crdt.CrdtFirstID]
-		newElement.NextID = crdt.CrdtFirstID
-		firstOp.PrevID = opID
-		crdt.CrdtFirstID = opID
+func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
+	if prevID == "" {
+		firstOp := session.CRDT[session.Head]
+		newElement.NextID = session.Head
+		firstOp.PrevID = elementID
+		session.Head = elementID
 		return true
 	} else {
 		return false
@@ -259,25 +254,25 @@ func (w *Worker) replacingFirstOp(newElement *Element, prevID, opID string, crdt
 }
 
 // Any other insert that doesn't take place at the beginning or end is handled here
-func (w *Worker) normalInsert(newElement *Element, prevID, opID string, crdt *CRDT) {
+func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, session *Session) {
 	fmt.Println("prevID:", prevID)
-	newPrevID := w.samePlaceInsertCheck(newElement, prevID, opID, crdt)
-	prevOp := crdt.Elements[newPrevID]
+	newPrevID := w.samePlaceInsertCheck(newElement, prevID, elementID, session)
+	prevOp := session.CRDT[newPrevID]
 	newElement.NextID = prevOp.NextID
-	prevOp.NextID = opID
+	prevOp.NextID = elementID
 }
 
 // Checks if any other clients have made inserts to the same prevID. The algorithm
 // compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
 // will move further down the message until it is greater than the nextID
-func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, opID string, crdt *CRDT) string {
+func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID string, session *Session) string {
 	var nextOpID int
-	prevOp := crdt.Elements[prevID]
+	prevOp := session.CRDT[prevID]
 	if prevOp.NextID != "" {
 		nextOpID, _ = strconv.Atoi(prevOp.NextID)
-		newOpID, _ := strconv.Atoi(opID)
-		for nextOpID >= newOpID && newElement.ClientID != crdt.Elements[prevOp.NextID].ClientID {
-			prevOp = crdt.Elements[strconv.Itoa(nextOpID)]
+		newOpID, _ := strconv.Atoi(elementID)
+		for nextOpID >= newOpID && newElement.ClientID != session.CRDT[prevOp.NextID].ClientID {
+			prevOp = session.CRDT[strconv.Itoa(nextOpID)]
 			nextOpID, _ = strconv.Atoi(prevOp.NextID)
 		}
 		return prevOp.ID
@@ -289,12 +284,11 @@ func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, opID string, 
 
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
 // number can be incremented
-func (w *Worker) addOpAndIncrementCounter(newElement *Element, opID string, crdt *CRDT) {
-	deepCopyOp := &Element{newElement.SessionID, newElement.ClientID, newElement.ID, newElement.PrevID, newElement.NextID, newElement.Text, newElement.Deleted}
-	crdt.Elements[opID] = deepCopyOp
-	w.localElements = append(w.localElements, *deepCopyOp)
-	fmt.Println(crdt.NextOpNumber)
-	crdt.NextOpNumber++
+func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Session) {
+	id := newElement.ID
+	session.CRDT[id] = newElement
+	w.localElements = append(w.localElements, newElement)
+	session.Next++
 }
 
 // Send all of the ops made locally on this worker to all other connected workers
@@ -302,7 +296,7 @@ func (w *Worker) addOpAndIncrementCounter(newElement *Element, opID string, crdt
 func (w *Worker) sendlocalElements() error {
 	for {
 		time.Sleep(time.Second * 10)
-		// w.getWorkers() // checks all workers, connects to more if needed
+		//w.getWorkers() // checks all workers, connects to more if needed
 		request := new(WorkerRequest)
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = w.localElements
@@ -325,12 +319,12 @@ func (w *Worker) sendlocalElements() error {
 // If it doesn't, skip over applying the op
 // If it has applied these ops already, skip over applying the op
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
-	incomingOps := request.Payload[0].([]Element)
-	for _, op := range incomingOps {
-		crdt := w.crdt[op.SessionID]
-		if crdt != nil {
-			if crdt.Elements[op.ID] == nil {
-				w.addToCRDT(&op, crdt)
+	elements := request.Payload[0].([]*Element)
+	for _, element := range elements {
+		session := w.sessions[element.SessionID]
+		if session != nil {
+			if session.CRDT[element.ID] == nil {
+				w.addToCRDT(element, session)
 			}
 		}
 	}
@@ -341,11 +335,13 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 func (w *Worker) getSession(sessionID string) {
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
-		err := workerCon.Call("Worker.SendCRDT", sessionID, response)
+		var isConnected bool
+		workerCon.Call("Worker.PingWorker", "", &isConnected)
+		err := workerCon.Call("Worker.SendSession", sessionID, response)
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			w.crdt[sessionID] = response.Payload[0].(*CRDT)
+			w.sessions[sessionID] = response.Payload[0].(*Session)
 			// w.crdtPrompt(sessionID) // Used in POC(CLI)
 			return
 		}
@@ -354,12 +350,12 @@ func (w *Worker) getSession(sessionID string) {
 
 // If client tries to get a session, this function can be used to get that session
 // if the worker has it in its CRDT map
-func (w *Worker) SendCRDT(sessionID string, response *WorkerResponse) error {
-	if w.crdt[sessionID] == nil {
+func (w *Worker) SendSession(sessionID string, response *WorkerResponse) error {
+	if w.sessions[sessionID] == nil {
 		return NoCRDTError(sessionID)
 	}
 	response.Payload = make([]interface{}, 1)
-	response.Payload[0] = w.crdt[sessionID]
+	response.Payload[0] = w.sessions[sessionID]
 	return nil
 }
 
@@ -408,7 +404,8 @@ func (w *Worker) registerWithLB() {
 	loadBalancerConn, err := rpc.Dial("tcp", w.serverAddr)
 	checkError(err)
 	settings := new(WorkerNetSettings)
-	err = loadBalancerConn.Call("LBServer.RegisterNewWorker", &WorkerInfo{w.localRPCAddr, w.localHTTPAddr}, settings)
+	info := &WorkerInfo{w.localRPCAddr, w.localHTTPAddr}
+	err = loadBalancerConn.Call("LBServer.RegisterNewWorker", info, settings)
 	checkError(err)
 	w.settings = settings
 	w.workerID = settings.WorkerID
@@ -495,24 +492,24 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	}
 
 	_clientID, _ := r.URL.Query()["userID"]
-	if len(clientID) == 0 {
+	if len(_clientID) == 0 {
 		http.Error(wr, "Missing clientID in URL parameter", http.StatusBadRequest)
 	}
 
 	_sessionID, _ := r.URL.Query()["sessionID"]
-	if len(sessionID) == 0 {
+	if len(_sessionID) == 0 {
 		http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
 	}
 
+	clientID := _clientID[0]
+	sessionID := _sessionID[0]
+
 	w.logger.Println("New socket connection from: ", clientID)
 
-	clientID = _clientID[0]
-	sessionID = _sessionID[0]
-
 	w.clients[clientID] = conn
-	w.sessions[sessionID] = append(w.sessions[sessionID, clientID)
+	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
 
-	go w.onElement(conn, clientID[0])
+	go w.onElement(conn, clientID)
 }
 
 // Read function to always listen for messages from the browser
@@ -520,8 +517,8 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 // Different commands should be handled here.
 func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	for {
-		element := Element{}
-		err := conn.ReadJSON(&element)
+		element := &Element{}
+		err := conn.ReadJSON(element)
 		if err != nil {
 			w.logger.Println("Error reading from websocket: ", err)
 			delete(w.clients, userID)
@@ -535,20 +532,20 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 
 		// Update session CRDT accordingly
 		if element.Deleted == true {
-			w.deleteFromCRDT(&element, w.crdt[element.SessionID])
+			w.deleteFromCRDT(element, w.sessions[element.SessionID])
 		} else {
-			w.addToCRDT(&element, w.crdt[element.SessionID])
+			w.addToCRDT(element, w.sessions[element.SessionID])
 		}
 
 		w.sendToClients(element)
 	}
 }
 
-func (w *Worker) sendToClients(element Element) {
+func (w *Worker) sendToClients(element *Element) {
 	sessionID := element.SessionID
 
 	var clientsToDelete []string
-	for _, clientID := range w.sessions[sessionID] {
+	for _, clientID := range w.clientSessions[sessionID] {
 		conn := w.clients[clientID]
 
 		err := conn.WriteJSON(element)
@@ -568,9 +565,9 @@ func (w *Worker) deleteClients(sessionID string, clients []string) {
 	for _, clientID := range clients {
 		delete(w.clients, clientID)
 
-		for i, id := range w.sessions[sessionID] {
+		for i, id := range w.clientSessions[sessionID] {
 			if id == clientID {
-				w.sessions[sessionID] = append(w.sessions[sessionID][:i], w.sessions[sessionID][i+1:]...)
+				w.clientSessions[sessionID] = append(w.clientSessions[sessionID][:i], w.clientSessions[sessionID][i+1:]...)
 				break
 			}
 		}
@@ -588,19 +585,19 @@ func checkError(err error) error {
 
 // Code for creating random strings: only for POC(CLI)
 // const charset = "abcdefghijklmnopqrstuvwxyz" +
-//   "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+// 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 //
 // var seededRand *rand.Rand = rand.New(
-//   rand.NewSource(time.Now().UnixNano()))
+// 	rand.NewSource(time.Now().UnixNano()))
 //
 // func StringWithCharset(length int, charset string) string {
-//   b := make([]byte, length)
-//   for i := range b {
-//     b[i] = charset[seededRand.Intn(len(charset))]
-//   }
-//   return string(b)
+// 	b := make([]byte, length)
+// 	for i := range b {
+// 		b[i] = charset[seededRand.Intn(len(charset))]
+// 	}
+// 	return string(b)
 // }
 //
 // func String(length int) string {
-//   return StringWithCharset(length, charset)
+// 	return StringWithCharset(length, charset)
 // }

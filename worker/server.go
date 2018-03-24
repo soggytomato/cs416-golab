@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	. "proj2_b0z8_b4n0b_i5n8_m9r8/lib/types"
+	. "../lib/types"
 )
 
 // Errors that the server could return.
