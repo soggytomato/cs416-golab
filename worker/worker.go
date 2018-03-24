@@ -130,11 +130,6 @@ func (w *Worker) init() {
 // 	return 0
 // }
 //
-// func (w *Worker) newSession() {
-// 	sessionID := String(5)
-// 	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
-// 	w.crdtPrompt(sessionID)
-// }
 //
 // func (w *Worker) crdtPrompt(sessionID string) {
 // 	reader := bufio.NewReader(os.Stdin)
@@ -332,8 +327,12 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 	return nil
 }
 
+func (w *Worker) newSession(sessionID string) {
+	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
+}
+
 // Client can provide the sessionID to get session from another worker
-func (w *Worker) getSession(sessionID string) {
+func (w *Worker) getSession(sessionID string) bool {
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
 		var isConnected bool
@@ -344,9 +343,10 @@ func (w *Worker) getSession(sessionID string) {
 		} else {
 			w.sessions[sessionID] = response.Payload[0].(*Session)
 			// w.crdtPrompt(sessionID) // Used in POC(CLI)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // If client tries to get a session, this function can be used to get that session
@@ -521,8 +521,11 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 
 	clientID := _clientID[0]
 	sessionID := _sessionID[0]
-
+	
 	w.logger.Println("New socket connection from: ", clientID, sessionID)
+	if !w.getSession(sessionID) {
+		w.newSession(sessionID)
+	}
 
 	w.clients[clientID] = conn
 	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
