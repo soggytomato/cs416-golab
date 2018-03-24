@@ -99,7 +99,7 @@ function formBindings() {
                         $('.editor').slideDown('slow');
 
                         setTimeout(function() {
-                            getSession();
+                            initCRDT();
                             editor.refresh();
                         }, 500);
                     }
@@ -161,18 +161,4 @@ function verifyRegister() {
     }
 
     return valid;
-}
-
-function getSession() {
-  $.ajax({
-      type: 'get',
-      url: 'http://'+workerIP+'/getSession',
-      data: {sessionID: sessionID},
-      success: function(data) {
-          console.log(data)
-      },
-      error: function(xhr, error) {
-        console.log(xhr, error);
-      }
-  })
 }

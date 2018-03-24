@@ -21,7 +21,7 @@ class Element {
 	A SeqCRDT is a local list of all elements that comprise a snippet.
 */
 class SeqCRDT {
-	constructor(seqCRDT = new Array(), first, length) {
+	constructor(seqCRDT = new Array(), first) {
     	this.seq = seqCRDT;
     	this.first = first;
     	this.length = Object.keys(seqCRDT).length;
@@ -41,7 +41,7 @@ class SeqCRDT {
     	return this.seq.length;
     }
 
-    /* 
+    /*
     Creates UID based on increment. */
 	getNewID() {
 		return this.length + "_" + userID;
@@ -93,7 +93,7 @@ class SeqCRDT {
 					curLine = lastLine + 1;
 				}
 
-				if (lastPos == undefined || lastVal == RETURN) { 
+				if (lastPos == undefined || lastVal == RETURN) {
 					curPos = 0;
 				} else {
 					curPos = lastPos + 1;
@@ -130,4 +130,15 @@ class SeqCRDT {
 		}
 	}
 }
-CRDT = new SeqCRDT();
+CRDT = undefined;
+
+function initCRDT() {
+  $.ajax({
+      type: 'get',
+      url: 'http://'+workerIP+'/getSession',
+      data: {sessionID: sessionID},
+      success: function(data) {
+        CRDT = new SeqCRDT(data.CRDT, data.Head)
+      }
+  })
+}

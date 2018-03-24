@@ -390,23 +390,8 @@ func (w *Worker) listenRPC() {
 	}()
 }
 
-func (w *Worker) SessionHandler(wr http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		_sessionID, _ := r.URL.Query()["sessionID"]
-		if len(_sessionID) == 0 {
-			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
-		}
-
-		sessionID := _sessionID[0]
-
-		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		wr.Header().Set("Access-Control-Allow-Origin", "*")
-		json.NewEncoder(wr).Encode("hello" + sessionID)
-	}
-}
-
 func (w *Worker) listenHTTP() {
-	http.HandleFunc("/getSession", w.SessionHandler)
+	http.HandleFunc("/getSession", w.sessionHandler)
 
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
@@ -495,6 +480,21 @@ func (w *Worker) PingWorker(payload string, reply *bool) error {
 	return nil
 }
 
+func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		sessionID := _sessionID[0]
+
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(wr).Encode(w.sessions[sessionID])
+	}
+}
+
 //**WEBSOCKET CODE**//
 
 // HTTP point to bootstrap websocket connection between client and worker
@@ -521,7 +521,7 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 
 	clientID := _clientID[0]
 	sessionID := _sessionID[0]
-	
+
 	w.logger.Println("New socket connection from: ", clientID, sessionID)
 	if !w.getSession(sessionID) {
 		w.newSession(sessionID)
@@ -558,6 +558,7 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 			w.addToCRDT(element, w.sessions[element.SessionID])
 		}
 
+		// TODO remove because we will buffer the sends
 		w.sendToClients(element)
 	}
 }
@@ -567,13 +568,16 @@ func (w *Worker) sendToClients(element *Element) {
 
 	var clientsToDelete []string
 	for _, clientID := range w.clientSessions[sessionID] {
-		conn := w.clients[clientID]
+		fmt.Println("Sending " + element.ClientID + " to user " + clientID)
+		if clientID != element.ClientID {
+			conn := w.clients[clientID]
 
-		err := conn.WriteJSON(element)
-		if err != nil {
-			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
+			err := conn.WriteJSON(element)
+			if err != nil {
+				w.logger.Println("Failed to send message to client '"+clientID+"':", err)
 
-			clientsToDelete = append(clientsToDelete, clientID)
+				clientsToDelete = append(clientsToDelete, clientID)
+			}
 		}
 	}
 
