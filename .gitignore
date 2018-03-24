@@ -2,3 +2,5 @@
 fs/log/
 
 worker/
+
+fs/nodeID

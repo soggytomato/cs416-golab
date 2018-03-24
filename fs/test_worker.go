@@ -28,24 +28,31 @@ func main() {
 
 	session := Session{
 		ID: "session-0",
-		Elements: make([]Element, 3),
-		Head: "session-0-head"}
-	session.Elements[0] = Element{
+		CRDT: make(map[string]*Element),
+		Head: "element-0",
+		Next: 4}
+	session.CRDT["element-0"] = &Element{
+		SessionID: "element-0",
 		ClientID: "client-0",
 		ID:       "element-0",
 		PrevID:   "",
+		NextID:   "element-1",
 		Text:     "a",
 		Deleted:  false}
-	session.Elements[1] = Element{
+	session.CRDT["element-1"] = &Element{
+		SessionID: "element-0",
 		ClientID: "client-0",
 		ID:       "element-1",
 		PrevID:   "element-0",
+		NextID:   "element-2",
 		Text:     "b",
 		Deleted:  false}
-	session.Elements[2] = Element{
+	session.CRDT["element-2"] = &Element{
+		SessionID: "element-0",
 		ClientID: "client-0",
 		ID:       "element-2",
 		PrevID:   "element-1",
+		NextID:   "",
 		Text:     "c",
 		Deleted:  false}
 
@@ -53,7 +60,8 @@ func main() {
 	request.Payload = make([]interface{}, 1)
 	request.Payload[0] = session
 
-	fmt.Println("Saving session...")
+	fmt.Println("Saving session:")
+	fmt.Println(session)
 	ignored := false
 	err = serverConn.Call("Server.SaveSession", request, &ignored)
 	checkError(err)
@@ -80,6 +88,9 @@ func main() {
 	newSession := response.Payload[0].(Session)
 	fmt.Println("Got session from file server:")
 	fmt.Println(newSession)
+	fmt.Println("First element: " + fmt.Sprint(*newSession.CRDT["element-0"]))
+	fmt.Println("Second element: " + fmt.Sprint(*newSession.CRDT["element-1"]))
+	fmt.Println("Third element: " + fmt.Sprint(*newSession.CRDT["element-2"]))
 
 	fmt.Println("Sleeping for 1000 ms...\n")
 	time.Sleep(1000 * time.Millisecond)
