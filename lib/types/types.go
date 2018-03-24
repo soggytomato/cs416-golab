@@ -20,8 +20,8 @@ type Element struct {
 	SessionID string
 	ClientID  string
 	ID        string
-	NextID    string
 	PrevID    string
+	NextID    string
 	Text      string
 	Deleted   bool
 }
