@@ -250,7 +250,7 @@ func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
 // If your character is placed at the beginning of the message, it needs to become
 // the new firstOp so we can iterate through the CRDT properly
 func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
-	if prevID == INITIAL_ID {
+	if prevID == "" {
 		firstOp := session.CRDT[session.Head]
 		newElement.NextID = session.Head
 		firstOp.PrevID = elementID
@@ -332,9 +332,9 @@ func (w *Worker) sendlocalElements() error {
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
 	elements := request.Payload[0].([]*Element)
 	for _, element := range elements {
-		crdt := w.sessions[element.SessionID]
-		if crdt != nil {
-			if _, ok := crdt.CRDT[element.ID]; ok {
+		session := w.sessions[element.SessionID]
+		if session != nil {
+			if _, ok := session.CRDT[element.ID]; ok {
 				w.addToCRDT(element, crdt)
 			}
 		}
