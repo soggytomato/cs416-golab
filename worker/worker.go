@@ -335,7 +335,7 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 		session := w.sessions[element.SessionID]
 		if session != nil {
 			if _, ok := session.CRDT[element.ID]; ok {
-				w.addToCRDT(element, crdt)
+				w.addToCRDT(element, session)
 			}
 		}
 	}
