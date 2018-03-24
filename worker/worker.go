@@ -504,7 +504,7 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	clientID := _clientID[0]
 	sessionID := _sessionID[0]
 
-	w.logger.Println("New socket connection from: ", clientID)
+	w.logger.Println("New socket connection from: ", clientID, sessionID)
 
 	w.clients[clientID] = conn
 	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
