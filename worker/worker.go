@@ -393,7 +393,7 @@ func (w *Worker) listenRPC() {
 }
 
 func (w *Worker) listenHTTP() {
-	http.HandleFunc("/getSession", w.sessionHandler)
+	http.HandleFunc("/session", w.sessionHandler)
 
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
@@ -494,6 +494,26 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
 		json.NewEncoder(wr).Encode(w.sessions[sessionID])
+	} else if r.Method == "POST" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		_userID, _ := r.URL.Query()["userID"]
+		if len(_userID) == 0 {
+			http.Error(wr, "Missing userID in URL parameter", http.StatusBadRequest)
+		}
+
+		fmt.Println("Session ID", _sessionID)
+		fmt.Println("User ID", _userID)
+
+		sessionID := _sessionID[0]
+		userID := _userID[0]
+
+		fmt.Println("Got delete request", sessionID, userID)
+
+		w.deleteClients(sessionID, []string{userID})
 	}
 }
 

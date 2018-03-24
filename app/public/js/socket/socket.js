@@ -1,5 +1,11 @@
 socket = undefined;
 
+$(window).on('beforeunload', function(event) {
+  $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
+
+  console.log("hello")
+});
+
 function initWS() {
     socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID='+sessionID);
     statusHTML = $('#status');
@@ -14,8 +20,7 @@ function onOpen() {
 }
 
 function onClose() {
-    console.log("Socket Close")
-    // TODO, connect to new worker if possible
+  $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
 }
 
 function onMessage(_msg) {
@@ -29,7 +34,7 @@ function sendElement(id) {
     const element = {
         SessionID: sessionID,
         ClientID: userID,
-        ID: _element.id.toString(),
+        ID: _element.id,
         PrevID: _element.prevId,
         Text: _element.val,
         Deleted: _element.del

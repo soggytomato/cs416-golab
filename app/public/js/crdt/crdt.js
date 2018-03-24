@@ -135,7 +135,7 @@ CRDT = new SeqCRDT();
 function initCRDT() {
   $.ajax({
       type: 'get',
-      url: 'http://'+workerIP+'/getSession',
+      url: 'http://'+workerIP+'/session',
       data: {sessionID: sessionID},
       success: function(data) {
         const crdt = data.CRDT;
