@@ -6,7 +6,7 @@
 */
 class Element {
     constructor(id, prev, next, val, del) {
-    	this.id = id;
+    	  this.id = id;
         this.prev = prev;
         this.next = next;
         this.val = val;
@@ -80,7 +80,7 @@ class SeqCRDT {
 	toMapping() {
 		var _mapping = new Mapping();
 
-		var curElem = this.getFirstElement();
+		var curElem = this.first;
 		var lastVal, lastPos, lastLine;
 		while (curElem != undefined) {
 			if (curElem.del !== true) {
@@ -130,7 +130,7 @@ class SeqCRDT {
 		}
 	}
 }
-CRDT = undefined;
+CRDT = new SeqCRDT();
 
 function initCRDT() {
   $.ajax({
@@ -138,7 +138,25 @@ function initCRDT() {
       url: 'http://'+workerIP+'/getSession',
       data: {sessionID: sessionID},
       success: function(data) {
-        CRDT = new SeqCRDT(data.CRDT, data.Head)
+        const crdt = data.CRDT;
+
+        const ids = Object.keys(data.CRDT);
+        ids.forEach(function(id){
+          const element = crdt[id];
+          const prev = element.PrevID == "" ? undefined : element.PrevID;
+          const next = element.NextID  == "" ? undefined : element.NextID;
+          const val = element.Text;
+          const del = element.Deleted;
+
+          CRDT.seq[id] = new Element(id, prev, next, val, del)
+        });
+
+        CRDT.first = CRDT.getFirstElement();
+        CRDT.length = ids.length;
+
+        mapping = CRDT.toMapping();
+
+        editor.setValue(CRDT.toSnippet());
       }
   })
 }
