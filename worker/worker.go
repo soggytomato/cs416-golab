@@ -10,23 +10,24 @@ $ go run worker.go [loadbalancer ip:port]
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/gob"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	. "../lib/types"
 	"github.com/gorilla/websocket"
 	// POC(CLI) relevant
+	// "bufio"
+	// "bytes"
+	// "math/rand"
+	// "strings"
+
 )
 
 type WorkerNetSettings struct {
@@ -100,7 +101,7 @@ func main() {
 	worker.registerWithLB()
 	worker.getWorkers()
 	go worker.sendlocalElements()
-	worker.workerPrompt() //POC(CLI)
+	// worker.workerPrompt() //POC(CLI)
 	for {
 
 	}
@@ -117,83 +118,83 @@ func (w *Worker) init() {
 
 //****POC(CLI) CODE***//
 
-func (w *Worker) workerPrompt() {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("Worker> ")
-		cmd, _ := reader.ReadString('\n')
-		if w.handleIntroCommand(cmd) == 1 {
-			return
-		}
-	}
-}
-
-func (w *Worker) handleIntroCommand(cmd string) int {
-	args := strings.Split(strings.TrimSpace(cmd), ",")
-
-	switch args[0] {
-	case "newSession":
-		w.newSession()
-	case "getSession":
-		w.getSession(args[1])
-	default:
-		fmt.Println(" Invalid command.")
-	}
-
-	return 0
-}
-
-func (w *Worker) newSession() {
-	sessionID := String(5)
-	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
-	w.crdtPrompt(sessionID)
-}
-
-func (w *Worker) crdtPrompt(sessionID string) {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		message := w.getMessage(w.sessions[sessionID])
-		fmt.Println("SessionID:", sessionID)
-		fmt.Println("Message:", message)
-		fmt.Print("Worker> ")
-		cmd, _ := reader.ReadString('\n')
-		if w.handleCommand(cmd) == 1 {
-			return
-		}
-	}
-}
-
-// Iterate through the beginning of the CRDT to the end to show the message and
-// specify the mapping of each character
-func (w *Worker) getMessage(session *Session) string {
-	var buffer bytes.Buffer
-	crdt := session.CRDT
-	firstElement := crdt[session.Head]
-	for firstElement != nil {
-		fmt.Println(firstElement.ID, "->", firstElement.Text)
-		buffer.WriteString(firstElement.Text)
-		firstElement = crdt[firstElement.NextID]
-	}
-	return buffer.String()
-}
-
-func (w *Worker) handleCommand(cmd string) int {
-	args := strings.Split(strings.TrimSpace(cmd), ",")
-
-	switch args[0] {
-	case "addRight":
-		err := w.addRight(args[1], args[2], args[3])
-		if checkError(err) != nil {
-			return 0
-		}
-	case "exit":
-		return 1
-	default:
-		fmt.Println(" Invalid command.")
-	}
-
-	return 0
-}
+// func (w *Worker) workerPrompt() {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleIntroCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// func (w *Worker) handleIntroCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "newSession":
+// 		w.newSession()
+// 	case "getSession":
+// 		w.getSession(args[1])
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+//
+// func (w *Worker) newSession() {
+// 	sessionID := String(5)
+// 	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
+// 	w.crdtPrompt(sessionID)
+// }
+//
+// func (w *Worker) crdtPrompt(sessionID string) {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		message := w.getMessage(w.sessions[sessionID])
+// 		fmt.Println("SessionID:", sessionID)
+// 		fmt.Println("Message:", message)
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// // Iterate through the beginning of the CRDT to the end to show the message and
+// // specify the mapping of each character
+// func (w *Worker) getMessage(session *Session) string {
+// 	var buffer bytes.Buffer
+// 	crdt := session.CRDT
+// 	firstElement := crdt[session.Head]
+// 	for firstElement != nil {
+// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
+// 		buffer.WriteString(firstElement.Text)
+// 		firstElement = crdt[firstElement.NextID]
+// 	}
+// 	return buffer.String()
+// }
+//
+// func (w *Worker) handleCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "addRight":
+// 		err := w.addRight(args[1], args[2], args[3])
+// 		if checkError(err) != nil {
+// 			return 0
+// 		}
+// 	case "exit":
+// 		return 1
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
 
 //**CRDT CODE**//
 
@@ -203,7 +204,7 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 		return nil
 	}
 	session := w.sessions[sessionID]
-	elementID := strconv.Itoa(session.Next) + "_" + strconv.Itoa(w.workerID)
+	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
 	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false}
 	w.addToCRDT(newElement, session)
 	return nil
@@ -296,10 +297,7 @@ func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Ses
 	id := newElement.ID
 	session.CRDT[id] = newElement
 	w.localElements = append(w.localElements, newElement)
-
-	indexOf_ := strings.LastIndex(id, "_")
-	elNum, _ := strconv.Atoi(id[0:indexOf_])
-	session.Next = elNum + 1
+	session.Next++
 }
 
 // Send all of the ops made locally on this worker to all other connected workers
@@ -334,7 +332,7 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 	for _, element := range elements {
 		session := w.sessions[element.SessionID]
 		if session != nil {
-			if _, ok := session.CRDT[element.ID]; ok {
+			if session.CRDT[element.ID] == nil {
 				w.addToCRDT(element, session)
 			}
 		}
@@ -353,7 +351,7 @@ func (w *Worker) getSession(sessionID string) {
 			fmt.Println(err)
 		} else {
 			w.sessions[sessionID] = response.Payload[0].(*Session)
-			w.crdtPrompt(sessionID) // Used in POC(CLI)
+			// w.crdtPrompt(sessionID) // Used in POC(CLI)
 			return
 		}
 	}
@@ -565,20 +563,20 @@ func checkError(err error) error {
 }
 
 // Code for creating random strings: only for POC(CLI)
-const charset = "abcdefghijklmnopqrstuvwxyz" +
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-var seededRand *rand.Rand = rand.New(
-	rand.NewSource(time.Now().UnixNano()))
-
-func StringWithCharset(length int, charset string) string {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
-}
-
-func String(length int) string {
-	return StringWithCharset(length, charset)
-}
+// const charset = "abcdefghijklmnopqrstuvwxyz" +
+// 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+//
+// var seededRand *rand.Rand = rand.New(
+// 	rand.NewSource(time.Now().UnixNano()))
+//
+// func StringWithCharset(length int, charset string) string {
+// 	b := make([]byte, length)
+// 	for i := range b {
+// 		b[i] = charset[seededRand.Intn(len(charset))]
+// 	}
+// 	return string(b)
+// }
+//
+// func String(length int) string {
+// 	return StringWithCharset(length, charset)
+// }
