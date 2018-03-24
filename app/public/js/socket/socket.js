@@ -19,12 +19,9 @@ function onClose() {
 }
 
 function onMessage(_msg) {
-    const msg = JSON.parse(_msg.data);
+    const element = JSON.parse(_msg.data);
 
-    const cmd = msg.Command;
-    if (cmd == HANDLE_OP_CMD) {
-        handleRemoteOperation(msg);
-    }
+    handleRemoteOperation(element);
 }
 
 function sendElement(id) {
