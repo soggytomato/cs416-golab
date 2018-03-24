@@ -3,6 +3,7 @@ debugMode = true;
 userID = "";
 sessionID = "";
 currentSessions = [];
+workerIP = '';
 
 $(document).ready(function(){
     $('.input-wrapper').resizable({
@@ -90,11 +91,15 @@ function formBindings() {
                     if (data.WorkerIP.length == 0) {
                         alert("No available Workers, please try again later")
                     } else {
-                        initWS(data.WorkerIP)
+                        workerIP = data.WorkerIP;
+
+                        initWS()
+
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
 
                         setTimeout(function() {
+                            getSession();
                             editor.refresh();
                         }, 500);
                     }
@@ -156,4 +161,18 @@ function verifyRegister() {
     }
 
     return valid;
+}
+
+function getSession() {
+  $.ajax({
+      type: 'get',
+      url: 'http://'+workerIP+'/getSession',
+      data: {sessionID: sessionID},
+      success: function(data) {
+          console.log(data)
+      },
+      error: function(xhr, error) {
+        console.log(xhr, error);
+      }
+  })
 }

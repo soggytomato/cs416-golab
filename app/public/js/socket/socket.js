@@ -1,6 +1,6 @@
 socket = undefined;
 
-function initWS(workerIP) {
+function initWS() {
     socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID='+sessionID);
     statusHTML = $('#status');
 

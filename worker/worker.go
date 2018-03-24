@@ -11,6 +11,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -389,7 +390,24 @@ func (w *Worker) listenRPC() {
 	}()
 }
 
+func (w *Worker) SessionHandler(wr http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		sessionID := _sessionID[0]
+
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(wr).Encode("hello" + sessionID)
+	}
+}
+
 func (w *Worker) listenHTTP() {
+	http.HandleFunc("/getSession", w.SessionHandler)
+
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
 	checkError(err)
