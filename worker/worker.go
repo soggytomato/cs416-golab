@@ -89,7 +89,7 @@ const INITIAL_ID string = "12345"
 func main() {
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
-	gob.Register([]Element{})
+	gob.Register([]*Element{})
 	gob.Register(&Element{})
 	gob.Register(&Session{})
 	worker := new(Worker)
@@ -214,7 +214,7 @@ func (w *Worker) addToCRDT(newElement *Element, session *Session) error {
 		w.addElementAndIncrementCounter(newElement, session)
 		return nil
 	}
-	if w.replacingFirstOp(newElement, newElement.PrevID, newElement.ID, session) {
+	if w.replacingFirstElement(newElement, newElement.PrevID, newElement.ID, session) {
 		w.addElementAndIncrementCounter(newElement, session)
 		return nil
 	}
@@ -249,7 +249,7 @@ func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
 
 // If your character is placed at the beginning of the message, it needs to become
 // the new firstOp so we can iterate through the CRDT properly
-func (w *Worker) replacingFirstOp(newElement *Element, prevID, elementID string, session *Session) bool {
+func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
 	if prevID == INITIAL_ID {
 		firstOp := session.CRDT[session.Head]
 		newElement.NextID = session.Head
@@ -307,7 +307,7 @@ func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Ses
 func (w *Worker) sendlocalElements() error {
 	for {
 		time.Sleep(time.Second * 10)
-		// w.getWorkers() // checks all workers, connects to more if needed
+		//w.getWorkers() // checks all workers, connects to more if needed
 		request := new(WorkerRequest)
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = w.localElements
@@ -330,12 +330,12 @@ func (w *Worker) sendlocalElements() error {
 // If it doesn't, skip over applying the op
 // If it has applied these ops already, skip over applying the op
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
-	elements := request.Payload[0].([]Element)
+	elements := request.Payload[0].([]*Element)
 	for _, element := range elements {
 		crdt := w.sessions[element.SessionID]
 		if crdt != nil {
 			if _, ok := crdt.CRDT[element.ID]; ok {
-				w.addToCRDT(&element, crdt)
+				w.addToCRDT(element, crdt)
 			}
 		}
 	}
@@ -346,6 +346,8 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 func (w *Worker) getSession(sessionID string) {
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
+		var isConnected bool
+		workerCon.Call("Worker.PingWorker", "", &isConnected)
 		err := workerCon.Call("Worker.SendSession", sessionID, response)
 		if err != nil {
 			fmt.Println(err)
