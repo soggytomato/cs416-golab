@@ -10,8 +10,6 @@ $ go run worker.go [loadbalancer ip:port]
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/gob"
 	"fmt"
 	"log"
@@ -120,83 +118,83 @@ func (w *Worker) init() {
 
 //****POC(CLI) CODE***//
 
-func (w *Worker) workerPrompt() {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("Worker> ")
-		cmd, _ := reader.ReadString('\n')
-		if w.handleIntroCommand(cmd) == 1 {
-			return
-		}
-	}
-}
-
-func (w *Worker) handleIntroCommand(cmd string) int {
-	args := strings.Split(strings.TrimSpace(cmd), ",")
-
-	switch args[0] {
-	case "newSession":
-		w.newSession()
-	case "getSession":
-		w.getSession(args[1])
-	default:
-		fmt.Println(" Invalid command.")
-	}
-
-	return 0
-}
-
-func (w *Worker) newSession() {
-	sessionID := "5"
-	w.sessions[sessionID] = &Session{"5", make(map[string]*Element), "", 1}
-	w.crdtPrompt(sessionID)
-}
-
-func (w *Worker) crdtPrompt(sessionID string) {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		message := w.getMessage(w.sessions[sessionID])
-		fmt.Println("SessionID:", sessionID)
-		fmt.Println("Message:", message)
-		fmt.Print("Worker> ")
-		cmd, _ := reader.ReadString('\n')
-		if w.handleCommand(cmd) == 1 {
-			return
-		}
-	}
-}
-
-// Iterate through the beginning of the CRDT to the end to show the message and
-// specify the mapping of each character
-func (w *Worker) getMessage(session *Session) string {
-	var buffer bytes.Buffer
-	crdt := session.CRDT
-	firstElement := crdt[session.Head]
-	for firstElement != nil {
-		fmt.Println(firstElement.ID, "->", firstElement.Text)
-		buffer.WriteString(firstElement.Text)
-		firstElement = crdt[firstElement.NextID]
-	}
-	return buffer.String()
-}
-
-func (w *Worker) handleCommand(cmd string) int {
-	args := strings.Split(strings.TrimSpace(cmd), ",")
-
-	switch args[0] {
-	case "addRight":
-		err := w.addRight(args[1], args[2], args[3])
-		if checkError(err) != nil {
-			return 0
-		}
-	case "exit":
-		return 1
-	default:
-		fmt.Println(" Invalid command.")
-	}
-
-	return 0
-}
+// func (w *Worker) workerPrompt() {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleIntroCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// func (w *Worker) handleIntroCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "newSession":
+// 		w.newSession()
+// 	case "getSession":
+// 		w.getSession(args[1])
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+//
+// func (w *Worker) newSession() {
+// 	sessionID := "5"
+// 	w.sessions[sessionID] = &Session{"5", make(map[string]*Element), "", 1}
+// 	w.crdtPrompt(sessionID)
+// }
+//
+// func (w *Worker) crdtPrompt(sessionID string) {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		message := w.getMessage(w.sessions[sessionID])
+// 		fmt.Println("SessionID:", sessionID)
+// 		fmt.Println("Message:", message)
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// // Iterate through the beginning of the CRDT to the end to show the message and
+// // specify the mapping of each character
+// func (w *Worker) getMessage(session *Session) string {
+// 	var buffer bytes.Buffer
+// 	crdt := session.CRDT
+// 	firstElement := crdt[session.Head]
+// 	for firstElement != nil {
+// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
+// 		buffer.WriteString(firstElement.Text)
+// 		firstElement = crdt[firstElement.NextID]
+// 	}
+// 	return buffer.String()
+// }
+//
+// func (w *Worker) handleCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "addRight":
+// 		err := w.addRight(args[1], args[2], args[3])
+// 		if checkError(err) != nil {
+// 			return 0
+// 		}
+// 	case "exit":
+// 		return 1
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
 
 //**CRDT CODE**//
 
