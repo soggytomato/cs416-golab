@@ -2,7 +2,6 @@
 debugMode = true;
 userID = "";
 sessionID = "";
-isNewSession = undefined;
 currentSessions = [];
 
 $(document).ready(function(){
@@ -91,7 +90,6 @@ function formBindings() {
                     if (data.WorkerIP.length == 0) {
                         alert("No available Workers, please try again later")
                     } else {
-                        isNewSession = $('#register').find('#newSessionRadio').is(':checked')
                         initWS(data.WorkerIP)
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
