@@ -99,7 +99,6 @@ function formBindings() {
                         $('.editor').slideDown('slow');
 
                         setTimeout(function() {
-                            initCRDT();
                             editor.refresh();
                         }, 500);
                     }

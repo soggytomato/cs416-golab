@@ -19,6 +19,7 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	. "../lib/types"
@@ -200,8 +201,10 @@ func (w *Worker) addToCRDT(newElement *Element, session *Session) error {
 		w.addElementAndIncrementCounter(newElement, session)
 		return nil
 	}
+
 	w.normalInsert(newElement, newElement.PrevID, newElement.ID, session)
 	w.addElementAndIncrementCounter(newElement, session)
+
 	return nil
 }
 
@@ -262,14 +265,13 @@ func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, ses
 // compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
 // will move further down the message until it is greater than the nextID
 func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID string, session *Session) string {
-	var nextOpID int
 	prevOp := session.CRDT[prevID]
 	if prevOp.NextID != "" {
-		nextOpID, _ = strconv.Atoi(prevOp.NextID)
-		newOpID, _ := strconv.Atoi(elementID)
-		for nextOpID >= newOpID && newElement.ClientID != session.CRDT[prevOp.NextID].ClientID {
-			prevOp = session.CRDT[strconv.Itoa(nextOpID)]
-			nextOpID, _ = strconv.Atoi(prevOp.NextID)
+		newOpID := elementID
+		nextOpID := prevOp.NextID
+		for strings.Compare(nextOpID, newOpID) == 1 && newElement.ClientID != session.CRDT[nextOpID].ClientID {
+			prevOp = session.CRDT[nextOpID]
+			nextOpID = prevOp.NextID
 		}
 		return prevOp.ID
 	} else {
@@ -523,7 +525,8 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	sessionID := _sessionID[0]
 
 	w.logger.Println("New socket connection from: ", clientID, sessionID)
-	if !w.getSession(sessionID) {
+
+	if _, ok := w.sessions[sessionID]; !ok && !w.getSession(sessionID) {
 		w.newSession(sessionID)
 	}
 

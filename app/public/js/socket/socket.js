@@ -10,7 +10,7 @@ function initWS() {
 }
 
 function onOpen() {
-    // GET THE SESS CRDT THROUGH A GET
+    initCRDT();
 }
 
 function onClose() {
