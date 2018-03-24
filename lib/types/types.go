@@ -12,7 +12,7 @@ type FSResponse struct {
 
 type Session struct {
 	ID   string
-	CRDT map[string]Element
+	CRDT map[string]*Element
 	Head string
 	Next int
 }
