@@ -69,6 +69,7 @@ func (e NoCRDTError) Error() string {
 
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
+const ELEMENT_DELAY int = 2
 
 // Since we are adding a character to the right of another character, we need
 // a fake INITIAL_ID to use to place the first character in an empty message
@@ -292,7 +293,7 @@ func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Ses
 // After sending, wipe all localElements from the worker
 func (w *Worker) sendlocalElements() error {
 	for {
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
 		//w.getWorkers() // checks all workers, connects to more if needed
 		request := new(WorkerRequest)
 		request.Payload = make([]interface{}, 1)
@@ -322,8 +323,11 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 		if session != nil {
 			if session.CRDT[element.ID] == nil {
 				w.addToCRDT(element, session)
-				w.sendToClients(element)
 			}
+			if element.Deleted == true {
+				w.deleteFromCRDT(element, session)
+			}
+			w.sendToClients(element)
 		}
 	}
 	return nil
