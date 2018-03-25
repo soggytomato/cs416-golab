@@ -99,10 +99,6 @@ class Mapping {
 
 		// Update mapping
 		mapping.set(line, ch, id);
-
-		if (debugMode) {
-			console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));		
-		}
 	}
 
 	getPosition(id) {

@@ -11,6 +11,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	. "../lib/types"
@@ -27,14 +29,7 @@ import (
 	// "bytes"
 	// "math/rand"
 	// "strings"
-
 )
-
-type WorkerNetSettings struct {
-	WorkerID                int `json:"workerID"`
-	HeartBeat               int `json:"heartbeat"`
-	MinNumWorkerConnections int `json:"min-num-worker-connections"`
-}
 
 type WorkerInfo struct {
 	RPCAddress  net.Addr
@@ -64,14 +59,6 @@ type WorkerResponse struct {
 
 type WorkerRequest struct {
 	Payload []interface{}
-}
-
-type browserMsg struct {
-	SessionID string
-	Username  string
-	Command   string
-	Elements  string
-	Payload   string
 }
 
 type NoCRDTError string
@@ -144,11 +131,6 @@ func (w *Worker) init() {
 // 	return 0
 // }
 //
-// func (w *Worker) newSession() {
-// 	sessionID := String(5)
-// 	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
-// 	w.crdtPrompt(sessionID)
-// }
 //
 // func (w *Worker) crdtPrompt(sessionID string) {
 // 	reader := bufio.NewReader(os.Stdin)
@@ -219,8 +201,16 @@ func (w *Worker) addToCRDT(newElement *Element, session *Session) error {
 		w.addElementAndIncrementCounter(newElement, session)
 		return nil
 	}
+
 	w.normalInsert(newElement, newElement.PrevID, newElement.ID, session)
 	w.addElementAndIncrementCounter(newElement, session)
+
+	return nil
+}
+
+func (w *Worker) deleteFromCRDT(element *Element, session *Session) error {
+	session.CRDT[element.ID].Deleted = true
+
 	return nil
 }
 
@@ -249,12 +239,12 @@ func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
 }
 
 // If your character is placed at the beginning of the message, it needs to become
-// the new firstOp so we can iterate through the CRDT properly
+// the new firstElement so we can iterate through the CRDT properly
 func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
 	if prevID == "" {
-		firstOp := session.CRDT[session.Head]
+		firstElement := session.CRDT[session.Head]
 		newElement.NextID = session.Head
-		firstOp.PrevID = elementID
+		firstElement.PrevID = elementID
 		session.Head = elementID
 		return true
 	} else {
@@ -266,25 +256,23 @@ func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID st
 func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, session *Session) {
 	fmt.Println("prevID:", prevID)
 	newPrevID := w.samePlaceInsertCheck(newElement, prevID, elementID, session)
-	prevOp := session.CRDT[newPrevID]
-	newElement.NextID = prevOp.NextID
-	prevOp.NextID = elementID
+	prevElement := session.CRDT[newPrevID]
+	newElement.NextID = prevElement.NextID
+	prevElement.NextID = elementID
 }
 
 // Checks if any other clients have made inserts to the same prevID. The algorithm
-// compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
+// compares the prevElement's nextID to the incomingOp ID - if nextID is greater, incomingOp
 // will move further down the message until it is greater than the nextID
 func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID string, session *Session) string {
-	var nextOpID int
-	prevOp := session.CRDT[prevID]
-	if prevOp.NextID != "" {
-		nextOpID, _ = strconv.Atoi(prevOp.NextID)
-		newOpID, _ := strconv.Atoi(elementID)
-		for nextOpID >= newOpID && newElement.ClientID != session.CRDT[prevOp.NextID].ClientID {
-			prevOp = session.CRDT[strconv.Itoa(nextOpID)]
-			nextOpID, _ = strconv.Atoi(prevOp.NextID)
+	prevElement := session.CRDT[prevID]
+	if prevElement.NextID != "" {
+		nextElementID := prevElement.NextID
+		for strings.Compare(nextElementID, elementID) == 1 && newElement.ClientID != session.CRDT[nextElementID].ClientID {
+			prevElement = session.CRDT[nextElementID]
+			nextElementID = prevElement.NextID
 		}
-		return prevOp.ID
+		return prevElement.ID
 	} else {
 		return prevID
 	}
@@ -340,8 +328,12 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 	return nil
 }
 
+func (w *Worker) newSession(sessionID string) {
+	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
+}
+
 // Client can provide the sessionID to get session from another worker
-func (w *Worker) getSession(sessionID string) {
+func (w *Worker) getSession(sessionID string) bool {
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
 		var isConnected bool
@@ -352,9 +344,10 @@ func (w *Worker) getSession(sessionID string) {
 		} else {
 			w.sessions[sessionID] = response.Payload[0].(*Session)
 			// w.crdtPrompt(sessionID) // Used in POC(CLI)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 // If client tries to get a session, this function can be used to get that session
@@ -399,6 +392,8 @@ func (w *Worker) listenRPC() {
 }
 
 func (w *Worker) listenHTTP() {
+	http.HandleFunc("/session", w.sessionHandler)
+
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
 	checkError(err)
@@ -486,6 +481,41 @@ func (w *Worker) PingWorker(payload string, reply *bool) error {
 	return nil
 }
 
+func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		sessionID := _sessionID[0]
+
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(wr).Encode(w.sessions[sessionID])
+	} else if r.Method == "POST" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		_userID, _ := r.URL.Query()["userID"]
+		if len(_userID) == 0 {
+			http.Error(wr, "Missing userID in URL parameter", http.StatusBadRequest)
+		}
+
+		fmt.Println("Session ID", _sessionID)
+		fmt.Println("User ID", _userID)
+
+		sessionID := _sessionID[0]
+		userID := _userID[0]
+
+		fmt.Println("Got delete request", sessionID, userID)
+
+		w.deleteClients(sessionID, []string{userID})
+	}
+}
+
 //**WEBSOCKET CODE**//
 
 // HTTP point to bootstrap websocket connection between client and worker
@@ -499,66 +529,104 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(wr, "Could not open websocket connection", http.StatusBadRequest)
 	}
-	userID, _ := r.URL.Query()["userID"]
-	if len(userID) == 0 {
-		http.Error(wr, "Missing userID in URL parameter", http.StatusBadRequest)
+
+	_clientID, _ := r.URL.Query()["userID"]
+	if len(_clientID) == 0 {
+		http.Error(wr, "Missing clientID in URL parameter", http.StatusBadRequest)
 	}
-	w.logger.Println("New socket connection from: ", userID)
-	w.clients[userID[0]] = conn
-	go w.reader(conn, userID[0])
+
+	_sessionID, _ := r.URL.Query()["sessionID"]
+	if len(_sessionID) == 0 {
+		http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+	}
+
+	clientID := _clientID[0]
+	sessionID := _sessionID[0]
+
+	w.logger.Println("New socket connection from: ", clientID, sessionID)
+
+	if _, ok := w.sessions[sessionID]; !ok && !w.getSession(sessionID) {
+		w.newSession(sessionID)
+	}
+
+	w.clients[clientID] = conn
+	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
+
+	go w.onElement(conn, clientID)
 }
 
 // Read function to always listen for messages from the browser
 // If read fails, the websocket will be closed.
 // Different commands should be handled here.
-func (w *Worker) reader(conn *websocket.Conn, userID string) {
+func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	for {
-		m := browserMsg{}
-		err := conn.ReadJSON(&m)
+		element := &Element{}
+		err := conn.ReadJSON(element)
 		if err != nil {
 			w.logger.Println("Error reading from websocket: ", err)
 			delete(w.clients, userID)
 			return
+		} else {
+			w.logger.Println("Got element from "+userID+": ", element)
 		}
-		w.logger.Println("Got message from "+userID+": ", m)
 
-		// Handle different commands here
-		if m.Command == "GetSessCRDT" {
-			w.getSessCRDT(m)
+		// Push to local elements
+		w.localElements = append(w.localElements, element)
+
+		// Update session CRDT accordingly
+		if element.Deleted == true {
+			w.deleteFromCRDT(element, w.sessions[element.SessionID])
+		} else {
+			w.addToCRDT(element, w.sessions[element.SessionID])
 		}
+
+		// TODO remove because we will buffer the sends
+		w.sendToClients(element)
 	}
 }
 
-// Write function, it is only called when the worker needs to write to worker
-// If a write fails, the websocket will be closed.
-// Assumes an already constructed msg when called as an argument.
-func (w *Worker) writer(msg browserMsg) {
-	// Write to Socket
-	conn := w.clients[msg.Username]
-	err := conn.WriteJSON(msg)
-	if err != nil {
-		w.logger.Println("Error writing to websocket: ", err)
-		delete(w.clients, msg.Username)
-		return
-	}
-}
+func (w *Worker) sendToClients(element *Element) {
+	sessionID := element.SessionID
 
-// Gets the Session CRDT from File System to send to client
-// Constructs the msg and calls w.writer(msg) to write to client
-func (w *Worker) getSessCRDT(msg browserMsg) {
-	// TODO:
-	//	File System RPC Call to get CRDT
-	msg.Payload = "This is suppose to be the CRDT"
-	w.writer(msg)
+	var clientsToDelete []string
+	for _, clientID := range w.clientSessions[sessionID] {
+		fmt.Println("Sending " + element.ClientID + " to user " + clientID)
+		if clientID != element.ClientID {
+			conn := w.clients[clientID]
+
+			err := conn.WriteJSON(element)
+			if err != nil {
+				w.logger.Println("Failed to send message to client '"+clientID+"':", err)
+
+				clientsToDelete = append(clientsToDelete, clientID)
+			}
+		}
+	}
+
+	w.deleteClients(sessionID, clientsToDelete)
 }
 
 //**UTIL CODE**//
+
+func (w *Worker) deleteClients(sessionID string, clients []string) {
+	for _, clientID := range clients {
+		delete(w.clients, clientID)
+
+		for i, id := range w.clientSessions[sessionID] {
+			if id == clientID {
+				w.clientSessions[sessionID] = append(w.clientSessions[sessionID][:i], w.clientSessions[sessionID][i+1:]...)
+				break
+			}
+		}
+	}
+}
 
 func checkError(err error) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
+
 	return nil
 }
 

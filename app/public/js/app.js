@@ -3,6 +3,7 @@ debugMode = true;
 userID = "";
 sessionID = "";
 currentSessions = [];
+workerIP = '';
 
 $(document).ready(function(){
     $('.input-wrapper').resizable({
@@ -90,7 +91,10 @@ function formBindings() {
                     if (data.WorkerIP.length == 0) {
                         alert("No available Workers, please try again later")
                     } else {
-                        ws = initWS(data.WorkerIP)
+                        workerIP = data.WorkerIP;
+
+                        initWS()
+
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
 
@@ -105,23 +109,6 @@ function formBindings() {
         return false;
     });
 };
-
-function initWS(workerIP) {
-    console.log("Trying to connect to: " + "ws://" + workerIP + "/ws")
-    var socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID)
-    statusHTML = $('#status')
-    socket.onopen = function() {
-        ws.send(JSON.stringify({ SessionID: sessionID, Username: userID, Command: "GetSessCRDT", Operations: "delete d1, insert a3" }));
-    };
-    socket.onmessage = function(e) {
-        console.log(e.data)
-    }
-    socket.onclose = function() {
-        console.log("Socket Close")
-            // TODO, connect to new worker if possible
-    }
-    return socket;
-}
 
 function verifyRegister() {
     var valid = true;
