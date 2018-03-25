@@ -217,6 +217,39 @@ func (s *Server) getLog(jobID string) *Log {
 	return nil
 }
 
+// A helper function for retrieving a set of logs specified by a given
+// session ID.
+//
+func (s *Server) getLogs(sessionID string) []Log {
+	s.index.RLock()
+	defer s.index.RUnlock()
+
+	jobIDs := s.index.logs[sessionID]
+	if jobIDs == nil {
+		return nil
+	}
+
+	logsMap := make(map[string]*Log)
+	for jobID, _ := range jobIDs {
+		_log := s.getLog(jobID)
+		if _log != nil {
+			logsMap[jobID] = _log
+		}
+	}
+	if len(logsMap) == 0 {
+		return nil
+	}
+
+	logs := make([]Log, len(logsMap))
+	i := 0
+	for _, _log := range logsMap {
+		logs[i] = *_log
+		i++
+	}
+
+	return logs
+}
+
 // Saves a log to a specified node. If the log is saved successfully,
 // the node will be added to the map (s.logs) so that the log can be
 // retrieved from this node at a later time. If the log cannot be
@@ -355,6 +388,8 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 }
 
 // Get a session from the file system, given a session ID.
+// If the session exists, the response payload will also include all
+// saved logs associated with that session.
 //
 func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) {
 	s.nodes.RLock()
@@ -370,8 +405,9 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 		if isConnected(node) {
 			session := s.getSessionFromNode(sessionID, node)
 			if session != nil {
-				response.Payload = make([]interface{}, 1)
+				response.Payload = make([]interface{}, 2)
 				response.Payload[0] = *session
+				response.Payload[1] = s.getLogs(sessionID)
 				break
 			} else {
 				delete(s.sessions.all[sessionID], node.nodeID)
@@ -420,42 +456,6 @@ func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 		response.Payload = make([]interface{}, 1)
 		response.Payload[0] = *_log
 	}
-
-	return
-}
-
-// Get a list of logs from the file system, given a session ID.
-//
-func (s *Server) GetLogs(request *FSRequest, response *FSResponse) (_ error) {
-	s.index.RLock()
-	defer s.index.RUnlock()
-
-	sessionID := request.Payload[0].(string)
-	jobIDs := s.index.logs[sessionID]
-	if jobIDs == nil {
-		return
-	}
-
-	logsMap := make(map[string]*Log)
-	for jobID, _ := range jobIDs {
-		_log := s.getLog(jobID)
-		if _log != nil {
-			logsMap[jobID] = _log
-		}
-	}
-	if len(logsMap) == 0 {
-		return
-	}
-
-	logs := make([]Log, len(logsMap))
-	i := 0
-	for _, _log := range logsMap {
-		logs[i] = *_log
-		i++
-	}
-
-	response.Payload = make([]interface{}, 1)
-	response.Payload[0] = logs
 
 	return
 }

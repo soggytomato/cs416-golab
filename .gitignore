@@ -1,6 +1,8 @@
 
 fs/log/
 
-worker/
-
 fs/nodeID
+
+fs/session/
+
+worker/runSnippet_*.go
