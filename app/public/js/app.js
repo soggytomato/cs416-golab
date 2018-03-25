@@ -65,7 +65,7 @@ function execute() {
     }));
     newForm.append(jQuery('<input>', {
         'name': 'snippet',
-        'value': "This is a snippet",
+        'value': CRDT.toSnippet(),
         'type': 'hidden'
     }));
     newForm.append()
@@ -77,7 +77,7 @@ function execute() {
         success: function(data) {
             jobIDs.push(data.JobID);
             console.log(jobIDs)
-            $(".logs").append("<span>" + data.JobID + "</span>")
+            $(".logs").append("<p id=" + data.JobID + ">" + data.JobID + "</p>")
         }
     })
 }

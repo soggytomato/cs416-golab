@@ -65,7 +65,7 @@ var (
 // Parses args, setups up RPC server.
 func main() {
 	gob.Register(&net.TCPAddr{})
-
+	RegisterGob()
 	addrs, _ := net.InterfaceAddrs()
 	var externalIP string
 	for _, a := range addrs {
@@ -285,10 +285,21 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = jobID
 		err = workerCon.Call("Worker.RunJob", request, response)
+		log := response.Payload[0].(Log)
 		if err != nil {
 			fmt.Println(err)
 		} else {
 			// Send out the new log
+			request = new(WorkerRequest)
+			request.Payload = make([]interface{}, 1)
+			request.Payload[0] = log
+			var ignored bool
+
+			fmt.Println(allWorkers.all)
+			for _, worker := range allWorkers.all {
+				workerCon, _ := rpc.Dial("tcp", worker.RPCAddress.String())
+				workerCon.Call("Worker.SendLog", request, &ignored)
+			}
 		}
 	}
 

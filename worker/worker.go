@@ -86,7 +86,7 @@ func main() {
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
-	gob.Register(&Session{})
+	RegisterGob()
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
@@ -112,109 +112,10 @@ func (w *Worker) init() {
 	w.clientSessions = make(map[string][]string)
 }
 
-func (w *Worker) listenRPC() {
-	addrs, _ := net.InterfaceAddrs()
-	var externalIP string
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				externalIP = ipnet.IP.String()
-			}
-		}
-	}
-	externalIP = externalIP + ":0"
-	tcpAddr, err := net.ResolveTCPAddr("tcp", externalIP)
-	checkError(err)
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	checkError(err)
-	rpc.Register(w)
-	w.localRPCAddr = listener.Addr()
-	rpc.Register(w)
-	w.externalIP = externalIP
-	w.logger.Println("listening for RPC on: ", listener.Addr().String())
-	go func() {
-		for {
-			conn, _ := listener.Accept()
-			go rpc.ServeConn(conn)
-		}
-	}()
-}
-
-func (w *Worker) listenHTTP() {
-	http.HandleFunc("/ws", w.wsHandler)
-	http.HandleFunc("/execute", w.executeJob)
-	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
-	checkError(err)
-	listener, err := net.ListenTCP("tcp", httpAddr)
-	checkError(err)
-	w.localHTTPAddr = listener.Addr()
-	go http.Serve(listener, nil)
-	w.logger.Println("listening for HTTP on: ", listener.Addr().String())
-}
-
-func (w *Worker) registerWithLB() {
-	loadBalancerConn, err := rpc.Dial("tcp", w.serverAddr)
-	checkError(err)
-	settings := new(WorkerNetSettings)
-	err = loadBalancerConn.Call("LBServer.RegisterNewWorker", &WorkerInfo{w.localRPCAddr, w.localHTTPAddr}, settings)
-	checkError(err)
-	w.settings = settings
-	w.workerID = settings.WorkerID
-	go w.startHeartBeat()
-	w.logger.SetPrefix("[Worker: " + strconv.Itoa(w.workerID) + "] ")
-	w.loadBalancerConn = loadBalancerConn
-}
-
 func (w *Worker) connectToFS() {
 	fsServerConn, err := rpc.Dial("tcp", w.fserverAddr)
 	checkError(err)
 	w.fsServerConn = fsServerConn
-}
-
-func (w *Worker) startHeartBeat() {
-	var ignored bool
-	w.loadBalancerConn.Call("LBServer.HeartBeat", w.workerID, &ignored)
-	for {
-		time.Sleep(time.Duration(w.settings.HeartBeat-TIME_BUFFER) * time.Millisecond)
-		w.loadBalancerConn.Call("LBServer.HeartBeat", w.workerID, &ignored)
-	}
-}
-
-// Gets miners from server if below MinNumMinerConnections
-func (w *Worker) getWorkers() {
-	var addrSet []net.Addr
-	for workerAddr, workerCon := range w.workers {
-		isConnected := false
-		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		if !isConnected {
-			delete(w.workers, workerAddr)
-		}
-	}
-	if len(w.workers) < int(w.settings.MinNumWorkerConnections) {
-		w.loadBalancerConn.Call("LBServer.GetNodes", w.workerID, &addrSet)
-		w.connectToWorkers(addrSet)
-	}
-}
-
-func (w *Worker) getCRDT() {
-	response := new(WorkerResponse)
-	for _, workerCon := range w.workers {
-		err := workerCon.Call("Worker.SendCRDT", "", response)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			w.crdt = response.Payload[0].(map[string]*Operation)
-			w.crdtFirstID = response.Payload[1].(string)
-			return
-		}
-	}
-}
-
-func (w *Worker) SendCRDT(payload string, response *WorkerResponse) error {
-	response.Payload = make([]interface{}, 2)
-	response.Payload[0] = w.crdt
-	response.Payload[1] = w.crdtFirstID
-	return nil
 }
 
 //****POC CODE***//
@@ -402,26 +303,6 @@ func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Ses
 	session.Next++
 }
 
-// Establishes RPC connections with workers in addrs array
-func (w *Worker) connectToWorkers(addrs []net.Addr) {
-	for _, workerAddr := range addrs {
-		if w.workers[workerAddr.String()] == nil {
-			workerCon, err := rpc.Dial("tcp", workerAddr.String())
-			if err != nil {
-				w.logger.Println(err)
-				delete(w.workers, workerAddr.String())
-			} else {
-				w.workers[workerAddr.String()] = workerCon
-				response := new(WorkerResponse)
-				request := new(WorkerRequest)
-				request.Payload = make([]interface{}, 1)
-				request.Payload[0] = w.localRPCAddr.String()
-				workerCon.Call("Worker.BidirectionalSetup", request, response)
-			}
-		}
-	}
-}
-
 // Send all of the ops made locally on this worker to all other connected workers
 // After sending, wipe all localElements from the worker
 func (w *Worker) sendlocalElements() error {
@@ -527,7 +408,7 @@ func (w *Worker) listenRPC() {
 
 func (w *Worker) listenHTTP() {
 	http.HandleFunc("/session", w.sessionHandler)
-
+	http.HandleFunc("/execute", w.executeJob)
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
 	checkError(err)
@@ -697,7 +578,7 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 //		- call Load Balancer with jobID
 //		- return to client with jobID
 func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
-
+	w.logger.Println("hi")
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
 		err := r.ParseForm()
@@ -802,7 +683,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
 	checkError(err)
 	log := fsResponse.Payload[0].(Log)
-
+	w.logger.Println("Log: ", log)
 	fileName := "runSnippet_" + jobID + ".go"
 	err = ioutil.WriteFile(fileName, []byte(log.Job.Snippet), 0777)
 	checkError(err)
@@ -829,16 +710,26 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	fsRequest.Payload[0] = log
 	w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
 
+	//os.Remove(fileName)
+
+	response.Payload = make([]interface{}, 1)
+	response.Payload[0] = log
+	w.logger.Println(response)
 	return nil
 }
 
-// Gets the Session CRDT from File System to send to client
-// Constructs the msg and calls w.writer(msg) to write to client
-func (w *Worker) getSessCRDT(msg browserMsg) {
-	// TODO:
-	//	File System RPC Call to get CRDT
-	msg.Payload = "This is suppose to be the CRDT"
-	w.writer(msg)
+func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
+	w.logger.Println("Got a log")
+	log := request.Payload[0].(Log)
+	w.logger.Println(log)
+
+	for _, clientConn := range w.clients {
+		err := clientConn.WriteJSON(log)
+		checkError(err)
+	}
+	return nil
+}
+
 //**UTIL CODE**//
 
 func (w *Worker) deleteClients(sessionID string, clients []string) {
@@ -877,6 +768,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: go run worker.go [LBServer ip:port] [FSServer ip:port]\n")
 	os.Exit(1)
 }
+
 // Code for creating random strings: only for POC(CLI)
 // const charset = "abcdefghijklmnopqrstuvwxyz" +
 // 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
