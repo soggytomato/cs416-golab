@@ -239,12 +239,12 @@ func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
 }
 
 // If your character is placed at the beginning of the message, it needs to become
-// the new firstOp so we can iterate through the CRDT properly
+// the new firstElement so we can iterate through the CRDT properly
 func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
 	if prevID == "" {
-		firstOp := session.CRDT[session.Head]
+		firstElement := session.CRDT[session.Head]
 		newElement.NextID = session.Head
-		firstOp.PrevID = elementID
+		firstElement.PrevID = elementID
 		session.Head = elementID
 		return true
 	} else {
@@ -256,24 +256,23 @@ func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID st
 func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, session *Session) {
 	fmt.Println("prevID:", prevID)
 	newPrevID := w.samePlaceInsertCheck(newElement, prevID, elementID, session)
-	prevOp := session.CRDT[newPrevID]
-	newElement.NextID = prevOp.NextID
-	prevOp.NextID = elementID
+	prevElement := session.CRDT[newPrevID]
+	newElement.NextID = prevElement.NextID
+	prevElement.NextID = elementID
 }
 
 // Checks if any other clients have made inserts to the same prevID. The algorithm
-// compares the prevOp's nextID to the incomingOp ID - if nextID is greater, incomingOp
+// compares the prevElement's nextID to the incomingOp ID - if nextID is greater, incomingOp
 // will move further down the message until it is greater than the nextID
 func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID string, session *Session) string {
-	prevOp := session.CRDT[prevID]
-	if prevOp.NextID != "" {
-		newOpID := elementID
-		nextOpID := prevOp.NextID
-		for strings.Compare(nextOpID, newOpID) == 1 && newElement.ClientID != session.CRDT[nextOpID].ClientID {
-			prevOp = session.CRDT[nextOpID]
-			nextOpID = prevOp.NextID
+	prevElement := session.CRDT[prevID]
+	if prevElement.NextID != "" {
+		nextElementID := prevElement.NextID
+		for strings.Compare(nextElementID, elementID) == 1 && newElement.ClientID != session.CRDT[nextElementID].ClientID {
+			prevElement = session.CRDT[nextElementID]
+			nextElementID = prevElement.NextID
 		}
-		return prevOp.ID
+		return prevElement.ID
 	} else {
 		return prevID
 	}
