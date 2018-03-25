@@ -44,12 +44,6 @@ type Worker struct {
 	RecentHeartbeat int64
 }
 
-type WorkerNetSettings struct {
-	WorkerID                int `json:"workerID"`
-	HeartBeat               int `json:"heartbeat"`
-	MinNumWorkerConnections int `json:"min-num-worker-connections"`
-}
-
 type AllWorkers struct {
 	sync.RWMutex
 	all   map[int]*Worker

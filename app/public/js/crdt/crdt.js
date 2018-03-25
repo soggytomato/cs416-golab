@@ -6,7 +6,7 @@
 */
 class Element {
     constructor(id, prev, next, val, del) {
-    	this.id = id;
+    	  this.id = id;
         this.prev = prev;
         this.next = next;
         this.val = val;
@@ -21,8 +21,10 @@ class Element {
 	A SeqCRDT is a local list of all elements that comprise a snippet.
 */
 class SeqCRDT {
-	constructor(seqCRDT = new Array()) {
+	constructor(seqCRDT = new Array(), first) {
     	this.seq = seqCRDT;
+    	this.first = first;
+    	this.length = Object.keys(seqCRDT).length;
     }
 
     get(id) {
@@ -31,27 +33,18 @@ class SeqCRDT {
 
     set(id, elem) {
     	this.seq[id] = elem;
+
+  		this.length++;
     }
 
-    /* 
-    Creates UID based on the current time and userID.
+    length() {
+    	return this.seq.length;
+    }
 
-	Its possible that the timestamp is not unique, so we append a counter to the end of the ID.
-	(Note: This will come in handle if we want to do block operations).	*/
+    /*
+    Creates UID based on increment. */
 	getNewID() {
-		var id = userID + '_' + Date.now() + '_0';
-
-		const elem = this.seq[id];
-		if (elem !== undefined) {
-			var i = 1;
-			while (this.seq[id + '_' + i] !== undefined) {
-				i++;
-			}
-
-			id = id + '_' + i;
-		}
-
-		return id;
+		return this.length + "_" + userID;
 	}
 
 	/*
@@ -87,7 +80,7 @@ class SeqCRDT {
 	toMapping() {
 		var _mapping = new Mapping();
 
-		var curElem = this.getFirstElement();
+		var curElem = this.first;
 		var lastVal, lastPos, lastLine;
 		while (curElem != undefined) {
 			if (curElem.del !== true) {
@@ -100,7 +93,7 @@ class SeqCRDT {
 					curLine = lastLine + 1;
 				}
 
-				if (lastPos == undefined || lastVal == RETURN) { 
+				if (lastPos == undefined || lastVal == RETURN) {
 					curPos = 0;
 				} else {
 					curPos = lastPos + 1;
@@ -138,3 +131,32 @@ class SeqCRDT {
 	}
 }
 CRDT = new SeqCRDT();
+
+function initCRDT() {
+  $.ajax({
+      type: 'get',
+      url: 'http://'+workerIP+'/session',
+      data: {sessionID: sessionID},
+      success: function(data) {
+        const crdt = data.CRDT;
+
+        const ids = Object.keys(data.CRDT);
+        ids.forEach(function(id){
+          const element = crdt[id];
+          const prev = element.PrevID == "" ? undefined : element.PrevID;
+          const next = element.NextID  == "" ? undefined : element.NextID;
+          const val = element.Text;
+          const del = element.Deleted;
+
+          CRDT.seq[id] = new Element(id, prev, next, val, del)
+        });
+
+        CRDT.first = CRDT.getFirstElement();
+        CRDT.length = ids.length;
+
+        mapping = CRDT.toMapping();
+
+        editor.setValue(CRDT.toSnippet());
+      }
+  })
+}

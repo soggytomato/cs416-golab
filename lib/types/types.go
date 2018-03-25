@@ -20,17 +20,18 @@ type WorkerRequest struct {
 }
 
 type Session struct {
-	ID       string
-	Elements []Element
-	Head     string
+	ID   string
+	CRDT map[string]*Element
+	Head string
+	Next int
 }
 
 type Element struct {
 	SessionID string
 	ClientID  string
 	ID        string
-	NextID    string
 	PrevID    string
+	NextID    string
 	Text      string
 	Deleted   bool
 }
@@ -45,6 +46,12 @@ type Job struct {
 	JobID     string
 	Snippet   string
 	Done      bool
+}
+
+type WorkerNetSettings struct {
+	WorkerID                int `json:"workerID"`
+	HeartBeat               int `json:"heartbeat"`
+	MinNumWorkerConnections int `json:"min-num-worker-connections"`
 }
 
 func RegisterGob() {
