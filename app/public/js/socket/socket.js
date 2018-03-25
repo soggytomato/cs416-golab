@@ -35,7 +35,7 @@ function sendElement(id) {
         SessionID: sessionID,
         ClientID: userID,
         ID: _element.id,
-        PrevID: _element.prevId,
+        PrevID: _element.prev,
         Text: _element.val,
         Deleted: _element.del
     };
