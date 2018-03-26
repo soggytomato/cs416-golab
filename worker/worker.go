@@ -299,6 +299,7 @@ func (w *Worker) sendlocalElements() error {
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = w.localElements
 		response := new(WorkerResponse)
+		w.logger.Println("Map of connceted workers:", w.workers)
 		for workerAddr, workerCon := range w.workers {
 			isConnected := false
 			workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -462,7 +463,10 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 				request := new(WorkerRequest)
 				request.Payload = make([]interface{}, 1)
 				request.Payload[0] = w.localRPCAddr.String()
-				workerCon.Call("Worker.BidirectionalSetup", request, response)
+				err = workerCon.Call("Worker.BidirectionalSetup", request, response)
+				if err != nil {
+					w.logger.Println("Error calling BidrectionalSetup:", err)
+				}
 			}
 		}
 	}
