@@ -33,11 +33,23 @@ function onMessage(_msg) {
 }
 
 function matchLog(log) {
-    for (var i = 0; i < jobIDs.length; i++) {
-        if (jobIDs[i] == log.Job.JobID) {
-            console.log("we have a match!");
+    if (log.Job.SessionID == sessionID) {
+        var isExist = false;
+        for (var i = 0; i < jobIDs.length; i++) {
+            if (jobIDs[i] == log.Job.JobID) {
+                isExist = true;
+                var logOutput = document.getElementById(log.Job.JobID);
+                logOutput.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.getElementById('outputBox').innerHTML = log.Output;
+                }, false);
+            }
+        }
+        if (!isExist) {
+            $("#logList").prepend("<li><a href=# id=" + log.Job.JobID + ">" + log.Job.JobID + "</a></li>")
             var logOutput = document.getElementById(log.Job.JobID);
-            logOutput.addEventListener('click', function() {
+            logOutput.addEventListener('click', function(e) {
+                e.preventDefault();
                 document.getElementById('outputBox').innerHTML = log.Output;
             }, false);
         }

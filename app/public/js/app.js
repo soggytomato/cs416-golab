@@ -58,28 +58,39 @@ $(document).ready(function() {
 });
 
 function execute() {
-    var newForm = jQuery('<form>', {}).append(jQuery('<input>', {
-        'name': 'sessionID',
-        'value': sessionID,
-        'type': 'hidden'
-    }));
-    newForm.append(jQuery('<input>', {
-        'name': 'snippet',
-        'value': CRDT.toSnippet(),
-        'type': 'hidden'
-    }));
-    newForm.append()
+    var newForm = document.createElement('form');
+    newForm.setAttribute('id', 'executeForm');
+    newForm.setAttribute('form', 'executeForm');
+
+    var sessInput = document.createElement('input');
+    sessInput.setAttribute('name', 'sessionID');
+    sessInput.setAttribute('value', sessionID);
+    sessInput.setAttribute('type', 'hidden');
+
+    var snippet = document.createElement('textarea');
+    snippet.setAttribute('name', 'snippet');
+    snippet.value = CRDT.toSnippet();
+    snippet.setAttribute('class', 'text');
+    snippet.setAttribute('form', 'executeForm');
+
+    newForm.append(sessInput);
+    newForm.append(snippet);
+    console.log(snippet)
+    $("body").append(newForm);
+    console.log($('#executeForm').serialize());
+
     $.ajax({
         type: 'post',
         url: "http://" + currentWorkerIP + '/execute',
         dataType: 'json',
-        data: newForm.serialize(),
+        data: $('#executeForm').serialize(),
         success: function(data) {
             jobIDs.push(data.JobID);
             console.log(jobIDs)
-            $(".logs").append("<p id=" + data.JobID + ">" + data.JobID + "</p>")
+            $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
         }
     })
+    newForm.parentNode.removeChild(newForm);
 }
 
 function formBindings() {

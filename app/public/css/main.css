@@ -88,6 +88,10 @@ html .editor .CodeMirror {
     color: cadetblue;
 }
 
+.logs {
+    color: cadetblue;
+}
+
 .register {
     background-color: black;
     border-radius: 10px;

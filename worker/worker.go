@@ -577,15 +577,22 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 //		- Construct and save the log to the file system
 //		- call Load Balancer with jobID
 //		- return to client with jobID
+
+type test_struct struct {
+	SessionID string `json:"SessionID"`
+	Snippet   string `json:"Snippet"`
+}
+
 func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
-	w.logger.Println("hi")
+
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
+
 		err := r.ParseForm()
 		checkError(err)
 		sessionID := r.FormValue("sessionID")
 		snippet := r.FormValue("snippet")
-
+		w.logger.Println("Snippet: ", snippet)
 		log := new(Log)
 		log.Job = *new(Job)
 		log.Job.SessionID = sessionID
@@ -710,7 +717,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	fsRequest.Payload[0] = log
 	w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
 
-	//os.Remove(fileName)
+	os.Remove(fileName)
 
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
@@ -724,6 +731,7 @@ func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 	w.logger.Println(log)
 
 	for _, clientConn := range w.clients {
+		w.logger.Println("Sending to: ", clientConn.RemoteAddr().String())
 		err := clientConn.WriteJSON(log)
 		checkError(err)
 	}
