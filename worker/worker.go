@@ -10,6 +10,7 @@ $ go run worker.go [loadbalancer ip:port]
 package main
 
 import (
+	"html"
 	// "bufio"
 	// "bytes"
 
@@ -710,7 +711,10 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 		log.Output = output.String()
 	} else {
 		// There was a compile or runtime error
-		log.Output = stderr.String()
+		s := html.EscapeString(stderr.String())
+		index := strings.Index(s, fileName)
+		s = html.UnescapeString(s[len(fileName)+index+1:])
+		log.Output = s
 	}
 	log.Job.Done = true
 	var ignored bool

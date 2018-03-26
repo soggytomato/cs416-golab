@@ -29,8 +29,6 @@ type Users struct {
 	AllUsernames []string `json:"AllUsernames"`
 }
 
-// TODO: Get rid of Globals!
-
 type AppServer struct {
 	LBConn          *rpc.Client
 	CurrentSessions []string
