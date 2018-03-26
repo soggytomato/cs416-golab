@@ -33,10 +33,23 @@ class Mapping {
     }
 
     delete(line, ch) {
-    	if (line != undefined && ch != undefined) {
-			if (mapping.lineLength(line) > 0) this.arr[line].splice(ch, 1); 
-			if (mapping.lineLength(line) == 0) mapping.deleteLine(line);
-		}
+	    	if (line != undefined && ch != undefined) {
+	    			const elem = CRDT.get(this.get(line, ch));
+	    			if (elem.val == RETURN && mapping.lineLength(line) > 0) {
+	    				const _line0 = this.getLine(line);
+	    				const _line1 = this.getLine(line+1);
+
+	    				// Merge the next line with this one
+	    				if (_line1 !== undefined) {
+	    					this.setLine(line, _line0.concat(_line1));
+	    					mapping.deleteLine(line+1)
+	    				}
+
+	    			}
+
+					if (mapping.lineLength(line) > 0) this.arr[line].splice(ch, 1);
+					if (mapping.lineLength(line) == 0) mapping.deleteLine(line);
+			}
     }
 
     length() {
@@ -84,7 +97,7 @@ class Mapping {
 		const _line = mapping.getLine(line);
 		const thisElem = CRDT.get(_line[ch]);
 
-		// If an element exists at this (line, ch), its either a 
+		// If an element exists at this (line, ch), its either a
 		// carriage return or any other type of character.
 		if (thisElem !== undefined && val == RETURN) {
 
