@@ -208,8 +208,6 @@ function handleRemoteInput(id, prevId, val) {
         // WHAT THE FUCK DO I DO?!?!??!
     }
 
-
-
     if (next !== undefined) {
         nextElem = CRDT.get(next);
 
@@ -233,7 +231,7 @@ function handleRemoteInput(id, prevId, val) {
             const _line = lines[i];
 
             _line.forEach(function(id, j) {
-                if (id == prevId) {
+                if (id == prevElem.id) {
                     stop = true;
 
                     if (prevElem.val === RETURN) ch = 0;

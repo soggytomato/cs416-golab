@@ -21,9 +21,9 @@ class Element {
 	A SeqCRDT is a local list of all elements that comprise a snippet.
 */
 class SeqCRDT {
-    constructor(seqCRDT = new Array(), first) {
+    constructor(seqCRDT = new Array(), head) {
         this.seq = seqCRDT;
-        this.first = first;
+        this.head = head;
         this.length = Object.keys(seqCRDT).length;
     }
 
@@ -33,8 +33,9 @@ class SeqCRDT {
 
     set(id, elem) {
         this.seq[id] = elem;
-
         this.length++;
+
+        if (elem.prev == undefined) this.head = elem;
     }
 
     length() {
@@ -48,8 +49,8 @@ class SeqCRDT {
     }
 
     /*
-    Gets the first element of this CRDT.*/
-    getFirstElement() {
+    Gets the head element of this CRDT.*/
+    getHead() {
         const _this = this;
 
         var start = null;
@@ -70,7 +71,7 @@ class SeqCRDT {
     Converts CRDT to a snippet string.*/
     toSnippet() {
         var _mapping = this.toMapping();
-        var snippet = mapping.toSnippet();
+        var snippet = _mapping.toSnippet();
 
         return snippet;
     }
@@ -80,7 +81,7 @@ class SeqCRDT {
     toMapping() {
         var _mapping = new Mapping();
 
-        var curElem = this.first;
+        var curElem = this.head;
         var lastVal, lastPos, lastLine;
         while (curElem != undefined) {
             if (curElem.del !== true) {
@@ -151,7 +152,7 @@ function initCRDT() {
                 CRDT.seq[id] = new Element(id, prev, next, val, del)
             });
 
-            CRDT.first = CRDT.getFirstElement();
+            CRDT.head = CRDT.getHead();
             CRDT.length = ids.length;
 
             mapping = CRDT.toMapping();
