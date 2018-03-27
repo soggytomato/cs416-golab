@@ -15,11 +15,6 @@ html { height: 100%; width: 100%; margin: 0;
 
 	.editor { height: inherit; margin: 10px!important;
 
-		.reset { float: right; height: 27px; margin-top: 7px; font-size: smaller; width: 77px;
-			img { width: 12px; margin-top: 3px; }
-			span { float: right; }
-		}
-
 		.left, .right { height: inherit; }
 
 		.title 		{ float: right; }
@@ -36,20 +31,20 @@ html { height: 100%; width: 100%; margin: 0;
 		}
 
 		.logs-wrapper { margin-top: .5rem; height: 82%;
-			.logs { height: 100%; border-radius: $border-radius; color: cadetblue;}
+			.logs { height: 100%; border-radius: $border-radius; color: cadetblue;
+				ul { display: inline-block; }
+			}
 			.log-selected { color: #d00; }
 		}
 
-		.execute, .share {
-			height: 50px;
-			border-radius: 5px;
-			width: 100%;
+		.execute { height: 50px; border-radius: 5px; width: 100%; }
+
+		.reset { float: right; height: 27px; margin-top: 7px; font-size: smaller; width: 77px;
+			img { width: 12px; margin-top: 3px; }
+			span { float: right; }
 		}
 
-		.CodeMirror {
-			height: 100%!important;
-			border-radius: $border-radius;
-		}
+		.CodeMirror { height: 100%!important; border-radius: $border-radius; }
 	}
 }
 
