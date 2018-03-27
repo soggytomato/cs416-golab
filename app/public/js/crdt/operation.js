@@ -124,6 +124,9 @@ function handleOperation(op) {
 
 /******************************* LOCAL HANDLERS *******************************/
 
+// Cache of local elements that haven't been ACK'd yet
+cache = []
+
 function handleLocalInput(line, ch, val) {
 	const id = CRDT.getNewID();
 
@@ -145,8 +148,12 @@ function handleLocalInput(line, ch, val) {
 	}
 
 	// Update CRDT and mapping
-	CRDT.set(id, new Element(id, prev, next, val, false));
+	const elem = new Element(id, prev, next, val, false);
+	CRDT.set(id, elem);
 	mapping.update(line, ch, id);
+
+	// Push to the cache
+	cache.push(elem);
 
 	sendElement(id);
 
@@ -161,6 +168,9 @@ function handleLocalDelete(line, ch) {
 
 	if (elem === undefined) return;
 	else elem.del = true;
+
+	// Push to the cache
+	cache.push(elem);
 
 	// Apply to the editor
 	mapping.delete(line, ch);
@@ -177,6 +187,19 @@ function handleRemoteOperation(op) {
 	const prevId = op.PrevID == "" ? undefined : op.PrevID;
 	const val = op.Text;
 	const del = op.Deleted;
+
+	// Cycle through cache
+	var index = undefined;
+	cache.forEach(function(elem, i){
+		if (elem.id == id && elem.del == elem.del) {
+			index = i; 
+			return false;
+		}
+	});
+
+	if (index !== undefined) {
+		cache.splice(index, 1);
+	}
 
 	if (del == false) handleRemoteInput(id, prevId, val);
 	else handleRemoteDelete(id);
@@ -289,7 +312,6 @@ function replayOperations(ops, rate = 500) {
 	if (typeof ops == "string") {
 		ops = getOpsFromString(ops);
 	}
-
 
 	const keys = Object.keys(ops);
 	var i = 0;

@@ -600,15 +600,13 @@ func (w *Worker) sendToClients(element *Element) {
 	var clientsToDelete []string
 	for _, clientID := range w.clientSessions[sessionID] {
 		fmt.Println("Sending " + element.ClientID + " to user " + clientID)
-		if clientID != element.ClientID {
-			conn := w.clients[clientID]
 
-			err := conn.WriteJSON(element)
-			if err != nil {
-				w.logger.Println("Failed to send message to client '"+clientID+"':", err)
+		conn := w.clients[clientID]
+		err := conn.WriteJSON(element)
+		if err != nil {
+			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
 
-				clientsToDelete = append(clientsToDelete, clientID)
-			}
+			clientsToDelete = append(clientsToDelete, clientID)
 		}
 	}
 
