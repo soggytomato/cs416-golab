@@ -10,21 +10,18 @@ $ go run worker.go [loadbalancer ip:port]
 package main
 
 import (
-	"html"
-	"path"
-	// "bufio"
-	// "bytes"
-
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
