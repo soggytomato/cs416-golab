@@ -1,9 +1,6 @@
 socket = undefined;
-
 $(window).on('beforeunload', function(event) {
     $.ajax({ type: 'post', url: 'http://' + workerIP + '/session?userID=' + userID + '&sessionID=' + sessionID });
-
-    console.log("hello")
 });
 
 function initWS() {
@@ -41,7 +38,7 @@ function matchLog(log) {
                 var logOutput = document.getElementById(log.Job.JobID);
                 logOutput.addEventListener('click', function(e) {
                     e.preventDefault();
-                    document.getElementById('outputBox').innerHTML = log.Output;
+                    logClicked(log);
                 }, false);
             }
         }
@@ -50,10 +47,18 @@ function matchLog(log) {
             var logOutput = document.getElementById(log.Job.JobID);
             logOutput.addEventListener('click', function(e) {
                 e.preventDefault();
-                document.getElementById('outputBox').innerHTML = log.Output;
+                logClicked(log);
             }, false);
         }
     }
+}
+
+function logClicked(log) {
+    editor.setValue(log.Job.Snippet);
+    editor.setOption("readOnly", true);
+    document.getElementById('outputBox').innerHTML = log.Output;
+    document.getElementById("snipTitle").style.color = '#d00'
+    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
 }
 
 function sendElement(id) {

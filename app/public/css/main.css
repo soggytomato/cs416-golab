@@ -73,6 +73,10 @@ html .editor .share {
     width: 100%;
 }
 
+.reset {
+    float: right;
+}
+
 html .editor .CodeMirror {
     height: 100% !important;
     border-radius: 10px;

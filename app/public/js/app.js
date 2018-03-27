@@ -57,6 +57,14 @@ $(document).ready(function() {
     formBindings();
 });
 
+function reset() {
+    editor.setValue(CRDT.toSnippet());
+    editor.setOption("readOnly", false);
+    document.getElementById('outputBox').innerHTML = "";
+    document.getElementById("snipTitle").style.color = ''
+    document.getElementById('snipTitle').innerHTML = "Snippet:"
+}
+
 function execute() {
     var newForm = document.createElement('form');
     newForm.setAttribute('id', 'executeForm');
