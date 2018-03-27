@@ -593,12 +593,10 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
-
 		err := r.ParseForm()
 		checkError(err)
 		sessionID := r.FormValue("sessionID")
 		snippet := r.FormValue("snippet")
-		w.logger.Println("Snippet: ", snippet)
 		log := new(Log)
 		log.Job = *new(Job)
 		log.Job.SessionID = sessionID
@@ -684,7 +682,7 @@ func (w *Worker) sendToClients(element *Element) {
 //		- saves the log to File system
 //		- Acks back to Load Balancer that it is done
 func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
-	w.logger.Println("RunJob")
+	w.logger.Println("RunJob Request")
 	jobID := request.Payload[0].(string)
 	fsRequest := new(FSRequest)
 	fsRequest.Payload = make([]interface{}, 1)
@@ -711,11 +709,22 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
 		// TODO: add timeout, probably don't needa check err of cmd.Run
-		err = cmd.Run()
-		checkError(err)
+		var timedout bool
+		timeoutCh := make(chan error, 1)
+		go func() {
+			timeoutCh <- cmd.Run()
+		}()
+		select {
+		case res := <-timeoutCh:
+			timedout = false
+		case <-time.After(5 * time.Second):
+			timedout = true
+		}
 
 		// Write the proper output to the log file
-		if len(stderr.String()) == 0 {
+		if timedout {
+			log.Output = "program timed out"
+		} else if len(stderr.String()) == 0 {
 			// No errors case
 			log.Output = output.String()
 		} else {
@@ -737,17 +746,12 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
-	w.logger.Println(response)
 	return nil
 }
 
 func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
-	w.logger.Println("Got a log")
 	log := request.Payload[0].(Log)
-	w.logger.Println(log)
-
 	for _, clientConn := range w.clients {
-		w.logger.Println("Sending to: ", clientConn.RemoteAddr().String())
 		err := clientConn.WriteJSON(log)
 		checkError(err)
 	}
