@@ -83,9 +83,7 @@ function execute() {
 
     newForm.append(sessInput);
     newForm.append(snippet);
-    console.log(snippet)
     $("body").append(newForm);
-    console.log($('#executeForm').serialize());
 
     $.ajax({
         type: 'post',
@@ -94,7 +92,6 @@ function execute() {
         data: $('#executeForm').serialize(),
         success: function(data) {
             jobIDs.push(data.JobID);
-            console.log(jobIDs)
             $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
         }
     })

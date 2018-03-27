@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -611,7 +610,8 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		log.Job = *new(Job)
 		log.Job.SessionID = sessionID
 		log.Job.Snippet = snippet
-		jobID := generateLogID(16)
+		t := time.Now()
+		jobID := sessionID + t.Format("20060102150405")
 		log.Job.JobID = jobID
 
 		// Save to FileSystem
@@ -628,6 +628,7 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
 		json.NewEncoder(wr).Encode(logSettings)
 
+		// Sending with go routine to not wait for return value
 		go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
 	}
 
@@ -738,10 +739,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 			log.Output = output.String()
 		} else {
 			// There was a compile or runtime error
-			s := html.EscapeString(stderr.String())
-			index := strings.Index(s, fileName)
-			s = html.UnescapeString(s[len(fileName)+index+1:])
-			log.Output = s
+			log.Output = sliceOutput(stderr.String(), fileName)
 		}
 		log.Job.Done = true
 		var ignored bool
@@ -782,6 +780,29 @@ func (w *Worker) deleteClients(sessionID string, clients []string) {
 	}
 }
 
+// Function gets rid of weird command line outputs from errors
+func sliceOutput(output string, fileName string) string {
+	arr := strings.Split(output, "\n")
+	var logOutput string
+	for _, str := range arr {
+		if str != "# command-line-arguments" {
+			s := html.EscapeString(str)
+			index := strings.Index(s, fileName)
+			if index >= 0 {
+				s = html.UnescapeString(s[len(fileName)+index+1:])
+			} else {
+				s = html.UnescapeString(s)
+			}
+			if len(logOutput) > 0 {
+				logOutput += "\n" + s
+			} else {
+				logOutput += s
+			}
+		}
+	}
+	return logOutput
+}
+
 func checkError(err error) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -789,16 +810,6 @@ func checkError(err error) error {
 	}
 
 	return nil
-}
-
-var ALPHABET = []rune("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-
-func generateLogID(length int) string {
-	id := make([]rune, length)
-	for i := range id {
-		id[i] = ALPHABET[rand.Intn(len(ALPHABET))]
-	}
-	return string(id)
 }
 
 func usage() {

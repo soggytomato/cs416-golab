@@ -56,7 +56,8 @@ function matchLog(log) {
 function logClicked(log) {
     editor.setValue(log.Job.Snippet);
     editor.setOption("readOnly", true);
-    document.getElementById('outputBox').innerHTML = log.Output;
+    str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
+    document.getElementById('outputBox').innerHTML = str;
     document.getElementById("snipTitle").style.color = '#d00'
     document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
 }
