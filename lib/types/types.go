@@ -39,6 +39,12 @@ type Job struct {
 	Done      bool
 }
 
+type WorkerNetSettings struct {
+	WorkerID                int `json:"workerID"`
+	HeartBeat               int `json:"heartbeat"`
+	MinNumWorkerConnections int `json:"min-num-worker-connections"`
+}
+
 func RegisterGob() {
 	gob.Register(Session{})
 	gob.Register(Log{})

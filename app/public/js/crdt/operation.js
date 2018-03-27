@@ -23,7 +23,7 @@ lastChange = 0;
 	the key stroke is actually applied to the text area that the user sees.
 
 	The 'change' event occurs after the operation has been processed and
-	added to the text area. At this point, we check consistency 
+	added to the text area. At this point, we check consistency
 	between the editors text area and the CRDT, given we are in debug mode.
 */
 $(document).ready(function(){
@@ -39,7 +39,7 @@ $(document).ready(function(){
 	});
 
 	// Handles all user inputs before they are applied to the editor.
-	editor.on('beforeChange', 
+	editor.on('beforeChange',
 		function(cm, change){
 			if (change.from.hitSide) return;
 
@@ -59,7 +59,7 @@ $(document).ready(function(){
 	// Handles all user inputs after they are applied to the editor.
 	if (debugMode) {
 		// Verifies snippet after processing handle.
-		editor.on('change', 
+		editor.on('change',
 			function(cm, change){
 				if (change.from.hitSide) return;
 
@@ -75,7 +75,7 @@ $(document).ready(function(){
 	Dispatches input or delete to 'handleInput' and 'handleRemove'.
 
 	Note: this is very unrefined at the moment, it assumes that the text
-		  entered/removed is always no more than one 'character'. 
+		  entered/removed is always no more than one 'character'.
 */
 function handleOperation(op) {
 	if (debugMode) ops.push(op);
@@ -90,7 +90,7 @@ function handleOperation(op) {
 		// Is this a return case?
 		if (op.text.length == 2 && op.text[0] == EMPTY && op.text[1] == EMPTY) {
 			inputChar = RETURN;
-		} // Is this an indent case? 
+		} // Is this an indent case?
 		else if (op.text[0].includes(TAB) && op.text[0].length > 1) {
 			// Break every tab into individual tabs.
 			for (var i = 0; i < op.text[0].length; i++) {
@@ -103,7 +103,7 @@ function handleOperation(op) {
 		} // Some weird CodeMirror shit
 		else if (op.text[0] == EMPTY) {
 			return;
-		} // Is this every other case? 
+		} // Is this every other case?
 		else {
 			inputChar = op.text[0];
 		}
@@ -144,10 +144,13 @@ function handleLocalInput(line, ch, val) {
 		nextElem.prev = id;
 	}
 
-	// Update CRDT
+	// Update CRDT and mapping
 	CRDT.set(id, new Element(id, prev, next, val, false));
-
 	mapping.update(line, ch, id);
+
+	sendElement(id);
+
+	if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
 
 function handleLocalDelete(line, ch) {
@@ -162,23 +165,39 @@ function handleLocalDelete(line, ch) {
 	// Apply to the editor
 	mapping.delete(line, ch);
 
-	if (debugMode) {
-		console.log("Observed remove at line: " + line + " pos: " + ch);
-	}
+	sendElement(id);
+
+	if (debugMode) console.log("Observed remove at line: " + line + " pos: " + ch);
 }
 
 /******************************* REMOTE HANDLERS *******************************/
 
-function handleRemoteOperation(id, prevId, type, val) {
-	if (CRDT.get(id) !== undefined) return;
+function handleRemoteOperation(op) {
+	const id = op.ID;
+	const prevId = op.PrevID == "" ? undefined : op.PrevID;
+	const val = op.Text;
+	const del = op.Deleted;
 
-	if (type == INPUT_OP) handleRemoteInput(id, prevId, val);
-	else if (type == DELETE_OP) handleDeleteOperations(id);
+	if (del == false) handleRemoteInput(id, prevId, val);
+	else handleRemoteDelete(id);
 }
 
 function handleRemoteInput(id, prevId, val) {
+	if (CRDT.get(id) !== undefined) return;
+
 	var prevElem, nextElem, prev, next;
+
 	prevElem = CRDT.get(prevId);
+	while (prevElem !== undefined) {
+		next = prevElem.next;
+
+		if (next === undefined || next < id) {
+			break;
+		} else {
+			prevElem = CRDT.get(next);
+		}
+	}
+
 	if (prevElem !== undefined) {
 		prev = prevElem.id;
 		next = prevElem.next;
@@ -205,9 +224,13 @@ function handleRemoteInput(id, prevId, val) {
 	var ch = 0;
 	if (prevElem !== undefined) {
 		var stop = false;
-		mapping.getLines().forEach(function(_line, i){
+
+		const lines = mapping.getLines();
+		for (var i = 0; i < lines.length; i++) {
+			const _line = lines[i];
+
 			_line.forEach(function(id, j){
-				if (id == prevId) {
+				if (id == prevElem.id) {
 					stop = true;
 
 					if (prevElem.val === RETURN) ch = 0;
@@ -221,19 +244,22 @@ function handleRemoteInput(id, prevId, val) {
 				if (prevElem.val === RETURN) line = i + 1;
 				else line = i;
 
-				return;
+				break;
 			}
-		});
+		}
 	}
 
 	// Apply to the editor
 	const pos = {line: line, ch: ch};
     editor.getDoc().replaceRange(val, pos, pos, REMOTE_INPUT_OP_PREFIX + id);
+
+    if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
 
 function handleRemoteDelete(id) {
 	const elem = CRDT.get(id);
 
+	// TODO: if undefined, deal with it
 	if (elem === undefined || elem.del == true) return;
 	else elem.del = true;
 
@@ -250,9 +276,7 @@ function handleRemoteDelete(id) {
 
 	if (pos1.line != undefined && pos1.ch !== undefined) editor.getDoc().replaceRange('', pos1, pos2, REMOTE_DELETE_OP_PREFIX + id);
 
-	if (debugMode) {
-		console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
-	}
+	if (debugMode) console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
 }
 
 /******************************* UTILITY *******************************/
