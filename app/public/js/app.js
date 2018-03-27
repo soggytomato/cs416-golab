@@ -138,9 +138,7 @@ function formBindings() {
                         alert("No available Workers, please try again later")
                     } else {
                         workerIP = data.WorkerIP;
-
                         initWS()
-
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
                         currentWorkerIP = data.WorkerIP

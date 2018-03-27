@@ -89,7 +89,8 @@ html .editor .CodeMirror {
 }
 
 .output {
-    color: cadetblue;
+    color: white;
+    padding: 5px 10px;
 }
 
 .logs {

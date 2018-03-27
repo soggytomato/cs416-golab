@@ -11,6 +11,7 @@ package main
 
 import (
 	"html"
+	"path"
 	// "bufio"
 	// "bytes"
 
@@ -18,7 +19,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -82,6 +82,8 @@ const TIME_BUFFER int = 500
 // a fake INITIAL_ID to use to place the first character in an empty message
 const INITIAL_ID string = "12345"
 
+const EXEC_DIR = "./execute"
+
 func main() {
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
@@ -111,6 +113,9 @@ func (w *Worker) init() {
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
+	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
+		os.Mkdir(EXEC_DIR, 0755)
+	}
 }
 
 func (w *Worker) connectToFS() {
@@ -679,50 +684,57 @@ func (w *Worker) sendToClients(element *Element) {
 //		- saves the log to File system
 //		- Acks back to Load Balancer that it is done
 func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
-
 	w.logger.Println("RunJob")
 	jobID := request.Payload[0].(string)
-
 	fsRequest := new(FSRequest)
 	fsRequest.Payload = make([]interface{}, 1)
 	fsRequest.Payload[0] = jobID
 	fsResponse := new(FSResponse)
 
+	// Gets log from File System
 	err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
 	checkError(err)
 	log := fsResponse.Payload[0].(Log)
-	w.logger.Println("Log: ", log)
-	fileName := "runSnippet_" + jobID + ".go"
-	err = ioutil.WriteFile(fileName, []byte(log.Job.Snippet), 0777)
-	checkError(err)
 
-	cmd := exec.Command("go", "run", fileName)
-	var output, stderr bytes.Buffer
-	cmd.Stdout = &output
-	cmd.Stderr = &stderr
+	if !log.Job.Done { // Check if log has been executed yet already
+		// 		- saves and compiles the file locally
+		//		- Runs the job
+		fileName := "runSnippet_" + jobID + ".go"
+		filePath := path.Join(EXEC_DIR, fileName)
+		file, _ := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
+		defer file.Close()
+		file.Write([]byte(log.Job.Snippet))
+		file.Sync()
 
-	// TODO: add timeout, probably don't needa check err of cmd.Run
-	err = cmd.Run()
-	checkError(err)
+		cmd := exec.Command("go", "run", filePath)
+		var output, stderr bytes.Buffer
+		cmd.Stdout = &output
+		cmd.Stderr = &stderr
+		// TODO: add timeout, probably don't needa check err of cmd.Run
+		err = cmd.Run()
+		checkError(err)
 
-	// Write the proper output to the log file
-	if len(stderr.String()) == 0 {
-		// No errors case
-		log.Output = output.String()
-	} else {
-		// There was a compile or runtime error
-		s := html.EscapeString(stderr.String())
-		index := strings.Index(s, fileName)
-		s = html.UnescapeString(s[len(fileName)+index+1:])
-		log.Output = s
+		// Write the proper output to the log file
+		if len(stderr.String()) == 0 {
+			// No errors case
+			log.Output = output.String()
+		} else {
+			// There was a compile or runtime error
+			s := html.EscapeString(stderr.String())
+			index := strings.Index(s, fileName)
+			s = html.UnescapeString(s[len(fileName)+index+1:])
+			log.Output = s
+		}
+		log.Job.Done = true
+		var ignored bool
+		fsRequest.Payload[0] = log
+
+		// saves the log to File system
+		w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
+		os.Remove(filePath)
 	}
-	log.Job.Done = true
-	var ignored bool
-	fsRequest.Payload[0] = log
-	w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
 
-	os.Remove(fileName)
-
+	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
 	w.logger.Println(response)
