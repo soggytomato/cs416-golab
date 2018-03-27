@@ -27,9 +27,8 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"sync"
-	// "strings"
 	"strings"
+	"sync"
 	"time"
 
 	. "../lib/types"
@@ -90,7 +89,9 @@ func main() {
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
-	RegisterGob()
+	gob.Register(&Session{})
+	gob.Register(Log{})
+	gob.Register([]Log{})
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
@@ -717,14 +718,13 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 		var output, stderr bytes.Buffer
 		cmd.Stdout = &output
 		cmd.Stderr = &stderr
-		// TODO: add timeout, probably don't needa check err of cmd.Run
 		var timedout bool
 		timeoutCh := make(chan error, 1)
 		go func() {
 			timeoutCh <- cmd.Run()
 		}()
 		select {
-		case res := <-timeoutCh:
+		case <-timeoutCh:
 			timedout = false
 		case <-time.After(5 * time.Second):
 			timedout = true
