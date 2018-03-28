@@ -148,7 +148,6 @@ function handleLocalInput(line, ch, val) {
         nextElem.prev = id;
     }
 
-<<<<<<< HEAD
 	// Update CRDT and mapping
 	const elem = new Element(id, prev, next, val, false);
 	CRDT.set(id, elem);
@@ -157,14 +156,7 @@ function handleLocalInput(line, ch, val) {
 	// Push to the cache
 	cache.push(elem);
 
-	sendElement(id);
-=======
-    // Update CRDT and mapping
-    CRDT.set(id, new Element(id, prev, next, val, false));
-    mapping.update(line, ch, id);
-
-    sendElement(id);
->>>>>>> master
+	sendElementByID(id);
 
     if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
@@ -178,18 +170,13 @@ function handleLocalDelete(line, ch) {
     if (elem === undefined) return;
     else elem.del = true;
 
-<<<<<<< HEAD
 	// Push to the cache
 	cache.push(elem);
 
 	// Apply to the editor
 	mapping.delete(line, ch);
-=======
-    // Apply to the editor
-    mapping.delete(line, ch);
->>>>>>> master
 
-    sendElement(id);
+    sendElementByID(id);
 
     if (debugMode) console.log("Observed remove at line: " + line + " pos: " + ch);
 }

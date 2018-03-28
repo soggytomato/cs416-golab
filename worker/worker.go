@@ -28,6 +28,7 @@ import (
 	"time"
 
 	. "../lib/types"
+	. "../lib/util"
 	"github.com/gorilla/websocket"
 	// POC(CLI) relevant
 	// "bufio"
@@ -57,8 +58,7 @@ type Worker struct {
 	sessions         map[string]*Session
 	clientSessions   map[string][]string
 	localElements    []*Element
-	cachedElements   map[string][]*Element
-	lastCacheFlush   int64
+	cache            *Cache
 }
 
 type LogSettings struct {
@@ -75,7 +75,6 @@ func (e NoCRDTError) Error() string {
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
 const ELEMENT_DELAY int = 2
-const CACHE_FLUSH_EXPIRY int = ELEMENT_DELAY * 5
 
 // Since we are adding a character to the right of another character, we need
 // a fake INITIAL_ID to use to place the first character in an empty message
@@ -100,7 +99,7 @@ func main() {
 	worker.connectToFS()
 	worker.getWorkers()
 	go worker.sendLocalElements()
-	go worker.maintainCache()
+	go worker.cache.Maintain()
 	// worker.workerPrompt() //POC(CLI)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -115,8 +114,9 @@ func (w *Worker) init() {
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
-	w.cachedElements = make(map[string][]*Element)
-	w.lastCacheFlush = time.Now().Unix()
+
+	w.cache = new(Cache)
+	w.cache.Init()
 
 	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
 		os.Mkdir(EXEC_DIR, 0755)
@@ -127,33 +127,6 @@ func (w *Worker) connectToFS() {
 	fsServerConn, err := rpc.Dial("tcp", w.fserverAddr)
 	checkError(err)
 	w.fsServerConn = fsServerConn
-}
-
-func (w *Worker) maintainCache() {
-	for {
-		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
-
-		for sessionID := range w.cachedElements {
-			go w.cleanCache(sessionID)
-		}
-	}
-}
-
-func (w *Worker) cleanCache(sessionID string) {
-	var numDeleted int = 0
-
-	cachedElements := w.cachedElements[sessionID]
-	for i, element := range cachedElements {
-		if int(time.Now().Unix()-element.Timestamp) < CACHE_FLUSH_EXPIRY {
-			break
-		} else {
-			i = i - numDeleted
-			numDeleted++
-
-			session := w.cachedElements[sessionID]
-			w.cachedElements[sessionID] = append(session[:i], session[i+1:]...)
-		}
-	}
 }
 
 //****POC CODE***//
@@ -335,13 +308,10 @@ func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID str
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
 // number can be incremented
 func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Session) {
-	newElement.Timestamp = time.Now().Unix()
-
 	id := newElement.ID
 	session.CRDT[id] = newElement
 
 	w.localElements = append(w.localElements, newElement)
-	w.cachedElements[newElement.SessionID] = append(w.cachedElements[newElement.SessionID], newElement)
 
 	session.Next++
 }
@@ -385,6 +355,9 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 			if element.Deleted == true {
 				w.deleteFromCRDT(element, session)
 			}
+
+			w.cache.Add(element)
+
 			w.sendToClients(element)
 		}
 	}
@@ -595,7 +568,7 @@ func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
 
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
-		json.NewEncoder(wr).Encode(w.cachedElements[sessionID])
+		json.NewEncoder(wr).Encode(w.cache.Get(sessionID))
 	}
 }
 
@@ -711,6 +684,8 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 		} else {
 			w.addToCRDT(element, w.sessions[element.SessionID])
 		}
+
+		w.cache.Add(element)
 
 		// TODO remove because we will buffer the sends
 		w.sendToClients(element)

@@ -45,7 +45,20 @@ function onMessage(_msg) {
     }
 }
 
-function sendElement(id) {
+function sendElement(_element) {
+    const element = {
+        SessionID: sessionID,
+        ClientID: userID,
+        ID: _element.id,
+        PrevID: _element.prev,
+        Text: _element.val,
+        Deleted: _element.del
+    };
+
+    socket.send(JSON.stringify(element));
+}
+
+function sendElementByID(id) {
     const _element = CRDT.get(id);
     const element = {
         SessionID: sessionID,

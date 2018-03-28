@@ -184,8 +184,16 @@ function recover() {
             type: 'get',
             url: 'http://'+workerIP+'/recover?sessionID='+sessionID,
             success: function(data) {
-                data.forEach(function(element){
-                    handleRemoteOperations(element);
+                if (data != null && data.length > 0) {
+                    data.forEach(function(element){
+                        handleRemoteOperations(element);
+                    });
+
+                    recover = false;
+                }
+
+                cache.forEach(function(element){
+                    sendElement(element);
                 });
             }
         });
