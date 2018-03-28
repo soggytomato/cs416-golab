@@ -125,15 +125,17 @@ func (f *FSNode) registerWithServer() {
 		} else {
 			f.logger.Println("Registered as existing node")
 		}
+
+		f.serverConn = serverConn
+		f.id = nodeID
+		go f.heartbeat()
+
+		f.logger.Println("Node [" + f.id + "] connected to server")
 	} else {
 		f.logger.Println("Rejected - failed to register with server")
+		f.logger.Println("Are you using an old nodeID? If you restarted the server, don't forget to remove it so that you can be assigned a new one.")
+		os.Exit(1)
 	}
-
-	f.serverConn = serverConn
-	f.id = nodeID
-	go f.heartbeat()
-
-	f.logger.Println("Node [" + f.id + "] connected to server")
 }
 
 func (f *FSNode) heartbeat() {

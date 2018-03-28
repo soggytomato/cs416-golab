@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 	"math/rand"
 
@@ -27,10 +28,10 @@ const HEARTBEAT_INTERVAL = 2000
 //
 type Server struct {
 	logger   *log.Logger
-	nodes    FSNodes
-	sessions Sessions
-	logs     Logs
-	index    Index
+	nodes    *FSNodes
+	sessions *Sessions
+	logs     *Logs
+	index    *Index
 }
 
 // A map of node IDs to file system nodes.
@@ -40,20 +41,20 @@ type FSNodes struct {
 	all map[string]*FSNode
 }
 
-// A map of session IDs to collections of node IDs which are known to
+// A map of session IDs to collections of nodes which are known to
 // have saved the session.
 //
 type Sessions struct {
 	sync.RWMutex
-	all map[string]map[string]bool
+	all map[string]map[string]*FSNode
 }
 
-// A map of job IDs to collections of node IDs which are known to have
+// A map of job IDs to collections of nodes which are known to have
 // saved the log (containing the job).
 //
 type Logs struct {
 	sync.RWMutex
-	all map[string]map[string]bool
+	all map[string]map[string]*FSNode
 }
 
 // A map of session IDs to collections of job IDs associated with the
@@ -64,11 +65,13 @@ type Index struct {
 	logs map[string]map[string]bool
 }
 
+// We will use exclusively atomic operations on lastHeartbeat
+//
 type FSNode struct {
 	nodeID        string
 	nodeAddr      string
 	nodeConn      *rpc.Client
-	lastHeartbeat int64
+	lastHeartbeat *int64
 }
 
 func main() {
@@ -94,10 +97,10 @@ func main() {
 
 func (s *Server) init() {
 	s.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
-	s.nodes = FSNodes{all: make(map[string]*FSNode)}
-	s.sessions = Sessions{all: make(map[string]map[string]bool)}
-	s.logs = Logs{all: make(map[string]map[string]bool)}
-	s.index = Index{logs: make(map[string]map[string]bool)}
+	s.nodes = &FSNodes{all: make(map[string]*FSNode)}
+	s.sessions = &Sessions{all: make(map[string]map[string]*FSNode)}
+	s.logs = &Logs{all: make(map[string]map[string]*FSNode)}
+	s.index = &Index{logs: make(map[string]map[string]bool)}
 
 	rand.Seed(time.Now().Unix())
 }
@@ -144,8 +147,6 @@ func (s *Server) listenRPC() {
 //
 func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	s.logger.Println("Saving session [" + session.ID + "] to node [" + node.nodeID + "]")
-	s.sessions.Lock()
-	defer s.sessions.Unlock()
 
 	request := new(FSRequest)
 	request.Payload = make([]interface{}, 1)
@@ -154,16 +155,12 @@ func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	err := node.nodeConn.Call("FSNode.SaveSession", request, &ok)
 	checkError(err)
 
-	if s.sessions.all[session.ID] == nil {
-		s.sessions.all[session.ID] = make(map[string]bool)
-	}
-
 	if ok {
-		s.sessions.all[session.ID][node.nodeID] = true
-		s.logger.Println("Session saved")
+		s.sessions.addNode(session.ID, node)
+		s.logger.Println("Session [" + session.ID + "] saved")
 	} else {
-		delete(s.sessions.all[session.ID], node.nodeID)
-		s.logger.Println("Session could not be saved")
+		s.sessions.removeNode(session.ID, node.nodeID)
+		s.logger.Println("Session [" + session.ID + "] could not be saved")
 	}
 }
 
@@ -180,10 +177,10 @@ func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
 	checkError(err)
 
 	if len(response.Payload) == 0 {
-		s.logger.Println("Session could not be retrieved")
+		s.logger.Println("Session [" + sessionID + "] could not be retrieved")
 		return nil
 	} else {
-		s.logger.Println("Session retrieved")
+		s.logger.Println("Session [" + sessionID + "] retrieved")
 		session := response.Payload[0].(Session)
 		return &session
 	}
@@ -195,21 +192,15 @@ func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
 // node will be removed from the log map (s.logs).
 //
 func (s *Server) getLog(jobID string) *Log {
-	s.nodes.RLock()
-	s.logs.Lock()
-	defer s.nodes.RUnlock()
-	defer s.logs.Unlock()
+	nodes := s.logs.get(jobID)
 
-	nodes := s.logs.all[jobID]
-
-	for nodeID, _ := range nodes {
-		node := s.nodes.all[nodeID]
+	for _, node := range nodes {
 		if isConnected(node) {
 			_log := s.getLogFromNode(jobID, node)
 			if _log != nil {
 				return _log
 			} else {
-				delete(s.logs.all[jobID], node.nodeID)
+				s.logs.removeNode(jobID, node.nodeID)
 			}
 		}
 	}
@@ -221,10 +212,7 @@ func (s *Server) getLog(jobID string) *Log {
 // session ID.
 //
 func (s *Server) getLogs(sessionID string) []Log {
-	s.index.RLock()
-	defer s.index.RUnlock()
-
-	jobIDs := s.index.logs[sessionID]
+	jobIDs := s.index.get(sessionID)
 	if jobIDs == nil {
 		return nil
 	}
@@ -259,8 +247,6 @@ func (s *Server) getLogs(sessionID string) []Log {
 //
 func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	s.logger.Println("Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]")
-	s.logs.Lock()
-	defer s.logs.Unlock()
 
 	request := new(FSRequest)
 	request.Payload = make([]interface{}, 1)
@@ -269,16 +255,12 @@ func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	err := node.nodeConn.Call("FSNode.SaveLog", request, &ok)
 	checkError(err)
 
-	if s.logs.all[_log.Job.JobID] == nil {
-		s.logs.all[_log.Job.JobID] = make(map[string]bool)
-	}
-
 	if ok {
-		s.logs.all[_log.Job.JobID][node.nodeID] = true
-		s.logger.Println("Log saved")
+		s.logs.addNode(_log.Job.JobID, node)
+		s.logger.Println("Log [" + _log.Job.JobID + "] saved")
 	} else {
-		delete(s.logs.all[_log.Job.JobID], node.nodeID)
-		s.logger.Println("Log could not be saved")
+		s.logs.removeNode(_log.Job.JobID, node.nodeID)
+		s.logger.Println("Log [" + _log.Job.JobID + "] could not be saved")
 	}
 }
 
@@ -295,10 +277,10 @@ func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
 	checkError(err)
 
 	if len(response.Payload) == 0 {
-		s.logger.Println("Log could not be retrieved")
+		s.logger.Println("Log [" + jobID + "] could not be retrieved")
 		return nil
 	} else {
-		s.logger.Println("Log retrieved")
+		s.logger.Println("Log [" + jobID + "] retrieved")
 		_log := response.Payload[0].(Log)
 		return &_log
 	}
@@ -315,13 +297,7 @@ func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
 // Hearbeat function - updates the node's most recent heartbeat.
 //
 func (s *Server) Heartbeat(nodeID string, _ *bool) (_ error) {
-	s.nodes.Lock()
-	defer s.nodes.Unlock()
-
-	if s.nodes.all[nodeID] != nil {
-		s.nodes.all[nodeID].lastHeartbeat = time.Now().UnixNano()
-	}
-
+	s.nodes.heartbeat(nodeID)
 	return
 }
 
@@ -330,37 +306,40 @@ func (s *Server) Heartbeat(nodeID string, _ *bool) (_ error) {
 // map. Invalid nodes will be rejected.
 //
 func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error) {
-	s.nodes.Lock()
-	defer s.nodes.Unlock()
-
 	nodeID := request.Payload[0].(string)
 	nodeAddr := request.Payload[1].(string)
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = false
+	accepted := false
 
 	if len(nodeID) == 0 {
+		now := time.Now().UnixNano()
 		nodeID = generateNodeID(16)
-		s.nodes.all[nodeID] = &FSNode{
+		node := &FSNode{
 			nodeID: nodeID,
-			nodeAddr: nodeAddr}
+			nodeAddr: nodeAddr,
+			lastHeartbeat: &now}
+		s.nodes.add(node)
 
 		response.Payload[0] = true
-		response.Payload[1] = nodeID
+		response.Payload[1] = node.nodeID
 
 		s.logger.Println("New node [" + nodeID + "] registered")
+		accepted = true
 	} else {
-		if s.nodes.all[nodeID] != nil {
+		if s.nodes.get(nodeID) != nil {
 			response.Payload[0] = true
 			s.logger.Println("Existing node [" + nodeID + "] registered")
+			accepted = true
 		} else {
 			s.logger.Println("Node [" + nodeID + "] rejected")
 			return
 		}
 	}
 
-	nodeConn, err := rpc.Dial("tcp", nodeAddr)
-	checkError(err)
-	s.nodes.all[nodeID].nodeConn = nodeConn
+	if accepted {
+		s.nodes.dial(nodeID, nodeAddr)
+	}
 
 	return
 }
@@ -369,18 +348,14 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 // save the session to all connected file system nodes.
 //
 func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
-	s.nodes.RLock()
-	s.sessions.Lock()
-	defer s.nodes.RUnlock()
-	defer s.sessions.Unlock()
-
 	session := request.Payload[0].(Session)
 
-	for _, node := range s.nodes.all {
+	nodes := s.nodes.getAll()
+	for _, node := range nodes {
 		if isConnected(node) {
 			go s.saveSessionToNode(&session, node)
-		} else if s.sessions.all[session.ID] != nil {
-			delete(s.sessions.all[session.ID], node.nodeID)
+		} else {
+			s.sessions.removeNode(session.ID, node.nodeID)
 		}
 	}
 
@@ -392,16 +367,10 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 // saved logs associated with that session.
 //
 func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) {
-	s.nodes.RLock()
-	s.sessions.Lock()
-	defer s.nodes.RUnlock()
-	defer s.sessions.Unlock()
-
 	sessionID := request.Payload[0].(string)
-	nodes := s.sessions.all[sessionID]
+	nodes := s.sessions.get(sessionID)
 
-	for nodeID, _ := range nodes {
-		node := s.nodes.all[nodeID]
+	for _, node := range nodes {
 		if isConnected(node) {
 			session := s.getSessionFromNode(sessionID, node)
 			if session != nil {
@@ -410,7 +379,7 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 				response.Payload[1] = s.getLogs(sessionID)
 				break
 			} else {
-				delete(s.sessions.all[sessionID], node.nodeID)
+				s.sessions.removeNode(sessionID, node.nodeID)
 			}
 		}
 	}
@@ -422,27 +391,18 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 // the log to all connected file system nodes.
 //
 func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
-	s.nodes.RLock()
-	s.logs.Lock()
-	s.index.Lock()
-	defer s.nodes.RUnlock()
-	defer s.logs.Unlock()
-	defer s.index.Unlock()
-
 	_log := request.Payload[0].(Log)
 
-	for _, node := range s.nodes.all {
+	nodes := s.nodes.getAll()
+	for _, node := range nodes {
 		if isConnected(node) {
 			go s.saveLogToNode(&_log, node)
 		} else if s.logs.all[_log.Job.JobID] != nil {
-			delete(s.logs.all[_log.Job.JobID], node.nodeID)
+			s.logs.removeNode(_log.Job.JobID, node.nodeID)
 		}
 	}
 
-	if s.index.logs[_log.Job.SessionID] == nil {
-		s.index.logs[_log.Job.SessionID] = make(map[string]bool)
-	}
-	s.index.logs[_log.Job.SessionID][_log.Job.JobID] = true
+	s.index.addLog(_log.Job.SessionID, _log.Job.JobID)
 
 	return
 }
@@ -469,7 +429,8 @@ func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 // <HELPER METHODS>
 
 func isConnected(node *FSNode) bool {
-	return time.Now().UnixNano() - node.lastHeartbeat <= int64(HEARTBEAT_INTERVAL * time.Millisecond)
+	since := time.Now().UnixNano() - atomic.LoadInt64(node.lastHeartbeat)
+	return since <= int64(HEARTBEAT_INTERVAL * time.Millisecond)
 }
 
 var ALPHABET = []rune("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
@@ -496,4 +457,152 @@ func checkError(err error) error {
 }
 
 // </HELPER METHODS>
+////////////////////////////////////////////////////////////////////////////////////////////
+
+//
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// <ATOMIC HELPERS>
+
+func (f *FSNodes) getAll() map[string]*FSNode {
+	f.RLock()
+	defer f.RUnlock()
+
+	nodes := make(map[string]*FSNode)
+	for key, val := range f.all {
+		nodes[key] = val
+	}
+
+	return nodes
+}
+
+func (f *FSNodes) get(nodeID string) *FSNode {
+	f.RLock()
+	defer f.RUnlock()
+
+	return f.all[nodeID]
+}
+
+func (f *FSNodes) add(node *FSNode) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.all[node.nodeID] = node
+}
+
+func (f *FSNodes) delete(nodeID string) {
+	f.Lock()
+	defer f.Unlock()
+
+	delete(f.all, nodeID)
+}
+
+func (f *FSNodes) heartbeat(nodeID string) {
+	f.RLock()
+	defer f.RUnlock()
+
+	if f.all[nodeID] != nil {
+		atomic.StoreInt64(f.all[nodeID].lastHeartbeat, time.Now().UnixNano())
+	}
+}
+
+func (f *FSNodes) dial(nodeID, addr string) {
+	f.RLock()
+	defer f.RUnlock()
+
+	if f.all[nodeID] != nil {
+		nodeConn, err := rpc.Dial("tcp", addr)
+		checkError(err)
+		f.all[nodeID].nodeConn = nodeConn
+	}
+}
+
+func (s *Sessions) get(sessionID string) map[string]*FSNode {
+	s.RLock()
+	defer s.RUnlock()
+
+	nodes := make(map[string]*FSNode)
+	for key, val := range s.all[sessionID] {
+		nodes[key] = val
+	}
+
+	return nodes
+}
+
+func (s *Sessions) addNode(sessionID string, node *FSNode) {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.all[sessionID] == nil {
+		s.all[sessionID] = make(map[string]*FSNode)
+	}
+
+	s.all[sessionID][node.nodeID] = node
+}
+
+func (s *Sessions) removeNode(sessionID, nodeID string) {
+	s.Lock()
+	defer s.Unlock()
+
+	if s.all[sessionID] != nil {
+		delete(s.all[sessionID], nodeID)
+	}
+}
+
+func (l *Logs) get(jobID string) map[string]*FSNode {
+	l.RLock()
+	defer l.RUnlock()
+
+	nodes := make(map[string]*FSNode)
+	for key, val := range l.all[jobID] {
+		nodes[key] = val
+	}
+
+	return nodes
+}
+
+func (l *Logs) addNode(sessionID string, node *FSNode) {
+	l.Lock()
+	defer l.Unlock()
+
+	if l.all[sessionID] == nil {
+		l.all[sessionID] = make(map[string]*FSNode)
+	}
+
+	l.all[sessionID][node.nodeID] = node
+}
+
+func (l *Logs) removeNode(sessionID, nodeID string) {
+	l.Lock()
+	defer l.Unlock()
+
+	if l.all[sessionID] != nil {
+		delete(l.all[sessionID], nodeID)
+	}
+}
+
+func (i *Index) get(sessionID string) map[string]bool {
+	i.RLock()
+	defer i.RUnlock()
+
+	jobs := make(map[string]bool)
+	for key, val := range i.logs[sessionID] {
+		jobs[key] = val
+	}
+
+	return jobs
+}
+
+func (i *Index) addLog(sessionID, jobID string) {
+	i.Lock()
+	defer i.Unlock()
+
+	if i.logs[sessionID] == nil {
+		i.logs[sessionID] = make(map[string]bool)
+	}
+
+	i.logs[sessionID][jobID] = true
+}
+
+// </ATOMIC HELPERS>
 ////////////////////////////////////////////////////////////////////////////////////////////
