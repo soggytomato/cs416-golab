@@ -1,4 +1,4 @@
-package util
+package cache
 
 import (
 	"time"

@@ -27,8 +27,8 @@ import (
 	"sync"
 	"time"
 
+	. "../lib/cache"
 	. "../lib/types"
-	. "../lib/util"
 	"github.com/gorilla/websocket"
 	// POC(CLI) relevant
 	// "bufio"
