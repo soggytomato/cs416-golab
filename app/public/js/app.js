@@ -1,6 +1,6 @@
 // Globals
 debugMode = true;
-recovery = false;
+recovering = false;
 
 workerIP = '';
 userID = '';
@@ -147,59 +147,6 @@ function openEditor() {
     setTimeout(function() {
         editor.refresh()
     }, 500);
-}
-
-function getWorker(cb) {
-    $.ajax({
-        type: 'post',
-        url: '/register',
-        dataType: 'json',
-        data: $('#register').serialize(),
-        success: cb
-    });
-}
-
-function register() {
-    getWorker(function(data) {
-        if (data.WorkerIP.length == 0) {
-            alert("No available Workers, please try again later")
-        } else {
-            workerIP = data.WorkerIP;
-
-            initWS();
-            openEditor();
-        }
-    });
-}
-
-function recover() {
-    recovery = true;
-
-    getWorker(function(data) {
-        if (data.WorkerIP.length == 0) {
-            alert("Lost worker connection! Please re-try later.")
-        } else {
-            workerIP = data.WorkerIP;
-        }
-
-        $.ajax({
-            type: 'get',
-            url: 'http://' + workerIP + '/recover?sessionID=' + sessionID,
-            success: function(data) {
-                if (data != null && data.length > 0) {
-                    data.forEach(function(element) {
-                        handleRemoteOperation(element);
-                    });
-
-                    recover = false;
-                }
-
-                cache.forEach(function(element) {
-                    sendElement(element);
-                });
-            }
-        });
-    });
 }
 
 function reset() {

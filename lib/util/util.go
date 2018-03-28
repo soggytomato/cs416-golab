@@ -37,6 +37,20 @@ func (c *Cache) clean(sessionID string) {
 	}
 }
 
+func (c *Cache) exists(element *Element) bool {
+	sessionID := element.SessionID
+
+	var exists bool = false
+	for _, _element := range c.elements[sessionID] {
+		if _element.ID == element.ID && _element.Deleted == element.Deleted {
+			exists = true
+			break
+		}
+	}
+
+	return exists
+}
+
 // </PRIVATE METHODS>
 ////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,8 +76,10 @@ func (c *Cache) Maintain() {
 func (c *Cache) Add(element *Element) {
 	sessionID := element.SessionID
 
-	element.Timestamp = time.Now().Unix()
-	c.elements[sessionID] = append(c.elements[sessionID], element)
+	if !c.exists(element) {
+		element.Timestamp = time.Now().Unix()
+		c.elements[sessionID] = append(c.elements[sessionID], element)
+	}
 }
 
 func (c *Cache) Get(sessionID string) []*Element {

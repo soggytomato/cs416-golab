@@ -548,9 +548,6 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 			http.Error(wr, "Missing userID in URL parameter", http.StatusBadRequest)
 		}
 
-		fmt.Println("Session ID", _sessionID)
-		fmt.Println("User ID", _userID)
-
 		sessionID := _sessionID[0]
 		userID := _userID[0]
 
