@@ -126,106 +126,6 @@ func (w *Worker) connectToFS() {
 	w.fsServerConn = fsServerConn
 }
 
-//****POC CODE***//
-
-// func (w *Worker) workerPrompt() {
-// 	reader := bufio.NewReader(os.Stdin)
-// 	for {
-// 		fmt.Print("Worker> ")
-// 		cmd, _ := reader.ReadString('\n')
-// 		if w.handleIntroCommand(cmd) == 1 {
-// 			return
-// 		}
-// 	}
-// }
-//
-// func (w *Worker) handleIntroCommand(cmd string) int {
-// 	args := strings.Split(strings.TrimSpace(cmd), ",")
-//
-// 	switch args[0] {
-// 	case "newSession":
-// 		w.newSession()
-// 	case "getSession":
-// 		w.getSession(args[1])
-// 	default:
-// 		fmt.Println(" Invalid command.")
-// 	}
-//
-// 	return 0
-// }
-//
-//
-// func (w *Worker) crdtPrompt(sessionID string) {
-// 	reader := bufio.NewReader(os.Stdin)
-// 	for {
-// 		message := w.getMessage(w.sessions[sessionID])
-// 		fmt.Println("SessionID:", sessionID)
-// 		fmt.Println("Message:", message)
-// 		fmt.Print("Worker> ")
-// 		cmd, _ := reader.ReadString('\n')
-// 		if w.handleCommand(cmd) == 1 {
-// 			return
-// 		}
-// 	}
-// }
-//
-// // Iterate through the beginning of the CRDT to the end to show the message and
-// // specify the mapping of each character
-// func (w *Worker) getMessage(session *Session) string {
-// 	var buffer bytes.Buffer
-// 	crdt := session.CRDT
-// 	firstElement := crdt[session.Head]
-// 	for firstElement != nil {
-// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
-// 		buffer.WriteString(firstElement.Text)
-// 		firstElement = crdt[firstElement.NextID]
-// 	}
-// 	return buffer.String()
-// }
-//
-// func (w *Worker) handleCommand(cmd string) int {
-// 	args := strings.Split(strings.TrimSpace(cmd), ",")
-//
-// 	switch args[0] {
-// 	case "addRight":
-// 		err := w.addRight(args[1], args[2], args[3])
-// 		if checkError(err) != nil {
-// 			return 0
-// 		}
-// 	case "exit":
-// 		return 1
-// 	default:
-// 		fmt.Println(" Invalid command.")
-// 	}
-//
-// 	return 0
-// }
-
-//**CRDT CODE**//
-
-// Adds a character to the right of the prevID specified in the args
-func (w *Worker) addRight(prevID, content, sessionID string) error {
-	session := w.sessions[sessionID]
-	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
-	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false, time.Now().Unix()}
-	added := session.Add(newElement)
-
-	if added {
-		w.localElements = append(w.localElements, newElement)
-	}
-
-	return nil
-}
-
-func (w *Worker) addToSession(element *Element) error {
-	session := w.sessions[element.SessionID]
-	if session.Add(element) {
-		w.localElements = append(w.localElements, element)
-	}
-
-	return nil
-}
-
 // Send all of the ops made locally on this worker to all other connected workers
 // After sending, wipe all localElements from the worker
 func (w *Worker) sendLocalElements() error {
@@ -754,6 +654,106 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: go run worker.go [LBServer ip:port] [FSServer ip:port]\n")
 	os.Exit(1)
 }
+
+//**CRDT CODE**//
+
+// Adds a character to the right of the prevID specified in the args
+func (w *Worker) addRight(prevID, content, sessionID string) error {
+	session := w.sessions[sessionID]
+	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
+	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false, time.Now().Unix()}
+	added := session.Add(newElement)
+
+	if added {
+		w.localElements = append(w.localElements, newElement)
+	}
+
+	return nil
+}
+
+func (w *Worker) addToSession(element *Element) error {
+	session := w.sessions[element.SessionID]
+	if session.Add(element) {
+		w.localElements = append(w.localElements, element)
+	}
+
+	return nil
+}
+
+//****POC CODE***//
+
+// func (w *Worker) workerPrompt() {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleIntroCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// func (w *Worker) handleIntroCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "newSession":
+// 		w.newSession()
+// 	case "getSession":
+// 		w.getSession(args[1])
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+//
+//
+// func (w *Worker) crdtPrompt(sessionID string) {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		message := w.getMessage(w.sessions[sessionID])
+// 		fmt.Println("SessionID:", sessionID)
+// 		fmt.Println("Message:", message)
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// // Iterate through the beginning of the CRDT to the end to show the message and
+// // specify the mapping of each character
+// func (w *Worker) getMessage(session *Session) string {
+// 	var buffer bytes.Buffer
+// 	crdt := session.CRDT
+// 	firstElement := crdt[session.Head]
+// 	for firstElement != nil {
+// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
+// 		buffer.WriteString(firstElement.Text)
+// 		firstElement = crdt[firstElement.NextID]
+// 	}
+// 	return buffer.String()
+// }
+//
+// func (w *Worker) handleCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "addRight":
+// 		err := w.addRight(args[1], args[2], args[3])
+// 		if checkError(err) != nil {
+// 			return 0
+// 		}
+// 	case "exit":
+// 		return 1
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
 
 // Code for creating random strings: only for POC(CLI)
 // const charset = "abcdefghijklmnopqrstuvwxyz" +
