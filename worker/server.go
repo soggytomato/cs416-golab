@@ -60,6 +60,7 @@ var (
 	MinNumWorkerConnections            = 2
 	NumWorkerToReturn                  = 4
 	WorkerIDCounter                    = 0
+	sessionIDs = make(map[string]bool)
 )
 
 // Parses args, setups up RPC server.
@@ -185,8 +186,28 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 	nextWorker := allWorkers.queue[0]
 	allWorkers.queue = allWorkers.queue[1:]
 
-	*retWorkerIP = nextWorker.HTTPAddress.String()
+	workerCon, err := rpc.Dial("tcp", nextWorker.RPCAddress.String())
+	defer workerCon.Close()
+	if err != nil {
+		fmt.Println("Error connecting to worker while registering")
+	}
+	var ignored bool
 
+	if sessionIDs[sessID] == false {
+		sessionIDs[sessID] = true
+		err = workerCon.Call("Worker.CreateNewSession", sessID, &ignored)
+		if err != nil {
+			fmt.Println("Error connecting to worker while calling CreateNewSession")
+		}
+	} else {
+		sessionIDs[sessID] = true
+		err = workerCon.Call("Worker.LoadSession", sessID, &ignored)
+		if err != nil {
+			fmt.Println("Error connecting to worker while calling LoadSession")
+		}
+	}
+
+	*retWorkerIP = nextWorker.HTTPAddress.String()
 	allWorkers.queue = append(allWorkers.queue, nextWorker)
 	return nil
 }
