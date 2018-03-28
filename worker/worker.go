@@ -322,21 +322,24 @@ func (w *Worker) sendLocalElements() error {
 	for {
 		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
 		//w.getWorkers() // checks all workers, connects to more if needed
-		request := new(WorkerRequest)
-		request.Payload = make([]interface{}, 1)
-		request.Payload[0] = w.localElements
-		response := new(WorkerResponse)
-		w.logger.Println("Map of connceted workers:", w.workers)
-		for workerAddr, workerCon := range w.workers {
-			isConnected := false
-			workerCon.Call("Worker.PingWorker", "", &isConnected)
-			if isConnected {
-				workerCon.Call("Worker.ApplyIncomingElements", request, response)
-			} else {
-				delete(w.workers, workerAddr)
+
+		if len(w.localElements) > 0 {
+			request := new(WorkerRequest)
+			request.Payload = make([]interface{}, 1)
+			request.Payload[0] = w.localElements
+			response := new(WorkerResponse)
+			w.logger.Println("Map of connceted workers:", w.workers)
+			for workerAddr, workerCon := range w.workers {
+				isConnected := false
+				workerCon.Call("Worker.PingWorker", "", &isConnected)
+				if isConnected {
+					workerCon.Call("Worker.ApplyIncomingElements", request, response)
+				} else {
+					delete(w.workers, workerAddr)
+				}
 			}
+			w.localElements = nil
 		}
-		w.localElements = nil
 	}
 	return nil
 }
@@ -347,6 +350,8 @@ func (w *Worker) sendLocalElements() error {
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
 	elements := request.Payload[0].([]*Element)
 	for _, element := range elements {
+		w.cache.Add(element)
+
 		session := w.sessions[element.SessionID]
 		if session != nil {
 			if session.CRDT[element.ID] == nil {
@@ -355,8 +360,6 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 			if element.Deleted == true {
 				w.deleteFromCRDT(element, session)
 			}
-
-			w.cache.Add(element)
 
 			w.sendToClients(element)
 		}

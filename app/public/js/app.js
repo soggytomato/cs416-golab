@@ -186,7 +186,7 @@ function recover() {
             success: function(data) {
                 if (data != null && data.length > 0) {
                     data.forEach(function(element){
-                        handleRemoteOperations(element);
+                        handleRemoteOperation(element);
                     });
 
                     recover = false;
