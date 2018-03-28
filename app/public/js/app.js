@@ -1,9 +1,11 @@
 // Globals
 debugMode = true;
+recovery = false;
+workerIP = '';
+
 userID = "";
 sessionID = "";
 currentSessions = [];
-workerIP = '';
 
 $(document).ready(function(){
     $('.input-wrapper').resizable({
@@ -79,32 +81,7 @@ function formBindings() {
     $('#register').submit(function(e) {
         e.preventDefault();
 
-        var valid = verifyRegister();
-
-        if (valid) {
-            $.ajax({
-                type: 'post',
-                url: '/register',
-                dataType: 'json',
-                data: $('#register').serialize(),
-                success: function(data) {
-                    if (data.WorkerIP.length == 0) {
-                        alert("No available Workers, please try again later")
-                    } else {
-                        workerIP = data.WorkerIP;
-
-                        initWS()
-
-                        $('.register').css('display', 'none');
-                        $('.editor').slideDown('slow');
-
-                        setTimeout(function() {
-                            editor.refresh();
-                        }, 500);
-                    }
-                }
-            })
-        }
+        if (verifyRegister()) register();
 
         return false;
     });
@@ -160,4 +137,56 @@ function verifyRegister() {
     }
 
     return valid;
+}
+
+function openEditor() {
+    $('.register').css('display', 'none');
+    $('.editor').slideDown('slow');
+
+    setTimeout(function(){editor.refresh()}, 500);
+}
+
+function getWorker(cb) {
+    $.ajax({
+        type: 'post',
+        url: '/register',
+        dataType: 'json',
+        data: $('#register').serialize(),
+        success: cb
+    });
+}
+
+function register() {
+    getWorker(function(data){
+        if (data.WorkerIP.length == 0) {
+            alert("No available Workers, please try again later")
+        } else {
+            workerIP = data.WorkerIP;
+
+            initWS();
+            openEditor();
+        }
+    });
+}
+
+function recover() {
+    recovery = true;
+
+    getWorker(function(data){
+        if (data.WorkerIP.length == 0) {
+            alert("Lost worker connection! Please re-try later.")
+        } else {
+            workerIP = data.WorkerIP;
+        }
+
+        $.ajax({
+            type: 'get',
+            url: 'http://'+workerIP+'/recover?sessionID='+sessionID,
+            success: function(data) {
+                data.forEach(function(element){
+                    handleRemoteOperations(element);
+                });
+            }
+        });
+    });
 }

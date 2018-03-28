@@ -1,9 +1,10 @@
 socket = undefined;
 
+unload = false;
 $(window).on('beforeunload', function(event) {
-  $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
+  unload = true;
 
-  console.log("hello")
+  $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
 });
 
 function initWS() {
@@ -13,14 +14,29 @@ function initWS() {
     socket.onopen = onOpen;
     socket.onclose = onClose;
     socket.onmessage = onMessage;
+    socket.onerror = onError;
 }
 
 function onOpen() {
     initCRDT();
 }
 
-function onClose() {
-  $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
+function onClose(e) {
+  console.log("CLOSE: " + e);
+
+  if (!unload) {
+    closeSession();
+    recover();
+  }
+}
+
+function onError(e) {
+    console.log("ERROR: " + e);
+
+  if (!unload) {
+    closeSession();
+    recover();
+  }
 }
 
 function onMessage(_msg) {
@@ -41,4 +57,10 @@ function sendElement(id) {
     };
 
     socket.send(JSON.stringify(element));
+}
+
+function closeSession() {
+    $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
+
+    if (socket.readyState == 0 || socket.readyState == 1) socket.close();
 }

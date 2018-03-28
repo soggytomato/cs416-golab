@@ -25,6 +25,8 @@ type Element struct {
 	NextID    string
 	Text      string
 	Deleted   bool
+
+	Timestamp int64
 }
 
 type Log struct {

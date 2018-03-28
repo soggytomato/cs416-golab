@@ -50,6 +50,8 @@ type Worker struct {
 	sessions         map[string]*Session
 	clientSessions   map[string][]string
 	localElements    []*Element
+	cachedElements   map[string][]*Element
+	lastCacheFlush   int64
 }
 
 type WorkerResponse struct {
@@ -70,6 +72,7 @@ func (e NoCRDTError) Error() string {
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
 const ELEMENT_DELAY int = 2
+const CACHE_FLUSH_EXPIRY int = ELEMENT_DELAY * 5
 
 // Since we are adding a character to the right of another character, we need
 // a fake INITIAL_ID to use to place the first character in an empty message
@@ -88,7 +91,8 @@ func main() {
 	worker.listenHTTP()
 	worker.registerWithLB()
 	worker.getWorkers()
-	go worker.sendlocalElements()
+	go worker.sendLocalElements()
+	go worker.maintainCache()
 	// worker.workerPrompt() //POC(CLI)
 	for {
 
@@ -102,6 +106,35 @@ func (w *Worker) init() {
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
+	w.cachedElements = make(map[string][]*Element)
+	w.lastCacheFlush = time.Now().Unix()
+}
+
+func (w *Worker) maintainCache() {
+	for {
+		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
+
+		for sessionID := range w.cachedElements {
+			go w.cleanCache(sessionID)
+		}
+	}
+}
+
+func (w *Worker) cleanCache(sessionID string) {
+	var numDeleted int = 0
+
+	cachedElements := w.cachedElements[sessionID]
+	for i, element := range cachedElements {
+		if int(time.Now().Unix()-element.Timestamp) < CACHE_FLUSH_EXPIRY {
+			break
+		} else {
+			i = i - numDeleted
+			numDeleted++
+
+			session := w.cachedElements[sessionID]
+			w.cachedElements[sessionID] = append(session[:i], session[i+1:]...)
+		}
+	}
 }
 
 //****POC(CLI) CODE***//
@@ -188,7 +221,7 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 	}
 	session := w.sessions[sessionID]
 	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
-	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false}
+	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false, time.Now().Unix()}
 	w.addToCRDT(newElement, session)
 	return nil
 }
@@ -283,15 +316,20 @@ func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID str
 // Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
 // number can be incremented
 func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Session) {
+	newElement.Timestamp = time.Now().Unix()
+
 	id := newElement.ID
 	session.CRDT[id] = newElement
+
 	w.localElements = append(w.localElements, newElement)
+	w.cachedElements[newElement.SessionID] = append(w.cachedElements[newElement.SessionID], newElement)
+
 	session.Next++
 }
 
 // Send all of the ops made locally on this worker to all other connected workers
 // After sending, wipe all localElements from the worker
-func (w *Worker) sendlocalElements() error {
+func (w *Worker) sendLocalElements() error {
 	for {
 		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
 		//w.getWorkers() // checks all workers, connects to more if needed
@@ -399,6 +437,7 @@ func (w *Worker) listenRPC() {
 
 func (w *Worker) listenHTTP() {
 	http.HandleFunc("/session", w.sessionHandler)
+	http.HandleFunc("/recover", w.recoveryHandler)
 
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
@@ -522,6 +561,21 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 		fmt.Println("Got delete request", sessionID, userID)
 
 		w.deleteClients(sessionID, []string{userID})
+	}
+}
+
+func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		sessionID := _sessionID[0]
+
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(wr).Encode(w.cachedElements[sessionID])
 	}
 }
 

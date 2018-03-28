@@ -1,7 +1,7 @@
 // String constants
 RETURN 	= '\n';
-SPACE 	= ' ';
 TAB 	= '\t';
+SPACE 	= ' ';
 EMPTY 	= '';
 
 // Operation constants
