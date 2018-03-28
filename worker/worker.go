@@ -28,6 +28,7 @@ import (
 	"time"
 
 	. "../lib/cache"
+	. "../lib/session"
 	. "../lib/types"
 	"github.com/gorilla/websocket"
 	// POC(CLI) relevant
@@ -75,10 +76,6 @@ func (e NoCRDTError) Error() string {
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
 const ELEMENT_DELAY int = 2
-
-// Since we are adding a character to the right of another character, we need
-// a fake INITIAL_ID to use to place the first character in an empty message
-const INITIAL_ID string = "12345"
 
 const EXEC_DIR = "./execute"
 
@@ -208,112 +205,25 @@ func (w *Worker) connectToFS() {
 
 // Adds a character to the right of the prevID specified in the args
 func (w *Worker) addRight(prevID, content, sessionID string) error {
-	if !w.prevIDExists(prevID, sessionID) {
-		return nil
-	}
 	session := w.sessions[sessionID]
 	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
 	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false, time.Now().Unix()}
-	w.addToCRDT(newElement, session)
-	return nil
-}
+	added := session.Add(newElement)
 
-func (w *Worker) addToCRDT(newElement *Element, session *Session) error {
-	if w.firstCRDTEntry(newElement.ID, session) {
-		w.addElementAndIncrementCounter(newElement, session)
-		return nil
+	if added {
+		w.localElements = append(w.localElements, newElement)
 	}
-	if w.replacingFirstElement(newElement, newElement.PrevID, newElement.ID, session) {
-		w.addElementAndIncrementCounter(newElement, session)
-		return nil
-	}
-
-	w.normalInsert(newElement, newElement.PrevID, newElement.ID, session)
-	w.addElementAndIncrementCounter(newElement, session)
 
 	return nil
 }
 
-func (w *Worker) deleteFromCRDT(element *Element, session *Session) error {
-	session.CRDT[element.ID].Deleted = true
+func (w *Worker) addToSession(element *Element) error {
+	session := w.sessions[element.SessionID]
+	if session.Add(element) {
+		w.localElements = append(w.localElements, element)
+	}
 
 	return nil
-}
-
-// Check if the prevID actually exists; if true, continue with addRight
-func (w *Worker) prevIDExists(prevID, sessionID string) bool {
-	session := w.sessions[sessionID]
-	if session != nil {
-		if _, ok := session.CRDT[prevID]; ok || prevID == INITIAL_ID {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
-}
-
-// The case where the first content is entered into a CRDT
-func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
-	if len(session.CRDT) <= 0 {
-		session.Head = elementID
-		return true
-	} else {
-		return false
-	}
-}
-
-// If your character is placed at the beginning of the message, it needs to become
-// the new firstElement so we can iterate through the CRDT properly
-func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
-	if prevID == "" {
-		firstElement := session.CRDT[session.Head]
-		newElement.NextID = session.Head
-		firstElement.PrevID = elementID
-		session.Head = elementID
-		return true
-	} else {
-		return false
-	}
-}
-
-// Any other insert that doesn't take place at the beginning or end is handled here
-func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, session *Session) {
-	fmt.Println("prevID:", prevID)
-	newPrevID := w.samePlaceInsertCheck(newElement, prevID, elementID, session)
-	prevElement := session.CRDT[newPrevID]
-	newElement.NextID = prevElement.NextID
-	prevElement.NextID = elementID
-}
-
-// Checks if any other clients have made inserts to the same prevID. The algorithm
-// compares the prevElement's nextID to the incomingOp ID - if nextID is greater, incomingOp
-// will move further down the message until it is greater than the nextID
-func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID string, session *Session) string {
-	prevElement := session.CRDT[prevID]
-	if prevElement.NextID != "" {
-		nextElementID := prevElement.NextID
-		for strings.Compare(nextElementID, elementID) == 1 && newElement.ClientID != session.CRDT[nextElementID].ClientID {
-			prevElement = session.CRDT[nextElementID]
-			nextElementID = prevElement.NextID
-		}
-		return prevElement.ID
-	} else {
-		return prevID
-	}
-
-}
-
-// Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
-// number can be incremented
-func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Session) {
-	id := newElement.ID
-	session.CRDT[id] = newElement
-
-	w.localElements = append(w.localElements, newElement)
-
-	session.Next++
 }
 
 // Send all of the ops made locally on this worker to all other connected workers
@@ -354,11 +264,11 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 
 		session := w.sessions[element.SessionID]
 		if session != nil {
-			if session.CRDT[element.ID] == nil {
-				w.addToCRDT(element, session)
-			}
+
 			if element.Deleted == true {
-				w.deleteFromCRDT(element, session)
+				session.Delete(element)
+			} else {
+				w.addToSession(element)
 			}
 
 			w.sendToClients(element)
@@ -679,10 +589,12 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 		w.localElements = append(w.localElements, element)
 
 		// Update session CRDT accordingly
+		session := w.sessions[element.SessionID]
 		if element.Deleted == true {
-			w.deleteFromCRDT(element, w.sessions[element.SessionID])
+			session.Delete(element)
 		} else {
-			w.addToCRDT(element, w.sessions[element.SessionID])
+			session.Add(element)
+			w.localElements = append(w.localElements, element)
 		}
 
 		w.cache.Add(element)

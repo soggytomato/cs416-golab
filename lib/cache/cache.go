@@ -3,7 +3,7 @@ package cache
 import (
 	"time"
 
-	. "../types"
+	. "../session"
 )
 
 const MAINTENANCE_INTERVAL int = 2
