@@ -19,21 +19,21 @@ function onOpen() {
 }
 
 function onClose(e) {
-  console.log("CLOSE: " + e);
+    console.log("CLOSE: " + e);
 
-  if (!unload) {
-    closeSession();
-    recover();
-  }
+    if (!unload) {
+        closeSession();
+        recover();
+    }
 }
 
 function onError(e) {
     console.log("ERROR: " + e);
 
-  if (!unload) {
-    closeSession();
-    recover();
-  }
+    if (!unload) {
+        closeSession();
+        recover();
+    }
 }
 
 function onMessage(_msg) {
@@ -75,7 +75,10 @@ function sendElementByID(id) {
 function closeSession() {
     unload = true;
 
-    $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
+    $.ajax({
+        type: 'post',
+        url: 'http://' + workerIP + '/session?userID=' + userID + '&sessionID=' + sessionID
+    });
 
     if (socket.readyState == 0 || socket.readyState == 1) socket.close();
 }

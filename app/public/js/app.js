@@ -144,7 +144,9 @@ function openEditor() {
     $('.register').css('display', 'none');
     $('.editor').slideDown('slow');
 
-    setTimeout(function(){editor.refresh()}, 500);
+    setTimeout(function() {
+        editor.refresh()
+    }, 500);
 }
 
 function getWorker(cb) {
@@ -158,7 +160,7 @@ function getWorker(cb) {
 }
 
 function register() {
-    getWorker(function(data){
+    getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
             alert("No available Workers, please try again later")
         } else {
@@ -173,7 +175,7 @@ function register() {
 function recover() {
     recovery = true;
 
-    getWorker(function(data){
+    getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
             alert("Lost worker connection! Please re-try later.")
         } else {
@@ -182,23 +184,24 @@ function recover() {
 
         $.ajax({
             type: 'get',
-            url: 'http://'+workerIP+'/recover?sessionID='+sessionID,
+            url: 'http://' + workerIP + '/recover?sessionID=' + sessionID,
             success: function(data) {
                 if (data != null && data.length > 0) {
-                    data.forEach(function(element){
+                    data.forEach(function(element) {
                         handleRemoteOperation(element);
                     });
 
                     recover = false;
                 }
 
-                cache.forEach(function(element){
+                cache.forEach(function(element) {
                     sendElement(element);
                 });
             }
         });
     });
 }
+
 function reset() {
     $('.log-selected').removeClass('log-selected');
 
@@ -268,7 +271,7 @@ function matchLog(log) {
 
 function logClicked(log) {
     $('.log-selected').removeClass('log-selected');
-    $('#'+log.Job.JobID).addClass('log-selected');
+    $('#' + log.Job.JobID).addClass('log-selected');
 
     editor.setValue(log.Job.Snippet);
     editor.setOption("readOnly", true);

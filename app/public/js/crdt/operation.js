@@ -1,8 +1,8 @@
 // String constants
-RETURN 	 = '\n';
-TAB 	   = '\t';
-SPACE 	 = ' ';
-EMPTY 	 = '';
+RETURN = '\n';
+TAB = '\t';
+SPACE = ' ';
+EMPTY = '';
 
 // Operation constants
 INPUT_OP = '+input';
@@ -16,15 +16,15 @@ REMOTE_DELETE_OP_PREFIX = REMOTE_DELETE_OP + '_';
 lastChange = 0;
 
 /*
-	Register the handlers for events coming from CodeMirror.
+    Register the handlers for events coming from CodeMirror.
 
-	Everytime there is an operation (key stroke), it will first hit the
-	'beforeChange' event handler which will process the operation before
-	the key stroke is actually applied to the text area that the user sees.
+    Everytime there is an operation (key stroke), it will first hit the
+    'beforeChange' event handler which will process the operation before
+    the key stroke is actually applied to the text area that the user sees.
 
-	The 'change' event occurs after the operation has been processed and
-	added to the text area. At this point, we check consistency
-	between the editors text area and the CRDT, given we are in debug mode.
+    The 'change' event occurs after the operation has been processed and
+    added to the text area. At this point, we check consistency
+    between the editors text area and the CRDT, given we are in debug mode.
 */
 $(document).ready(function() {
     editor = CodeMirror.fromTextArea(document.getElementById("code"), {
@@ -73,10 +73,10 @@ $(document).ready(function() {
 });
 
 /*
-	Dispatches input or delete to 'handleInput' and 'handleRemove'.
+    Dispatches input or delete to 'handleInput' and 'handleRemove'.
 
-	Note: this is very unrefined at the moment, it assumes that the text
-		  entered/removed is always no more than one 'character'.
+    Note: this is very unrefined at the moment, it assumes that the text
+          entered/removed is always no more than one 'character'.
 */
 function handleOperation(op) {
     if (debugMode) ops.push(op);
@@ -148,15 +148,15 @@ function handleLocalInput(line, ch, val) {
         nextElem.prev = id;
     }
 
-	// Update CRDT and mapping
-	const elem = new Element(id, prev, next, val, false);
-	CRDT.set(id, elem);
-	mapping.update(line, ch, id);
+    // Update CRDT and mapping
+    const elem = new Element(id, prev, next, val, false);
+    CRDT.set(id, elem);
+    mapping.update(line, ch, id);
 
-	// Push to the cache
-	cache.push(elem);
+    // Push to the cache
+    cache.push(elem);
 
-	sendElementByID(id);
+    sendElementByID(id);
 
     if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
@@ -170,11 +170,11 @@ function handleLocalDelete(line, ch) {
     if (elem === undefined) return;
     else elem.del = true;
 
-	// Push to the cache
-	cache.push(elem);
+    // Push to the cache
+    cache.push(elem);
 
-	// Apply to the editor
-	mapping.delete(line, ch);
+    // Apply to the editor
+    mapping.delete(line, ch);
 
     sendElementByID(id);
 
@@ -189,21 +189,21 @@ function handleRemoteOperation(op) {
     const val = op.Text;
     const del = op.Deleted;
 
-	// Cycle through cache
-	var index = undefined;
-	cache.forEach(function(elem, i){
-		if (elem.id == id && elem.del == elem.del) {
-			index = i;
-			return false;
-		}
-	});
+    // Cycle through cache
+    var index = undefined;
+    cache.forEach(function(elem, i) {
+        if (elem.id == id && elem.del == elem.del) {
+            index = i;
+            return false;
+        }
+    });
 
-	if (index !== undefined) {
-		cache.splice(index, 1);
-	}
+    if (index !== undefined) {
+        cache.splice(index, 1);
+    }
 
-	if (del == false) handleRemoteInput(id, prevId, val);
-	else handleRemoteDelete(id);
+    if (del == false) handleRemoteInput(id, prevId, val);
+    else handleRemoteDelete(id);
 }
 
 function handleRemoteInput(id, prevId, val) {
@@ -274,7 +274,10 @@ function handleRemoteInput(id, prevId, val) {
     }
 
     // Apply to the editor
-    const pos = { line: line, ch: ch };
+    const pos = {
+        line: line,
+        ch: ch
+    };
     editor.getDoc().replaceRange(val, pos, pos, REMOTE_INPUT_OP_PREFIX + id);
 
     if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
@@ -289,7 +292,10 @@ function handleRemoteDelete(id) {
 
     // Apply to the editor
     const pos1 = mapping.getPosition(id);
-    var pos2 = { line: undefined, ch: undefined };
+    var pos2 = {
+        line: undefined,
+        ch: undefined
+    };
     if (elem.val == RETURN) {
         pos2.line = pos1.line + 1;
         pos2.ch = 0;
@@ -310,30 +316,30 @@ function handleRemoteDelete(id) {
 ops = []
 
 function replayOperations(ops, rate = 500) {
-	if (typeof ops == "string") {
-		ops = getOpsFromString(ops);
-	}
+    if (typeof ops == "string") {
+        ops = getOpsFromString(ops);
+    }
 
-	const keys = Object.keys(ops);
-	var i = 0;
+    const keys = Object.keys(ops);
+    var i = 0;
 
-	var interval = setInterval(function(){
-		if (keys[i] == undefined) {
-			clearInterval(interval);
-			return;
-		}
+    var interval = setInterval(function() {
+        if (keys[i] == undefined) {
+            clearInterval(interval);
+            return;
+        }
 
-		const key = keys[i];
-		const op = ops[key];
-		const origin = op.origin;
-		if (origin == INPUT_OP || origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
-			editor.getDoc().replaceRange(op.text, op.from, op.to, INPUT_OP);
-		} else if (origin == DELETE_OP || origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
-			editor.getDoc().replaceRange(op.text, op.from, op.to, DELETE_OP);
-		}
+        const key = keys[i];
+        const op = ops[key];
+        const origin = op.origin;
+        if (origin == INPUT_OP || origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
+            editor.getDoc().replaceRange(op.text, op.from, op.to, INPUT_OP);
+        } else if (origin == DELETE_OP || origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
+            editor.getDoc().replaceRange(op.text, op.from, op.to, DELETE_OP);
+        }
 
-		i++;
-	}, rate);
+        i++;
+    }, rate);
 }
 
 function logOpsString() {
