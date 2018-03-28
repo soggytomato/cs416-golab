@@ -347,7 +347,7 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 		} else {
 			session := fsResponse.Payload[0].(Session)
 			w.sessions[sessionID] = &session
-			// TODO handle logs
+			// TODO handle logs and apply cached elements
 			return true
 		}
 	}
