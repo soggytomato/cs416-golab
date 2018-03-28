@@ -1,14 +1,11 @@
 socket = undefined;
-
 unload = false;
 $(window).on('beforeunload', function(event) {
-  unload = true;
-
-  $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
+    closeSession();
 });
 
 function initWS() {
-    socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID='+sessionID);
+    socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID=' + sessionID);
     statusHTML = $('#status');
 
     socket.onopen = onOpen;
@@ -41,8 +38,11 @@ function onError(e) {
 
 function onMessage(_msg) {
     const element = JSON.parse(_msg.data);
-
-    handleRemoteOperation(element);
+    if (element.hasOwnProperty('Job')) {
+        matchLog(element);
+    } else {
+        handleRemoteOperation(element);
+    }
 }
 
 function sendElement(id) {
@@ -60,6 +60,8 @@ function sendElement(id) {
 }
 
 function closeSession() {
+    unload = true;
+
     $.ajax({type: 'post', url: 'http://'+workerIP+'/session?userID=' + userID + '&sessionID='+sessionID});
 
     if (socket.readyState == 0 || socket.readyState == 1) socket.close();

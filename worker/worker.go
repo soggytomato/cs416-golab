@@ -10,16 +10,21 @@ $ go run worker.go [loadbalancer ip:port]
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
 	"os"
+	"os/exec"
+	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	. "../lib/types"
@@ -41,6 +46,8 @@ type Worker struct {
 	loadBalancerConn *rpc.Client
 	settings         *WorkerNetSettings
 	serverAddr       string
+	fserverAddr      string
+	fsServerConn     *rpc.Client
 	localRPCAddr     net.Addr
 	localHTTPAddr    net.Addr
 	externalIP       string
@@ -54,13 +61,9 @@ type Worker struct {
 	lastCacheFlush   int64
 }
 
-type WorkerResponse struct {
-	Error   error
-	Payload []interface{}
-}
-
-type WorkerRequest struct {
-	Payload []interface{}
+type LogSettings struct {
+	JobID  string `json:"JobID"`
+	Output string `json:"Output"`
 }
 
 type NoCRDTError string
@@ -78,36 +81,52 @@ const CACHE_FLUSH_EXPIRY int = ELEMENT_DELAY * 5
 // a fake INITIAL_ID to use to place the first character in an empty message
 const INITIAL_ID string = "12345"
 
+const EXEC_DIR = "./execute"
+
 func main() {
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
 	gob.Register(&Session{})
+	gob.Register(Log{})
+	gob.Register([]Log{})
 	worker := new(Worker)
 	worker.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	worker.init()
 	worker.listenRPC()
 	worker.listenHTTP()
 	worker.registerWithLB()
+	worker.connectToFS()
 	worker.getWorkers()
 	go worker.sendLocalElements()
 	go worker.maintainCache()
 	// worker.workerPrompt() //POC(CLI)
-	for {
-
-	}
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	wg.Wait()
 }
 
 func (w *Worker) init() {
 	args := os.Args[1:]
 	w.serverAddr = args[0]
+	w.fserverAddr = args[1]
 	w.workers = make(map[string]*rpc.Client)
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
 	w.cachedElements = make(map[string][]*Element)
 	w.lastCacheFlush = time.Now().Unix()
+
+	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
+		os.Mkdir(EXEC_DIR, 0755)
+	}
+}
+
+func (w *Worker) connectToFS() {
+	fsServerConn, err := rpc.Dial("tcp", w.fserverAddr)
+	checkError(err)
+	w.fsServerConn = fsServerConn
 }
 
 func (w *Worker) maintainCache() {
@@ -137,7 +156,7 @@ func (w *Worker) cleanCache(sessionID string) {
 	}
 }
 
-//****POC(CLI) CODE***//
+//****POC CODE***//
 
 // func (w *Worker) workerPrompt() {
 // 	reader := bufio.NewReader(os.Stdin)
@@ -438,6 +457,7 @@ func (w *Worker) listenRPC() {
 func (w *Worker) listenHTTP() {
 	http.HandleFunc("/session", w.sessionHandler)
 	http.HandleFunc("/recover", w.recoveryHandler)
+	http.HandleFunc("/execute", w.executeJob)
 
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
@@ -618,6 +638,55 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	go w.onElement(conn, clientID)
 }
 
+// HTTP point to handle an execute job from client
+// Assumption is the client will send a JSON object with the sessionID and code snippet in string form
+// Returns a log ID for the browser to store
+// Steps:
+//		- Construct and save the log to the file system
+//		- call Load Balancer with jobID
+//		- return to client with jobID
+
+type test_struct struct {
+	SessionID string `json:"SessionID"`
+	Snippet   string `json:"Snippet"`
+}
+
+func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
+
+	if r.Method == "POST" {
+		w.logger.Println("Got a /execute POST Request")
+		err := r.ParseForm()
+		checkError(err)
+		sessionID := r.FormValue("sessionID")
+		snippet := r.FormValue("snippet")
+		log := new(Log)
+		log.Job = *new(Job)
+		log.Job.SessionID = sessionID
+		log.Job.Snippet = snippet
+		t := time.Now()
+		jobID := sessionID + t.Format("20060102150405")
+		log.Job.JobID = jobID
+
+		// Save to FileSystem
+		request := new(FSRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = log
+		var ignored bool
+		err = w.fsServerConn.Call("Server.SaveLog", request, &ignored)
+		checkError(err)
+		// Sending back jobID
+		logSettings := *new(LogSettings)
+		logSettings.JobID = jobID
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(wr).Encode(logSettings)
+
+		// Sending with go routine to not wait for return value
+		go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
+	}
+
+}
+
 // Read function to always listen for messages from the browser
 // If read fails, the websocket will be closed.
 // Different commands should be handled here.
@@ -667,6 +736,86 @@ func (w *Worker) sendToClients(element *Element) {
 	w.deleteClients(sessionID, clientsToDelete)
 }
 
+// Runs a job called by the load balancer
+//  Steps:
+//		- Gets log from File System
+// 		- saves and compiles the file locally
+//		- Runs the job
+//		- saves the log to File system
+//		- Acks back to Load Balancer that it is done
+func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
+	w.logger.Println("RunJob Request")
+	jobID := request.Payload[0].(string)
+	fsRequest := new(FSRequest)
+	fsRequest.Payload = make([]interface{}, 1)
+	fsRequest.Payload[0] = jobID
+	fsResponse := new(FSResponse)
+
+	// Gets log from File System
+	err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
+	checkError(err)
+	log := fsResponse.Payload[0].(Log)
+
+	if !log.Job.Done { // Check if log has been executed yet already
+		// 		- saves and compiles the file locally
+		//		- Runs the job
+		fileName := "runSnippet_" + jobID + ".go"
+		filePath := path.Join(EXEC_DIR, fileName)
+		file, _ := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0755)
+		defer file.Close()
+		file.Write([]byte(log.Job.Snippet))
+		file.Sync()
+
+		cmd := exec.Command("go", "run", filePath)
+		var output, stderr bytes.Buffer
+		cmd.Stdout = &output
+		cmd.Stderr = &stderr
+		var timedout bool
+		timeoutCh := make(chan error, 1)
+		go func() {
+			timeoutCh <- cmd.Run()
+		}()
+		select {
+		case <-timeoutCh:
+			timedout = false
+		case <-time.After(5 * time.Second):
+			timedout = true
+		}
+
+		// Write the proper output to the log file
+		if timedout {
+			log.Output = "program timed out"
+		} else if len(stderr.String()) == 0 {
+			// No errors case
+			log.Output = output.String()
+		} else {
+			// There was a compile or runtime error
+			log.Output = sliceOutput(stderr.String(), fileName)
+		}
+		log.Job.Done = true
+		var ignored bool
+		fsRequest.Payload[0] = log
+
+		// saves the log to File system
+		w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
+		os.Remove(filePath)
+	}
+
+	// Acks back to Load Balancer that it is done
+	response.Payload = make([]interface{}, 1)
+	response.Payload[0] = log
+	return nil
+}
+
+func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
+	log := request.Payload[0].(Log)
+	for _, clientConn := range w.clients {
+		err := clientConn.WriteJSON(log)
+		checkError(err)
+	}
+	return nil
+}
+
 //**UTIL CODE**//
 
 func (w *Worker) deleteClients(sessionID string, clients []string) {
@@ -682,6 +831,29 @@ func (w *Worker) deleteClients(sessionID string, clients []string) {
 	}
 }
 
+// Function gets rid of weird command line outputs from errors
+func sliceOutput(output string, fileName string) string {
+	arr := strings.Split(output, "\n")
+	var logOutput string
+	for _, str := range arr {
+		if str != "# command-line-arguments" {
+			s := html.EscapeString(str)
+			index := strings.Index(s, fileName)
+			if index >= 0 {
+				s = html.UnescapeString(s[len(fileName)+index+1:])
+			} else {
+				s = html.UnescapeString(s)
+			}
+			if len(logOutput) > 0 {
+				logOutput += "\n" + s
+			} else {
+				logOutput += s
+			}
+		}
+	}
+	return logOutput
+}
+
 func checkError(err error) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -689,6 +861,11 @@ func checkError(err error) error {
 	}
 
 	return nil
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, "Usage: go run worker.go [LBServer ip:port] [FSServer ip:port]\n")
+	os.Exit(1)
 }
 
 // Code for creating random strings: only for POC(CLI)
