@@ -29,17 +29,35 @@ html {
       height: 25%; }
       html .editor .output-wrapper .output {
         height: 89%;
-        border-radius: 10px; }
+        border-radius: 10px;
+        color: white;
+        padding: 5px 10px; }
     html .editor .logs-wrapper {
       margin-top: .5rem;
       height: 82%; }
       html .editor .logs-wrapper .logs {
         height: 100%;
-        border-radius: 10px; }
-    html .editor .execute, html .editor .share {
+        border-radius: 10px;
+        color: cadetblue; }
+        html .editor .logs-wrapper .logs ul {
+          display: inline-block; }
+      html .editor .logs-wrapper .log-selected {
+        color: #d00; }
+    html .editor .execute {
       height: 50px;
       border-radius: 5px;
       width: 100%; }
+    html .editor .reset {
+      float: right;
+      height: 27px;
+      margin-top: 7px;
+      font-size: smaller;
+      width: 77px; }
+      html .editor .reset img {
+        width: 12px;
+        margin-top: 3px; }
+      html .editor .reset span {
+        float: right; }
     html .editor .CodeMirror {
       height: 100% !important;
       border-radius: 10px; }

@@ -1,11 +1,13 @@
 // Globals
-debugMode = true;
+debugMode = false;
 userID = "";
 sessionID = "";
 currentSessions = [];
+currentWorkerIP = ""
+jobIDs = []
 workerIP = '';
 
-$(document).ready(function(){
+$(document).ready(function() {
     $('.input-wrapper').resizable({
         handles: 's',
         resize: function() {
@@ -92,12 +94,10 @@ function formBindings() {
                         alert("No available Workers, please try again later")
                     } else {
                         workerIP = data.WorkerIP;
-
                         initWS()
-
                         $('.register').css('display', 'none');
                         $('.editor').slideDown('slow');
-
+                        currentWorkerIP = data.WorkerIP
                         setTimeout(function() {
                             editor.refresh();
                         }, 500);
@@ -160,4 +160,83 @@ function verifyRegister() {
     }
 
     return valid;
+}
+
+function reset() {
+    $('.log-selected').removeClass('log-selected');
+    
+    editor.setValue(CRDT.toSnippet());
+    editor.setOption("readOnly", false);
+    document.getElementById('outputBox').innerHTML = "";
+    document.getElementById("snipTitle").style.color = ''
+    document.getElementById('snipTitle').innerHTML = "Snippet:"
+}
+
+function execute() {
+    var newForm = document.createElement('form');
+    newForm.setAttribute('id', 'executeForm');
+    newForm.setAttribute('form', 'executeForm');
+
+    var sessInput = document.createElement('input');
+    sessInput.setAttribute('name', 'sessionID');
+    sessInput.setAttribute('value', sessionID);
+    sessInput.setAttribute('type', 'hidden');
+
+    var snippet = document.createElement('textarea');
+    snippet.setAttribute('name', 'snippet');
+    snippet.value = CRDT.toSnippet();
+    snippet.setAttribute('class', 'text');
+    snippet.setAttribute('form', 'executeForm');
+
+    newForm.append(sessInput);
+    newForm.append(snippet);
+    $("body").append(newForm);
+
+    $.ajax({
+        type: 'post',
+        url: "http://" + currentWorkerIP + '/execute',
+        dataType: 'json',
+        data: $('#executeForm').serialize(),
+        success: function(data) {
+            jobIDs.push(data.JobID);
+            $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
+        }
+    })
+    newForm.parentNode.removeChild(newForm);
+}
+
+function matchLog(log) {
+    if (log.Job.SessionID == sessionID) {
+        var isExist = false;
+        for (var i = 0; i < jobIDs.length; i++) {
+            if (jobIDs[i] == log.Job.JobID) {
+                isExist = true;
+                var logOutput = document.getElementById(log.Job.JobID);
+                logOutput.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    logClicked(log);
+                }, false);
+            }
+        }
+        if (!isExist) {
+            $("#logList").prepend("<li><a href=# id=" + log.Job.JobID + ">" + log.Job.JobID + "</a></li>")
+            var logOutput = document.getElementById(log.Job.JobID);
+            logOutput.addEventListener('click', function(e) {
+                e.preventDefault();
+                logClicked(log);
+            }, false);
+        }
+    }
+}
+
+function logClicked(log) {
+    $('.log-selected').removeClass('log-selected');
+    $('#'+log.Job.JobID).addClass('log-selected');
+
+    editor.setValue(log.Job.Snippet);
+    editor.setOption("readOnly", true);
+    str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
+    document.getElementById('outputBox').innerHTML = str;
+    document.getElementById("snipTitle").style.color = '#d00'
+    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
 }

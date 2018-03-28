@@ -65,7 +65,7 @@ var (
 // Parses args, setups up RPC server.
 func main() {
 	gob.Register(&net.TCPAddr{})
-
+	RegisterGob()
 	addrs, _ := net.InterfaceAddrs()
 	var externalIP string
 	for _, a := range addrs {
@@ -254,6 +254,54 @@ func (s *LBServer) HeartBeat(workerID int, _ignored *bool) error {
 	}
 
 	allWorkers.all[workerID].RecentHeartbeat = time.Now().UnixNano()
+
+	return nil
+}
+
+// This function is called when a worker receives a run request by their client
+// The worker will save the job
+func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
+	allWorkers.Lock()
+	defer allWorkers.Unlock()
+
+	if len(allWorkers.queue) == 0 {
+		return nil
+	}
+
+	nextWorker := allWorkers.queue[0]
+	allWorkers.queue = allWorkers.queue[1:]
+
+	nextWorkerIP := nextWorker.RPCAddress.String()
+
+	allWorkers.queue = append(allWorkers.queue, nextWorker)
+
+	workerCon, err := rpc.Dial("tcp", nextWorkerIP)
+	defer workerCon.Close()
+	if err != nil {
+		fmt.Println("Error connecting to worker to run job")
+	} else {
+		response := new(WorkerResponse)
+		request := new(WorkerRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = jobID
+		err = workerCon.Call("Worker.RunJob", request, response)
+		log := response.Payload[0].(Log)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			// Send out the new log
+			request = new(WorkerRequest)
+			request.Payload = make([]interface{}, 1)
+			request.Payload[0] = log
+			var ignored bool
+
+			fmt.Println(allWorkers.all)
+			for _, worker := range allWorkers.all {
+				workerCon, _ := rpc.Dial("tcp", worker.RPCAddress.String())
+				workerCon.Call("Worker.SendLog", request, &ignored)
+			}
+		}
+	}
 
 	return nil
 }
