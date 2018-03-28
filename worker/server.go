@@ -60,7 +60,7 @@ var (
 	MinNumWorkerConnections            = 2
 	NumWorkerToReturn                  = 4
 	WorkerIDCounter                    = 0
-	sessionIDs = make(map[string]bool)
+	sessionIDs                         = make(map[string]bool)
 )
 
 // Parses args, setups up RPC server.

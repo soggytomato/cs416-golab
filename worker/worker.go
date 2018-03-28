@@ -241,7 +241,7 @@ func (w *Worker) sendlocalElements() error {
 		request.Payload[0] = w.localElements
 		response := new(WorkerResponse)
 		w.logger.Println("Map of connceted workers:", w.workers)
-		w.saveModifiedSessionsToFS()
+		w.saveModifiedSessionsToFS() // can't put this in loop since it won't run if there are no workers
 		for workerAddr, workerCon := range w.workers {
 			isConnected := false
 			workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -347,7 +347,7 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 		} else {
 			session := fsResponse.Payload[0].(Session)
 			w.sessions[sessionID] = &session
-		  // TODO handle logs
+			// TODO handle logs
 			return true
 		}
 	}
@@ -552,10 +552,6 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	sessionID := _sessionID[0]
 
 	w.logger.Println("New socket connection from: ", clientID, sessionID)
-
-	// if _, ok := w.sessions[sessionID]; !ok && !w.getSessionAndLogs(sessionID) {
-	// 	w.newSession(sessionID)
-	// }
 
 	w.clients[clientID] = conn
 	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
