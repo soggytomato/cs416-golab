@@ -28,24 +28,31 @@ func main() {
 
 	session := Session{
 		ID: "session-0",
-		Elements: make([]Element, 3),
-		Head: "session-0-head"}
-	session.Elements[0] = Element{
+		CRDT: make(map[string]*Element),
+		Head: "element-0",
+		Next: 4}
+	session.CRDT["element-0"] = &Element{
+		SessionID: "element-0",
 		ClientID: "client-0",
 		ID:       "element-0",
 		PrevID:   "",
+		NextID:   "element-1",
 		Text:     "a",
 		Deleted:  false}
-	session.Elements[1] = Element{
+	session.CRDT["element-1"] = &Element{
+		SessionID: "element-0",
 		ClientID: "client-0",
 		ID:       "element-1",
 		PrevID:   "element-0",
+		NextID:   "element-2",
 		Text:     "b",
 		Deleted:  false}
-	session.Elements[2] = Element{
+	session.CRDT["element-2"] = &Element{
+		SessionID: "element-0",
 		ClientID: "client-0",
 		ID:       "element-2",
 		PrevID:   "element-1",
+		NextID:   "",
 		Text:     "c",
 		Deleted:  false}
 
@@ -53,33 +60,12 @@ func main() {
 	request.Payload = make([]interface{}, 1)
 	request.Payload[0] = session
 
-	fmt.Println("Saving session...")
+	fmt.Println("Saving session:")
+	fmt.Println(session)
 	ignored := false
 	err = serverConn.Call("Server.SaveSession", request, &ignored)
 	checkError(err)
 	fmt.Println("Session (probably) saved.")
-
-	fmt.Println("Sleeping for 1000 ms...\n")
-	time.Sleep(1000 * time.Millisecond)
-
-
-	// Test get session
-
-	fmt.Println("Getting session from file server...")
-	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = session.ID
-	response := new(FSResponse)
-
-	err = serverConn.Call("Server.GetSession", request, response)
-	checkError(err)
-	if len(response.Payload) == 0 {
-		fmt.Println("Failed to get session from file server.")
-		return
-	}
-	newSession := response.Payload[0].(Session)
-	fmt.Println("Got session from file server:")
-	fmt.Println(newSession)
 
 	fmt.Println("Sleeping for 1000 ms...\n")
 	time.Sleep(1000 * time.Millisecond)
@@ -115,7 +101,7 @@ func main() {
 	request = new(FSRequest)
 	request.Payload = make([]interface{}, 1)
 	request.Payload[0] = _log.Job.JobID
-	response = new(FSResponse)
+	response := new(FSResponse)
 
 	err = serverConn.Call("Server.GetLog", request, response)
 	checkError(err)
@@ -135,21 +121,21 @@ func main() {
 
 	log1 := Log{
 		Job: Job{
-			SessionID: "session-1",
+			SessionID: "session-0",
 			JobID: "job-1",
 			Snippet: `fmt.Println("I love CPSC 416!")`,
 			Done: true},
 		Output: `I love CPSC 416!`}
 	log2 := Log{
 		Job: Job{
-			SessionID: "session-2",
+			SessionID: "session-1",
 			JobID: "job-2",
 			Snippet: `fmt.Println("Ayy lmao")`,
 			Done: true},
 		Output: `Ayy lmao`}
 	log3 := Log{
 		Job: Job{
-			SessionID: "session-2",
+			SessionID: "session-0",
 			JobID: "job-3",
 			Snippet: `fmt.Println("Those A2 marks tho")`,
 			Done: true},
@@ -188,45 +174,30 @@ func main() {
 	time.Sleep(1000 * time.Millisecond)
 
 
-	// Get all logs in session-1
+	// Test get session (session-1)
 
-	fmt.Println("Getting logs from file server in session-1 (job-1)...")
+	fmt.Println("Getting session from file server...")
 	request = new(FSRequest)
 	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = log1.Job.SessionID
+	request.Payload[0] = session.ID
 	response = new(FSResponse)
 
-	err = serverConn.Call("Server.GetLogs", request, response)
+	err = serverConn.Call("Server.GetSession", request, response)
 	checkError(err)
 	if len(response.Payload) == 0 {
-		fmt.Println("Failed to get logs from file server.")
+		fmt.Println("Failed to get session from file server.")
 		return
 	}
-	logs := response.Payload[0].([]Log)
-	fmt.Println("Got logs from file server:")
-	fmt.Println(logs)
+	newSession := response.Payload[0].(Session)
+	fmt.Println("Got session from file server:")
+	fmt.Println(newSession)
+	fmt.Println("First element: " + fmt.Sprint(*newSession.CRDT["element-0"]))
+	fmt.Println("Second element: " + fmt.Sprint(*newSession.CRDT["element-1"]))
+	fmt.Println("Third element: " + fmt.Sprint(*newSession.CRDT["element-2"]))
 
-	fmt.Println("Sleeping for 1000 ms...\n")
-	time.Sleep(1000 * time.Millisecond)
-
-
-	// Get all logs in session-2
-
-	fmt.Println("Getting logs from file server in session-2 (job-2, job-3)...")
-	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = log2.Job.SessionID
-	response = new(FSResponse)
-
-	err = serverConn.Call("Server.GetLogs", request, response)
-	checkError(err)
-	if len(response.Payload) == 0 {
-		fmt.Println("Failed to get logs from file server.")
-		return
-	}
-	logs = response.Payload[0].([]Log)
-	fmt.Println("Got logs from file server:")
-	fmt.Println(logs)
+	newLogs := response.Payload[1].([]Log)
+	fmt.Println("Got logs for the session:")
+	fmt.Println(newLogs)
 }
 
 func checkError(err error) error {
