@@ -50,6 +50,7 @@ type Worker struct {
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
 	sessions         map[string]*Session
+	modifiedSessions map[string]*Session
 	clientSessions   map[string][]string
 	localElements    []*Element
 	logs             map[string]*Log
@@ -106,6 +107,7 @@ func (w *Worker) init() {
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
+	w.modifiedSessions = make(map[string]*Session)
 	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
 		os.Mkdir(EXEC_DIR, 0755)
 	}
@@ -224,6 +226,7 @@ func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Ses
 	id := newElement.ID
 	session.CRDT[id] = newElement
 	w.localElements = append(w.localElements, newElement)
+	w.modifiedSessions[session.ID] = session
 	session.Next++
 }
 
@@ -238,6 +241,7 @@ func (w *Worker) sendlocalElements() error {
 		request.Payload[0] = w.localElements
 		response := new(WorkerResponse)
 		w.logger.Println("Map of connceted workers:", w.workers)
+		w.saveModifiedSessionsToFS()
 		for workerAddr, workerCon := range w.workers {
 			isConnected := false
 			workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -269,7 +273,22 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 			w.sendToClients(element)
 		}
 	}
+
 	return nil
+}
+
+func (w *Worker) saveModifiedSessionsToFS() {
+	var ignored bool
+	for sessionID, session := range w.modifiedSessions {
+		request := new(FSRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = session
+		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
+		if err != nil {
+			w.logger.Println("saveSessionToFS:", err)
+		}
+		delete(w.modifiedSessions, sessionID)
+	}
 }
 
 // Load balancer calls CreateNewSession when it receives a request from a client
@@ -306,7 +325,7 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 	for _, workerCon := range w.workers {
 		var isConnected bool
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		err := workerCon.Call("Worker.SendSession", sessionID, response)
+		err := workerCon.Call("Worker.GetSession", sessionID, response)
 		if err != nil {
 			w.logger.Println("getSessionAndLogs:", err)
 		} else {
@@ -318,12 +337,15 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 
 	// If worker's neighbours cannot provide the session, contact the file server for the session
 	if w.sessions[sessionID] == nil {
+		fsRequest := new(FSRequest)
 		fsResponse := new(FSResponse)
-		err := w.fsServerConn.Call("Server.GetSession", sessionID, fsResponse)
+		fsRequest.Payload = make([]interface{}, 1)
+		fsRequest.Payload[0] = sessionID
+		err := w.fsServerConn.Call("Server.GetSession", fsRequest, fsResponse)
 		if err != nil {
 			w.logger.Println("getSessionAndLogs:", err)
 		} else {
-			session := response.Payload[0].(Session)
+			session := fsResponse.Payload[0].(Session)
 			w.sessions[sessionID] = &session
 		  // TODO handle logs
 			return true
@@ -334,12 +356,13 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 
 // If client tries to get a session, this function can be used to get that session
 // if the worker has it in its CRDT map
-func (w *Worker) SendSession(sessionID string, response *WorkerResponse) error {
+func (w *Worker) GetSession(sessionID string, response *WorkerResponse) error {
 	if w.sessions[sessionID] == nil {
 		return NoCRDTError(sessionID)
 	}
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = w.sessions[sessionID]
+	// TODO Get logs
 	return nil
 }
 
