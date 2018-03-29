@@ -86,6 +86,7 @@ func main() {
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
 	gob.Register(&Session{})
+	gob.Register(Job{})
 	gob.Register(Log{})
 	gob.Register([]Log{})
 	worker := new(Worker)
@@ -145,6 +146,8 @@ func (w *Worker) sendLocalElements() error {
 				if isConnected {
 					workerCon.Call("Worker.ApplyIncomingElements", request, response)
 				} else {
+					w.logger.Println("Lost worker: ", workerAddr)
+
 					delete(w.workers, workerAddr)
 				}
 			}
@@ -275,6 +278,8 @@ func (w *Worker) getWorkers() {
 		isConnected := false
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
 		if !isConnected {
+			w.logger.Println("Lost worker: ", workerAddr)
+
 			delete(w.workers, workerAddr)
 		}
 	}
