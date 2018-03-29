@@ -59,6 +59,23 @@ function sendElement(_element) {
     };
 
     socket.send(JSON.stringify(element));
+
+    if (debugMode) {
+        if (element.Deleted) {
+            console.log("=============DELETE===========\n"+
+                    "ID: "+element.ID+"\n"+
+                    "PREV ID: "+element.PrevID+"\n"+
+                    "TEXT: "+element.Text+"\n"+
+                    "=============================")
+        } else {
+            console.log("=============INSERT===========\n"+
+                    "ID: "+element.ID+"\n"+
+                    "PREV ID: "+element.PrevID+"\n"+
+                    "TEXT: "+element.Text+"\n"+
+                    "=============================")
+        }
+        
+    }
 }
 
 function sendElementByID(id) {

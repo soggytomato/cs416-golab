@@ -58,7 +58,7 @@ type Worker struct {
 	logger           *log.Logger
 	sessions         map[string]*Session
 	clientSessions   map[string][]string
-	localElements    []*Element
+	localElements    []Element
 	cache            *Cache
 }
 
@@ -82,6 +82,7 @@ const EXEC_DIR = "./execute"
 func main() {
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
+	gob.Register([]Element{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
 	gob.Register(&Session{})
@@ -138,7 +139,6 @@ func (w *Worker) sendLocalElements() error {
 			request.Payload = make([]interface{}, 1)
 			request.Payload[0] = w.localElements
 			response := new(WorkerResponse)
-			w.logger.Println("Map of connceted workers:", w.workers)
 			for workerAddr, workerCon := range w.workers {
 				isConnected := false
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -158,21 +158,11 @@ func (w *Worker) sendLocalElements() error {
 // If it doesn't, skip over applying the op
 // If it has applied these ops already, skip over applying the op
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
-	elements := request.Payload[0].([]*Element)
+	elements := request.Payload[0].([]Element)
 	for _, element := range elements {
 		w.cache.Add(element)
-
-		session := w.sessions[element.SessionID]
-		if session != nil {
-
-			if element.Deleted == true {
-				session.Delete(element)
-			} else {
-				w.addToSession(element)
-			}
-
-			w.sendToClients(element)
-		}
+		w.addToSession(element)
+		w.sendToClients(element)
 	}
 	return nil
 }
@@ -361,9 +351,9 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 		sessionID := _sessionID[0]
 		userID := _userID[0]
 
-		fmt.Println("Got delete request", sessionID, userID)
-
 		w.deleteClients(sessionID, []string{userID})
+
+		w.logger.Println("User " + userID + " has closed session " + sessionID)
 	}
 }
 
@@ -485,32 +475,18 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 			w.logger.Println("Got element from "+userID+": ", element)
 		}
 
-		// Push to local elements
-		w.localElements = append(w.localElements, element)
-
-		// Update session CRDT accordingly
-		session := w.sessions[element.SessionID]
-		if element.Deleted == true {
-			session.Delete(element)
-		} else {
-			session.Add(element)
-			w.localElements = append(w.localElements, element)
-		}
-
-		w.cache.Add(element)
+		w.addToSession(*element)
 
 		// TODO remove because we will buffer the sends
-		w.sendToClients(element)
+		w.sendToClients(*element)
 	}
 }
 
-func (w *Worker) sendToClients(element *Element) {
+func (w *Worker) sendToClients(element Element) {
 	sessionID := element.SessionID
 
 	var clientsToDelete []string
 	for _, clientID := range w.clientSessions[sessionID] {
-		fmt.Println("Sending " + element.ClientID + " to user " + clientID)
-
 		conn := w.clients[clientID]
 		err := conn.WriteJSON(element)
 		if err != nil {
@@ -662,19 +638,29 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 	session := w.sessions[sessionID]
 	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
 	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false, time.Now().Unix()}
-	added := session.Add(newElement)
-
-	if added {
-		w.localElements = append(w.localElements, newElement)
-	}
+	w.addToSession(*newElement)
 
 	return nil
 }
 
-func (w *Worker) addToSession(element *Element) error {
+func (w *Worker) addToSession(element Element) error {
+	_element := element
+
 	session := w.sessions[element.SessionID]
-	if session.Add(element) {
-		w.localElements = append(w.localElements, element)
+	if session == nil {
+		return nil
+	}
+
+	var processed bool = false
+	if element.Deleted == true {
+		processed = session.Delete(element)
+	} else {
+		processed = session.Add(element)
+	}
+
+	if processed {
+		w.logger.Println("Adding " + _element.ID + "to local elements")
+		w.localElements = append(w.localElements, _element)
 	}
 
 	return nil

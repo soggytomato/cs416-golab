@@ -10,7 +10,7 @@ const MAINTENANCE_INTERVAL int = 2
 const EXPIRY_THRESHOLD int = 5 * MAINTENANCE_INTERVAL
 
 type Cache struct {
-	elements map[string][]*Element
+	elements map[string][]Element
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ func (c *Cache) clean(sessionID string) {
 	}
 }
 
-func (c *Cache) exists(element *Element) bool {
+func (c *Cache) exists(element Element) bool {
 	sessionID := element.SessionID
 
 	var exists bool = false
@@ -60,7 +60,7 @@ func (c *Cache) exists(element *Element) bool {
 // <PUBLIC METHODS>
 
 func (c *Cache) Init() {
-	c.elements = make(map[string][]*Element)
+	c.elements = make(map[string][]Element)
 }
 
 func (c *Cache) Maintain() {
@@ -73,7 +73,7 @@ func (c *Cache) Maintain() {
 	}
 }
 
-func (c *Cache) Add(element *Element) {
+func (c *Cache) Add(element Element) {
 	sessionID := element.SessionID
 
 	if !c.exists(element) {
@@ -82,7 +82,7 @@ func (c *Cache) Add(element *Element) {
 	}
 }
 
-func (c *Cache) Get(sessionID string) []*Element {
+func (c *Cache) Get(sessionID string) []Element {
 	return c.elements[sessionID]
 }
 

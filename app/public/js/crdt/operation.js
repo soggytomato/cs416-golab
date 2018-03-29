@@ -12,8 +12,11 @@ REMOTE_DELETE_OP = '+remote_delete';
 REMOTE_INPUT_OP_PREFIX = REMOTE_INPUT_OP + '_';
 REMOTE_DELETE_OP_PREFIX = REMOTE_DELETE_OP + '_';
 
-// Timestamp for the last encountered operation
-lastChange = 0;
+// Queue of changes
+changes = new Array();
+
+// Flages whether the changes are currently being addressed
+changesInProgress = false
 
 /*
     Register the handlers for events coming from CodeMirror.
@@ -42,34 +45,41 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
-            if (change.from.hitSide) return;
+            if (origin == DELETE_OP && change.from.hitSide) return;
 
-            const curTime = Date.now();
-            if (curTime == lastChange) {
-                setTimeout(function() {
-                    lastChange = Date.now();
-                    handleOperation(change);
-                }, 1);
-            } else {
-                lastChange = curTime;
-                handleOperation(change);
+            changes.push(change);
+
+            // If no changes are currently in progress, kick off a new Promise
+            if (!changesInProgress) {
+                changesInProgress = true;
+
+                var promise = new Promise(
+                    function(resolve, reject) {
+                        handleOperation(changes[0]);
+                        
+                        changes.splice(0, 1);
+                        if (change.length > 0) {
+                            resolve();
+                        } else {
+                            reject();
+                        }
+                    }
+                );
+
+                promise.then(
+                    function() {
+                        var promise = new Promise(opPromise);
+                        promise.then(opResolve, opReject);
+                    }, 
+                    function() {
+                        changesInProgress = false;
+
+                        if (debugMode) CRDT.verify();
+                    }
+                );
             }
         }
     );
-
-    // Handles all user inputs after they are applied to the editor.
-    if (debugMode) {
-        // Verifies snippet after processing handle.
-        editor.on('change',
-            function(cm, change) {
-                if (change.from.hitSide) return;
-
-                setTimeout(function() {
-                    CRDT.verify();
-                }, 100);
-            }
-        );
-    }
 });
 
 /*
