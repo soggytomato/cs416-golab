@@ -78,6 +78,9 @@ const INITIAL_ID string = "12345"
 const EXEC_DIR = "./execute"
 
 func main() {
+	if len(os.Args) != 3 {
+		usage()
+	}
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]*Element{})
@@ -241,7 +244,7 @@ func (w *Worker) sendlocalElements() error {
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = w.localElements
 		response := new(WorkerResponse)
-		w.logger.Println("Map of connceted workers:", w.workers)
+		w.logger.Println("Map of connected workers:", w.workers)
 		w.saveModifiedSessionsToFS() // can't put this in loop since it won't run if there are no workers
 		for workerAddr, workerCon := range w.workers {
 			isConnected := false
@@ -436,10 +439,15 @@ func (w *Worker) registerWithLB() {
 
 func (w *Worker) startHeartBeat() {
 	var ignored bool
-	w.loadBalancerConn.Call("LBServer.HeartBeat", w.workerID, &ignored)
+	request := new(WorkerRequest)
+	request.Payload = make([]interface{}, 2)
+	request.Payload[0] = w.workerID
+	request.Payload[1] = len(w.clients)
+	w.loadBalancerConn.Call("LBServer.HeartBeat", request, &ignored)
 	for {
 		time.Sleep(time.Duration(w.settings.HeartBeat-TIME_BUFFER) * time.Millisecond)
-		w.loadBalancerConn.Call("LBServer.HeartBeat", w.workerID, &ignored)
+		request.Payload[1] = len(w.clients)
+		w.loadBalancerConn.Call("LBServer.HeartBeat", request, &ignored)
 	}
 }
 
