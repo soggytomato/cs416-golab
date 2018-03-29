@@ -29,11 +29,6 @@ import (
 
 	. "../lib/types"
 	"github.com/gorilla/websocket"
-	// POC(CLI) relevant
-	// "bufio"
-	// "bytes"
-	// "math/rand"
-	// "strings"
 )
 
 type WorkerInfo struct {
@@ -55,8 +50,10 @@ type Worker struct {
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
 	sessions         map[string]*Session
+	modifiedSessions map[string]*Session
 	clientSessions   map[string][]string
 	localElements    []*Element
+	logs             map[string][]Log
 }
 
 type LogSettings struct {
@@ -85,7 +82,7 @@ func main() {
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
-	gob.Register(&Session{})
+	gob.Register(Session{})
 	gob.Register(Log{})
 	gob.Register([]Log{})
 	worker := new(Worker)
@@ -97,7 +94,6 @@ func main() {
 	worker.connectToFS()
 	worker.getWorkers()
 	go worker.sendlocalElements()
-	// worker.workerPrompt() //POC(CLI)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	wg.Wait()
@@ -111,6 +107,8 @@ func (w *Worker) init() {
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
+	w.modifiedSessions = make(map[string]*Session)
+	w.logs = make(map[string][]Log)
 	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
 		os.Mkdir(EXEC_DIR, 0755)
 	}
@@ -121,81 +119,6 @@ func (w *Worker) connectToFS() {
 	checkError(err)
 	w.fsServerConn = fsServerConn
 }
-
-//****POC CODE***//
-
-// func (w *Worker) workerPrompt() {
-// 	reader := bufio.NewReader(os.Stdin)
-// 	for {
-// 		fmt.Print("Worker> ")
-// 		cmd, _ := reader.ReadString('\n')
-// 		if w.handleIntroCommand(cmd) == 1 {
-// 			return
-// 		}
-// 	}
-// }
-//
-// func (w *Worker) handleIntroCommand(cmd string) int {
-// 	args := strings.Split(strings.TrimSpace(cmd), ",")
-//
-// 	switch args[0] {
-// 	case "newSession":
-// 		w.newSession()
-// 	case "getSession":
-// 		w.getSession(args[1])
-// 	default:
-// 		fmt.Println(" Invalid command.")
-// 	}
-//
-// 	return 0
-// }
-//
-//
-// func (w *Worker) crdtPrompt(sessionID string) {
-// 	reader := bufio.NewReader(os.Stdin)
-// 	for {
-// 		message := w.getMessage(w.sessions[sessionID])
-// 		fmt.Println("SessionID:", sessionID)
-// 		fmt.Println("Message:", message)
-// 		fmt.Print("Worker> ")
-// 		cmd, _ := reader.ReadString('\n')
-// 		if w.handleCommand(cmd) == 1 {
-// 			return
-// 		}
-// 	}
-// }
-//
-// // Iterate through the beginning of the CRDT to the end to show the message and
-// // specify the mapping of each character
-// func (w *Worker) getMessage(session *Session) string {
-// 	var buffer bytes.Buffer
-// 	crdt := session.CRDT
-// 	firstElement := crdt[session.Head]
-// 	for firstElement != nil {
-// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
-// 		buffer.WriteString(firstElement.Text)
-// 		firstElement = crdt[firstElement.NextID]
-// 	}
-// 	return buffer.String()
-// }
-//
-// func (w *Worker) handleCommand(cmd string) int {
-// 	args := strings.Split(strings.TrimSpace(cmd), ",")
-//
-// 	switch args[0] {
-// 	case "addRight":
-// 		err := w.addRight(args[1], args[2], args[3])
-// 		if checkError(err) != nil {
-// 			return 0
-// 		}
-// 	case "exit":
-// 		return 1
-// 	default:
-// 		fmt.Println(" Invalid command.")
-// 	}
-//
-// 	return 0
-// }
 
 //**CRDT CODE**//
 
@@ -273,7 +196,7 @@ func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID st
 
 // Any other insert that doesn't take place at the beginning or end is handled here
 func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, session *Session) {
-	fmt.Println("prevID:", prevID)
+	w.logger.Println("prevID:", prevID)
 	newPrevID := w.samePlaceInsertCheck(newElement, prevID, elementID, session)
 	prevElement := session.CRDT[newPrevID]
 	newElement.NextID = prevElement.NextID
@@ -304,6 +227,7 @@ func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Ses
 	id := newElement.ID
 	session.CRDT[id] = newElement
 	w.localElements = append(w.localElements, newElement)
+	w.modifiedSessions[session.ID] = session
 	session.Next++
 }
 
@@ -318,6 +242,7 @@ func (w *Worker) sendlocalElements() error {
 		request.Payload[0] = w.localElements
 		response := new(WorkerResponse)
 		w.logger.Println("Map of connceted workers:", w.workers)
+		w.saveModifiedSessionsToFS() // can't put this in loop since it won't run if there are no workers
 		for workerAddr, workerCon := range w.workers {
 			isConnected := false
 			workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -349,25 +274,91 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 			w.sendToClients(element)
 		}
 	}
+
 	return nil
 }
 
-func (w *Worker) newSession(sessionID string) {
-	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
+func (w *Worker) saveModifiedSessionsToFS() {
+	var ignored bool
+	for sessionID, session := range w.modifiedSessions {
+		request := new(FSRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = session
+		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
+		if err != nil {
+			w.logger.Println("saveSessionToFS:", err)
+			break
+		}
+		delete(w.modifiedSessions, sessionID)
+	}
 }
 
-// Client can provide the sessionID to get session from another worker
-func (w *Worker) getSession(sessionID string) bool {
+// Load balancer calls CreateNewSession when it receives a request from a client
+// using an ID it has not seen before. Worker stores a new Session locally and saves
+// it to the FS
+func (w *Worker) CreateNewSession(sessionID string, response *bool) error {
+	request := new(FSRequest)
+	session := &Session{sessionID, make(map[string]*Element), "", 1}
+
+	w.sessions[sessionID] = session
+	request.Payload = make([]interface{}, 1)
+	request.Payload[0] = w.sessions[sessionID]
+	var ignored bool
+	err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
+	if err != nil {
+		w.logger.Println("CreateNewSession:", err)
+	}
+	return nil
+}
+
+// If worker doesn't have Session, contact other workers/FS to load the Session
+// Once stored, worker will actively update Session as Elements arrive
+func (w *Worker) LoadSession(sessionID string, response *bool) error {
+	if w.sessions[sessionID] == nil {
+		w.getSessionAndLogs(sessionID)
+	}
+
+	return nil
+}
+
+// Get the Session from a connected worker or get it from the FS
+func (w *Worker) getSessionAndLogs(sessionID string) bool {
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
 		var isConnected bool
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		err := workerCon.Call("Worker.SendSession", sessionID, response)
+		err := workerCon.Call("Worker.GetSession", sessionID, response)
 		if err != nil {
-			fmt.Println(err)
+			w.logger.Println("getSessionAndLogs:", err)
 		} else {
-			w.sessions[sessionID] = response.Payload[0].(*Session)
-			// w.crdtPrompt(sessionID) // Used in POC(CLI)
+			session := response.Payload[0].(Session)
+			logs := response.Payload[1].([]Log)
+			if len(logs) > 0 {
+				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			}
+			w.sessions[sessionID] = &session
+			return true
+		}
+	}
+
+	// If worker's neighbours cannot provide the session, contact the file server for the session
+	if w.sessions[sessionID] == nil {
+		fsRequest := new(FSRequest)
+		fsResponse := new(FSResponse)
+		fsRequest.Payload = make([]interface{}, 1)
+		fsRequest.Payload[0] = sessionID
+		err := w.fsServerConn.Call("Server.GetSession", fsRequest, fsResponse)
+		if err != nil {
+			w.logger.Println("getSessionAndLogs:", err)
+		} else {
+			session := fsResponse.Payload[0].(Session)
+			logs := fsResponse.Payload[1].([]Log)
+			w.logger.Println(logs)
+			if len(logs) > 0 {
+				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			}
+			w.sessions[sessionID] = &session
+			// TODO handle cached elements
 			return true
 		}
 	}
@@ -376,12 +367,13 @@ func (w *Worker) getSession(sessionID string) bool {
 
 // If client tries to get a session, this function can be used to get that session
 // if the worker has it in its CRDT map
-func (w *Worker) SendSession(sessionID string, response *WorkerResponse) error {
+func (w *Worker) GetSession(sessionID string, response *WorkerResponse) error {
 	if w.sessions[sessionID] == nil {
 		return NoCRDTError(sessionID)
 	}
-	response.Payload = make([]interface{}, 1)
+	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = w.sessions[sessionID]
+	response.Payload[1] = w.logs[sessionID]
 	return nil
 }
 
@@ -531,13 +523,13 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 			http.Error(wr, "Missing userID in URL parameter", http.StatusBadRequest)
 		}
 
-		fmt.Println("Session ID", _sessionID)
-		fmt.Println("User ID", _userID)
+		w.logger.Println("Session ID", _sessionID)
+		w.logger.Println("User ID", _userID)
 
 		sessionID := _sessionID[0]
 		userID := _userID[0]
 
-		fmt.Println("Got delete request", sessionID, userID)
+		w.logger.Println("Got delete request", sessionID, userID)
 
 		w.deleteClients(sessionID, []string{userID})
 	}
@@ -571,10 +563,6 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 	sessionID := _sessionID[0]
 
 	w.logger.Println("New socket connection from: ", clientID, sessionID)
-
-	if _, ok := w.sessions[sessionID]; !ok && !w.getSession(sessionID) {
-		w.newSession(sessionID)
-	}
 
 	w.clients[clientID] = conn
 	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
@@ -666,7 +654,7 @@ func (w *Worker) sendToClients(element *Element) {
 
 	var clientsToDelete []string
 	for _, clientID := range w.clientSessions[sessionID] {
-		fmt.Println("Sending " + element.ClientID + " to user " + clientID)
+		w.logger.Println("Sending " + element.ClientID + " to user " + clientID)
 		if clientID != element.ClientID {
 			conn := w.clients[clientID]
 
@@ -750,11 +738,13 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
+
 	return nil
 }
 
 func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 	log := request.Payload[0].(Log)
+	w.logs[log.Job.SessionID] = append(w.logs[log.Job.SessionID], log)
 	for _, clientConn := range w.clients {
 		err := clientConn.WriteJSON(log)
 		checkError(err)
@@ -813,22 +803,3 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: go run worker.go [LBServer ip:port] [FSServer ip:port]\n")
 	os.Exit(1)
 }
-
-// Code for creating random strings: only for POC(CLI)
-// const charset = "abcdefghijklmnopqrstuvwxyz" +
-// 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-//
-// var seededRand *rand.Rand = rand.New(
-// 	rand.NewSource(time.Now().UnixNano()))
-//
-// func StringWithCharset(length int, charset string) string {
-// 	b := make([]byte, length)
-// 	for i := range b {
-// 		b[i] = charset[seededRand.Intn(len(charset))]
-// 	}
-// 	return string(b)
-// }
-//
-// func String(length int) string {
-// 	return StringWithCharset(length, charset)
-// }
