@@ -94,7 +94,7 @@ func main() {
 	worker.registerWithLB()
 	worker.connectToFS()
 	worker.getWorkers()
-	go worker.sendlocalElements()
+	go worker.sendLocalElements()
 	go worker.cache.Maintain()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -130,15 +130,17 @@ func (w *Worker) connectToFS() {
 func (w *Worker) sendLocalElements() error {
 	for {
 		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
-		//w.getWorkers() // checks all workers, connects to more if needed
 
+		w.saveModifiedSessionsToFS()
+
+		//w.getWorkers() // checks all workers, connects to more if needed
 		if len(w.localElements) > 0 {
+			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
+
 			request := new(WorkerRequest)
 			request.Payload = make([]interface{}, 1)
 			request.Payload[0] = w.localElements
 			response := new(WorkerResponse)
-			w.logger.Println("Map of connceted workers:", w.workers)
-			w.saveModifiedSessionsToFS() // can't put this in loop since it won't run if there are no workers
 			for workerAddr, workerCon := range w.workers {
 				isConnected := false
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -178,9 +180,12 @@ func (w *Worker) saveModifiedSessionsToFS() {
 		request.Payload[0] = session
 		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
 		if err != nil {
-			w.logger.Println("saveSessionToFS:", err)
+			w.logger.Println("Failed to save session "+sessionID+" to FS server.\n", err)
 			break
 		}
+
+		w.logger.Println("Saved session " + sessionID + " to FS server.")
+
 		delete(w.modifiedSessions, sessionID)
 	}
 }
@@ -215,13 +220,16 @@ func (w *Worker) LoadSession(sessionID string, response *bool) error {
 
 // Get the Session from a connected worker or get it from the FS
 func (w *Worker) getSessionAndLogs(sessionID string) bool {
+	// Mark the session as pending, so the cache doesn't flush
+	w.cache.AddPending(sessionID)
+
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
 		var isConnected bool
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
 		err := workerCon.Call("Worker.GetSession", sessionID, response)
 		if err != nil {
-			w.logger.Println("getSessionAndLogs:", err)
+			w.logger.Println("Failed to retrieve session and logs for session "+sessionID+"\n", err)
 		} else {
 			session := response.Payload[0].(Session)
 			logs := response.Payload[1].([]Log)
@@ -254,6 +262,17 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			return true
 		}
 	}
+
+	// Apply the cached elements to the session
+	if w.sessions[sessionID] != nil {
+		cachedElements := w.cache.Get(sessionID)
+		for _, element := range cachedElements {
+			w.addToSession(element)
+		}
+	}
+	// Remove pending status on session
+	w.cache.RemovePending(sessionID)
+
 	return false
 }
 
@@ -436,6 +455,10 @@ func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
 		}
 
 		sessionID := _sessionID[0]
+
+		if w.sessions[sessionID] == nil {
+			w.getSessionAndLogs(sessionID)
+		}
 
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
@@ -715,7 +738,8 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 func (w *Worker) addToSession(element Element) error {
 	_element := element
 
-	session := w.sessions[element.SessionID]
+	sessionID := element.SessionID
+	session := w.sessions[sessionID]
 	if session == nil {
 		return nil
 	}
@@ -728,6 +752,7 @@ func (w *Worker) addToSession(element Element) error {
 	}
 
 	if processed {
+		w.modifiedSessions[sessionID] = session
 		w.localElements = append(w.localElements, _element)
 	}
 

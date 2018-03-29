@@ -10,7 +10,8 @@ const MAINTENANCE_INTERVAL int = 2
 const EXPIRY_THRESHOLD int = 5 * MAINTENANCE_INTERVAL
 
 type Cache struct {
-	elements map[string][]Element
+	elements        map[string][]Element
+	pendingSessions map[string]bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +62,7 @@ func (c *Cache) exists(element Element) bool {
 
 func (c *Cache) Init() {
 	c.elements = make(map[string][]Element)
+	c.pendingSessions = make(map[string]bool)
 }
 
 func (c *Cache) Maintain() {
@@ -68,7 +70,9 @@ func (c *Cache) Maintain() {
 		time.Sleep(time.Second * time.Duration(MAINTENANCE_INTERVAL))
 
 		for sessionID := range c.elements {
-			go c.clean(sessionID)
+			if pending, ok := c.pendingSessions[sessionID]; !ok || pending == false {
+				go c.clean(sessionID)
+			}
 		}
 	}
 }
@@ -84,6 +88,14 @@ func (c *Cache) Add(element Element) {
 
 func (c *Cache) Get(sessionID string) []Element {
 	return c.elements[sessionID]
+}
+
+func (c *Cache) AddPending(sessionID string) {
+	c.pendingSessions[sessionID] = true
+}
+
+func (c *Cache) RemovePending(sessionID string) {
+	c.pendingSessions[sessionID] = false
 }
 
 // </PUBLIC METHODS>
