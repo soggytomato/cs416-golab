@@ -53,7 +53,7 @@ type Worker struct {
 	modifiedSessions map[string]*Session
 	clientSessions   map[string][]string
 	localElements    []*Element
-	logs             map[string]*Log
+	logs             map[string][]Log
 }
 
 type LogSettings struct {
@@ -108,6 +108,7 @@ func (w *Worker) init() {
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
 	w.modifiedSessions = make(map[string]*Session)
+	w.logs = make(map[string][]Log)
 	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
 		os.Mkdir(EXEC_DIR, 0755)
 	}
@@ -286,6 +287,7 @@ func (w *Worker) saveModifiedSessionsToFS() {
 		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
 		if err != nil {
 			w.logger.Println("saveSessionToFS:", err)
+			break
 		}
 		delete(w.modifiedSessions, sessionID)
 	}
@@ -330,6 +332,10 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			w.logger.Println("getSessionAndLogs:", err)
 		} else {
 			session := response.Payload[0].(Session)
+			logs := response.Payload[1].([]Log)
+			if len(logs) > 0 {
+				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			}
 			w.sessions[sessionID] = &session
 			return true
 		}
@@ -346,8 +352,13 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			w.logger.Println("getSessionAndLogs:", err)
 		} else {
 			session := fsResponse.Payload[0].(Session)
+			logs := fsResponse.Payload[1].([]Log)
+			w.logger.Println(logs)
+			if len(logs) > 0 {
+				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			}
 			w.sessions[sessionID] = &session
-			// TODO handle logs and apply cached elements
+			// TODO handle cached elements
 			return true
 		}
 	}
@@ -360,9 +371,9 @@ func (w *Worker) GetSession(sessionID string, response *WorkerResponse) error {
 	if w.sessions[sessionID] == nil {
 		return NoCRDTError(sessionID)
 	}
-	response.Payload = make([]interface{}, 1)
+	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = w.sessions[sessionID]
-	// TODO Get logs
+	response.Payload[1] = w.logs[sessionID]
 	return nil
 }
 
@@ -727,11 +738,13 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
+
 	return nil
 }
 
 func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 	log := request.Payload[0].(Log)
+	w.logs[log.Job.SessionID] = append(w.logs[log.Job.SessionID], log)
 	for _, clientConn := range w.clients {
 		err := clientConn.WriteJSON(log)
 		checkError(err)
