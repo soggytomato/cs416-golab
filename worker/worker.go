@@ -77,6 +77,9 @@ const ELEMENT_DELAY int = 2
 const EXEC_DIR = "./execute"
 
 func main() {
+	if len(os.Args) != 3 {
+		usage()
+	}
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]Element{})
@@ -349,10 +352,15 @@ func (w *Worker) registerWithLB() {
 
 func (w *Worker) startHeartBeat() {
 	var ignored bool
-	w.loadBalancerConn.Call("LBServer.HeartBeat", w.workerID, &ignored)
+	request := new(WorkerRequest)
+	request.Payload = make([]interface{}, 2)
+	request.Payload[0] = w.workerID
+	request.Payload[1] = len(w.clients)
+	w.loadBalancerConn.Call("LBServer.HeartBeat", request, &ignored)
 	for {
 		time.Sleep(time.Duration(w.settings.HeartBeat-TIME_BUFFER) * time.Millisecond)
-		w.loadBalancerConn.Call("LBServer.HeartBeat", w.workerID, &ignored)
+		request.Payload[1] = len(w.clients)
+		w.loadBalancerConn.Call("LBServer.HeartBeat", request, &ignored)
 	}
 }
 
