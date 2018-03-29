@@ -5,13 +5,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/rpc"
 	"os"
 	"sync"
 	"time"
-	"math/rand"
 
+	. "../lib/session"
 	. "../lib/types"
 )
 
@@ -129,7 +130,7 @@ func (s *Server) listenRPC() {
 		for {
 			conn, err := listener.Accept()
 			checkError(err)
-			s.logger.Println("New connection from "+conn.RemoteAddr().String())
+			s.logger.Println("New connection from " + conn.RemoteAddr().String())
 			go rpc.ServeConn(conn)
 		}
 	}()
@@ -341,7 +342,7 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 	if len(nodeID) == 0 {
 		nodeID = generateNodeID(16)
 		s.nodes.all[nodeID] = &FSNode{
-			nodeID: nodeID,
+			nodeID:   nodeID,
 			nodeAddr: nodeAddr}
 
 		response.Payload[0] = true
@@ -469,7 +470,7 @@ func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 // <HELPER METHODS>
 
 func isConnected(node *FSNode) bool {
-	return time.Now().UnixNano() - node.lastHeartbeat <= int64(HEARTBEAT_INTERVAL * time.Millisecond)
+	return time.Now().UnixNano()-node.lastHeartbeat <= int64(HEARTBEAT_INTERVAL*time.Millisecond)
 }
 
 var ALPHABET = []rune("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
