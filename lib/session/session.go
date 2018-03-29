@@ -90,7 +90,7 @@ func (s *Session) insert(element Element) {
 		element.PrevID = prevElement.ID
 	}
 
-	logElement(_element)
+	logElement(&element)
 
 	s.CRDT[id] = &element
 	s.Next++
@@ -149,7 +149,7 @@ func logElement(element *Element) {
 	if !element.Deleted {
 		fmt.Println(
 			"============INSERT===========\n",
-			"SESSION: "+s.ID+"\n",
+			"SESSION: "+element.SessionID+"\n",
 			"ID: "+element.ID+"\n",
 			"PREV ID: "+element.PrevID+"\n",
 			"NEXT ID: "+element.NextID+"\n",
@@ -158,11 +158,11 @@ func logElement(element *Element) {
 	} else {
 		fmt.Println(
 			"============DELETE===========\n",
-			"SESSION: "+s.ID+"\n",
-			"ID: "+_element.ID+"\n",
-			"PREV ID: "+_element.PrevID+"\n",
-			"NEXT ID: "+_element.NextID+"\n",
-			"TEXT: "+_element.Text+"\n",
+			"SESSION: "+element.SessionID+"\n",
+			"ID: "+element.ID+"\n",
+			"PREV ID: "+element.PrevID+"\n",
+			"NEXT ID: "+element.NextID+"\n",
+			"TEXT: "+element.Text+"\n",
 			"=============================")
 	}
 }

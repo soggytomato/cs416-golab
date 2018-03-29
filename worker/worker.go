@@ -659,7 +659,6 @@ func (w *Worker) addToSession(element Element) error {
 	}
 
 	if processed {
-		w.logger.Println("Adding " + _element.ID + "to local elements")
 		w.localElements = append(w.localElements, _element)
 	}
 
