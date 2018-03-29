@@ -31,11 +31,6 @@ import (
 	. "../lib/session"
 	. "../lib/types"
 	"github.com/gorilla/websocket"
-	// POC(CLI) relevant
-	// "bufio"
-	// "bytes"
-	// "math/rand"
-	// "strings"
 )
 
 type WorkerInfo struct {
@@ -57,7 +52,9 @@ type Worker struct {
 	workers          map[string]*rpc.Client
 	logger           *log.Logger
 	sessions         map[string]*Session
+	modifiedSessions map[string]*Session
 	clientSessions   map[string][]string
+	logs             map[string][]Log
 	localElements    []Element
 	cache            *Cache
 }
@@ -85,7 +82,7 @@ func main() {
 	gob.Register([]Element{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
-	gob.Register(&Session{})
+	gob.Register(Session{})
 	gob.Register(Job{})
 	gob.Register(Log{})
 	gob.Register([]Log{})
@@ -97,9 +94,8 @@ func main() {
 	worker.registerWithLB()
 	worker.connectToFS()
 	worker.getWorkers()
-	go worker.sendLocalElements()
+	go worker.sendlocalElements()
 	go worker.cache.Maintain()
-	// worker.workerPrompt() //POC(CLI)
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	wg.Wait()
@@ -113,10 +109,11 @@ func (w *Worker) init() {
 	w.sessions = make(map[string]*Session)
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
+	w.modifiedSessions = make(map[string]*Session)
+	w.logs = make(map[string][]Log)
 
 	w.cache = new(Cache)
 	w.cache.Init()
-
 	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
 		os.Mkdir(EXEC_DIR, 0755)
 	}
@@ -140,6 +137,8 @@ func (w *Worker) sendLocalElements() error {
 			request.Payload = make([]interface{}, 1)
 			request.Payload[0] = w.localElements
 			response := new(WorkerResponse)
+			w.logger.Println("Map of connceted workers:", w.workers)
+			w.saveModifiedSessionsToFS() // can't put this in loop since it won't run if there are no workers
 			for workerAddr, workerCon := range w.workers {
 				isConnected := false
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
@@ -167,25 +166,91 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 		w.addToSession(element)
 		w.sendToClients(element)
 	}
+
 	return nil
 }
 
-func (w *Worker) newSession(sessionID string) {
-	w.sessions[sessionID] = &Session{sessionID, make(map[string]*Element), "", 1}
+func (w *Worker) saveModifiedSessionsToFS() {
+	var ignored bool
+	for sessionID, session := range w.modifiedSessions {
+		request := new(FSRequest)
+		request.Payload = make([]interface{}, 1)
+		request.Payload[0] = session
+		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
+		if err != nil {
+			w.logger.Println("saveSessionToFS:", err)
+			break
+		}
+		delete(w.modifiedSessions, sessionID)
+	}
 }
 
-// Client can provide the sessionID to get session from another worker
-func (w *Worker) getSession(sessionID string) bool {
+// Load balancer calls CreateNewSession when it receives a request from a client
+// using an ID it has not seen before. Worker stores a new Session locally and saves
+// it to the FS
+func (w *Worker) CreateNewSession(sessionID string, response *bool) error {
+	request := new(FSRequest)
+	session := &Session{sessionID, make(map[string]*Element), "", 1}
+
+	w.sessions[sessionID] = session
+	request.Payload = make([]interface{}, 1)
+	request.Payload[0] = w.sessions[sessionID]
+	var ignored bool
+	err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
+	if err != nil {
+		w.logger.Println("CreateNewSession:", err)
+	}
+	return nil
+}
+
+// If worker doesn't have Session, contact other workers/FS to load the Session
+// Once stored, worker will actively update Session as Elements arrive
+func (w *Worker) LoadSession(sessionID string, response *bool) error {
+	if w.sessions[sessionID] == nil {
+		w.getSessionAndLogs(sessionID)
+	}
+
+	return nil
+}
+
+// Get the Session from a connected worker or get it from the FS
+func (w *Worker) getSessionAndLogs(sessionID string) bool {
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
 		var isConnected bool
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
-		err := workerCon.Call("Worker.SendSession", sessionID, response)
+		err := workerCon.Call("Worker.GetSession", sessionID, response)
 		if err != nil {
-			fmt.Println(err)
+			w.logger.Println("getSessionAndLogs:", err)
 		} else {
-			w.sessions[sessionID] = response.Payload[0].(*Session)
-			// w.crdtPrompt(sessionID) // Used in POC(CLI)
+			session := response.Payload[0].(Session)
+			logs := response.Payload[1].([]Log)
+			if len(logs) > 0 {
+				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			}
+			w.sessions[sessionID] = &session
+			return true
+		}
+	}
+
+	// If worker's neighbours cannot provide the session, contact the file server for the session
+	if w.sessions[sessionID] == nil {
+		fsRequest := new(FSRequest)
+		fsResponse := new(FSResponse)
+		fsRequest.Payload = make([]interface{}, 1)
+		fsRequest.Payload[0] = sessionID
+		err := w.fsServerConn.Call("Server.GetSession", fsRequest, fsResponse)
+		if err != nil {
+			w.logger.Println("getSessionAndLogs:", err)
+		} else {
+			session := fsResponse.Payload[0].(Session)
+			logs := fsResponse.Payload[1].([]Log)
+			w.logger.Println(logs)
+			if len(logs) > 0 {
+				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			}
+			w.sessions[sessionID] = &session
+			// TODO handle cached elements
 			return true
 		}
 	}
@@ -194,12 +259,13 @@ func (w *Worker) getSession(sessionID string) bool {
 
 // If client tries to get a session, this function can be used to get that session
 // if the worker has it in its CRDT map
-func (w *Worker) SendSession(sessionID string, response *WorkerResponse) error {
+func (w *Worker) GetSession(sessionID string, response *WorkerResponse) error {
 	if w.sessions[sessionID] == nil {
 		return NoCRDTError(sessionID)
 	}
-	response.Payload = make([]interface{}, 1)
+	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = w.sessions[sessionID]
+	response.Payload[1] = w.logs[sessionID]
 	return nil
 }
 
@@ -406,10 +472,6 @@ func (w *Worker) wsHandler(wr http.ResponseWriter, r *http.Request) {
 
 	w.logger.Println("New socket connection from: ", clientID, sessionID)
 
-	if _, ok := w.sessions[sessionID]; !ok && !w.getSession(sessionID) {
-		w.newSession(sessionID)
-	}
-
 	w.clients[clientID] = conn
 	w.clientSessions[sessionID] = append(w.clientSessions[sessionID], clientID)
 
@@ -572,11 +634,13 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
+
 	return nil
 }
 
 func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 	log := request.Payload[0].(Log)
+	w.logs[log.Job.SessionID] = append(w.logs[log.Job.SessionID], log)
 	for _, clientConn := range w.clients {
 		err := clientConn.WriteJSON(log)
 		checkError(err)
