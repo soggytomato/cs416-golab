@@ -87,7 +87,7 @@ html {
   position: fixed;
   z-index: 10000;
   right: 50px;
-  top: 50px; }
+  bottom: 270px; }
 
 label, .subtitle {
   font-family: Consolas, monaco, monospace;
