@@ -24,7 +24,8 @@ html {
     html .editor .input-wrapper {
       height: 75%; }
       html .editor .input-wrapper .input {
-        height: 95%; }
+        height: 95%;
+        min-height: 150px; }
     html .editor .output-wrapper {
       height: 25%; }
       html .editor .output-wrapper .output {
@@ -84,10 +85,10 @@ html {
 
 .gopher {
   width: 90px;
-  position: fixed;
+  position: relative;
   z-index: 10000;
-  right: 50px;
-  bottom: 270px; }
+  left: 92%;
+  bottom: 140px; }
 
 label, .subtitle {
   font-family: Consolas, monaco, monospace;

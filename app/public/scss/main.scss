@@ -23,7 +23,7 @@ html { height: 100%; width: 100%; margin: 0;
 		.logs, .output { background-color: $grey-fill; }
 
 		.input-wrapper { height: 75%; 
-			.input { height: 95%; }
+			.input { height: 95%; min-height: 150px; }
 		}
 
 		.output-wrapper { height: 25%;
@@ -61,7 +61,7 @@ html { height: 100%; width: 100%; margin: 0;
 }
 
 .logo {	width: 360px; margin-left: auto; display: block; margin-right: auto; }
-.gopher { width: 90px; position: fixed; z-index: 10000; right: 50px; bottom: 270px; }
+.gopher { width: 90px; position: relative; z-index: 10000; left: 92%; bottom: 140px; }
 
 label, .subtitle {
 	font-family: Consolas, monaco, monospace;
