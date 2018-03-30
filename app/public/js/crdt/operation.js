@@ -42,6 +42,18 @@ $(document).ready(function() {
         lineNumbers: true
     });
 
+    editor_readOnly = CodeMirror.fromTextArea(document.getElementById("code_readOnly"), {
+        theme: "dracula",
+        matchBrackets: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: true,
+        electricChars: true,
+        smartIndent: false,
+        mode: "text/x-go",
+        lineNumbers: true
+    });
+
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
@@ -56,7 +68,7 @@ $(document).ready(function() {
                 var promise = new Promise(
                     function(resolve, reject) {
                         handleOperation(changes[0]);
-                        
+
                         changes.splice(0, 1);
                         if (change.length > 0) {
                             resolve();
@@ -70,7 +82,7 @@ $(document).ready(function() {
                     function() {
                         var promise = new Promise(opPromise);
                         promise.then(opResolve, opReject);
-                    }, 
+                    },
                     function() {
                         changesInProgress = false;
 

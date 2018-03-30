@@ -153,7 +153,13 @@ function reset() {
     $('.log-selected').removeClass('log-selected');
 
     editor.setValue(CRDT.toSnippet());
-    editor.setOption("readOnly", false);
+
+    $('#editArea').show();
+    setTimeout(function() {
+        editor.refresh()
+    }, 500);
+    $('#readOnlyArea').hide();
+
     document.getElementById('outputBox').innerHTML = "";
     document.getElementById("snipTitle").style.color = ''
     document.getElementById('snipTitle').innerHTML = "Snippet:"
@@ -220,8 +226,15 @@ function logClicked(log) {
     $('.log-selected').removeClass('log-selected');
     $('#' + log.Job.JobID).addClass('log-selected');
 
-    editor.setValue(log.Job.Snippet);
-    editor.setOption("readOnly", true);
+    editor_readOnly.setValue(log.Job.Snippet);
+    editor_readOnly.setOption("readOnly", true);
+    setTimeout(function() {
+        editor_readOnly.refresh()
+    }, 500);
+
+    $('#editArea').hide();
+    $('#readOnlyArea').show();
+
     str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
     document.getElementById('outputBox').innerHTML = str;
     document.getElementById("snipTitle").style.color = '#d00'
