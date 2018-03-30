@@ -16,7 +16,7 @@ html {
     html .editor .left, html .editor .right {
       height: inherit; }
     html .editor .title {
-      float: right; }
+      float: left; }
     html .editor .subtitle {
       font-size: 20px; }
     html .editor .logs, html .editor .output {
@@ -34,7 +34,7 @@ html {
         padding: 5px 10px; }
     html .editor .logs-wrapper {
       margin-top: .5rem;
-      height: 75.5%; }
+      height: 82%; }
       html .editor .logs-wrapper .logs {
         height: 100%;
         border-radius: 10px;
@@ -81,6 +81,13 @@ html {
   margin-left: auto;
   display: block;
   margin-right: auto; }
+
+.gopher {
+  width: 90px;
+  position: fixed;
+  z-index: 10000;
+  right: 50px;
+  top: 50px; }
 
 label, .subtitle {
   font-family: Consolas, monaco, monospace;

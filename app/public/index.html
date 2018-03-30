@@ -26,20 +26,7 @@
 
 <body>
     <div class="editor row" style="display:none">
-        <div class="left col-10">
-            <div class="input-wrapper mr-1">
-                <span id="snipTitle" class="subtitle">Snippet:</span>
-                <div class="mb-1 input">
-                    <textarea id="code" name="code" style="display:none;"></textarea>
-                </div>
-            </div>
-            <div class="output-wrapper mt-3">
-                <span class="subtitle">Output:</span>
-                <div class="output" id="outputBox"></div>
-            </div>
-        </div>
-        <div class="right col">
-            <img src="img/gopher.png" style="width:90px">
+        <div class="left col">
             <span class="title title-text">GoLab</span>
             <button type="button" onclick="execute()" class="btn btn-default btn-lg mb-2 execute">
               <img src="img/play-circle.svg" alt="play-circle" class="btn-icon"><span>Execute</span>
@@ -54,6 +41,20 @@
                 </div>
             </div>
         </div>
+        <div class="right col-10">
+            <div class="input-wrapper mr-1">
+                <span id="snipTitle" class="subtitle">Snippet:</span>
+                <img src="img/gopher-left.png" class="gopher">
+                <div class="mb-1 input">
+                    <textarea id="code" name="code" style="display:none;"></textarea>
+                </div>
+            </div>
+            <div class="output-wrapper mt-3">
+                <span class="subtitle">Output:</span>
+                <div class="output" id="outputBox"></div>
+            </div>
+        </div>
+        
     </div>
 
     <div class="register-wrapper">

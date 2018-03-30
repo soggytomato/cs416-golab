@@ -17,7 +17,7 @@ html { height: 100%; width: 100%; margin: 0;
 
 		.left, .right { height: inherit; }
 
-		.title 		{ float: right; }
+		.title 		{ float: left; }
 		.subtitle 	{ font-size: 20px; }
 
 		.logs, .output { background-color: $grey-fill; }
@@ -30,7 +30,7 @@ html { height: 100%; width: 100%; margin: 0;
 			.output { height: 89%; border-radius: $border-radius; color: white; padding: 5px 10px; }	
 		}
 
-		.logs-wrapper { margin-top: .5rem; height: 75.5%;
+		.logs-wrapper { margin-top: .5rem; height: 82%;
 			.logs { height: 100%; border-radius: $border-radius; color: cadetblue;
 				ul { display: inline-block; }
 			}
@@ -61,10 +61,9 @@ html { height: 100%; width: 100%; margin: 0;
 }
 
 .logo {	width: 360px; margin-left: auto; display: block; margin-right: auto; }
+.gopher { width: 90px; position: fixed; z-index: 10000; right: 50px; top: 50px; }
 
 label, .subtitle {
 	font-family: Consolas, monaco, monospace;
 	color: $subtitle-color;
 }
-
-
