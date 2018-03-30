@@ -1,6 +1,6 @@
 $background-color: #333;
-$title-color: cadetblue;
-$subtitle-color: #8c8c8c;
+$title-color: #76d99e;
+$subtitle-color: white;
 $grey-fill: rgba(95,98, 117, 0.5);
 $border-radius: 10px;
 
@@ -54,11 +54,13 @@ html { height: 100%; width: 100%; margin: 0;
 	font-family: Consolas, monaco, monospace;
 }
 
-.register { background-color: black; border-radius: $border-radius; margin-top: 15%;
+.register { background-color: rgba(220,220, 220, 0.19); border-radius: $border-radius; margin-top: 5%;
 	#submitForm { margin-bottom: 10px; }
 
 	.title { text-align: center; }
 }
+
+.logo {	width: 360px; margin-left: auto; display: block; margin-right: auto; }
 
 label, .subtitle {
 	font-family: Consolas, monaco, monospace;

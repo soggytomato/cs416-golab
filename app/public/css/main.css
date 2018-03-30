@@ -64,20 +64,26 @@ html {
 
 .title-text {
   font-size: 50px;
-  color: cadetblue;
+  color: #76d99e;
   font-family: Consolas, monaco, monospace; }
 
 .register {
-  background-color: black;
+  background-color: rgba(220, 220, 220, 0.19);
   border-radius: 10px;
-  margin-top: 15%; }
+  margin-top: 5%; }
   .register #submitForm {
     margin-bottom: 10px; }
   .register .title {
     text-align: center; }
 
+.logo {
+  width: 360px;
+  margin-left: auto;
+  display: block;
+  margin-right: auto; }
+
 label, .subtitle {
   font-family: Consolas, monaco, monospace;
-  color: #8c8c8c; }
+  color: white; }
 
 /*# sourceMappingURL=main.css.map */

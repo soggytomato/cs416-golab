@@ -141,7 +141,7 @@ function verifyRegister() {
 }
 
 function openEditor() {
-    $('.register').css('display', 'none');
+    $('.register-wrapper').css('display', 'none');
     $('.editor').slideDown('slow');
 
     setTimeout(function() {
