@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	. "../lib/cache"
+	. "../lib/session"
 	. "../lib/types"
 	"github.com/gorilla/websocket"
 )
@@ -52,8 +54,9 @@ type Worker struct {
 	sessions         map[string]*Session
 	modifiedSessions map[string]*Session
 	clientSessions   map[string][]string
-	localElements    []*Element
 	logs             map[string][]Log
+	localElements    []Element
+	cache            *Cache
 }
 
 type LogSettings struct {
@@ -71,10 +74,6 @@ func (e NoCRDTError) Error() string {
 const TIME_BUFFER int = 500
 const ELEMENT_DELAY int = 2
 
-// Since we are adding a character to the right of another character, we need
-// a fake INITIAL_ID to use to place the first character in an empty message
-const INITIAL_ID string = "12345"
-
 const EXEC_DIR = "./execute"
 
 func main() {
@@ -83,9 +82,11 @@ func main() {
 	}
 	gob.Register(map[string]*Element{})
 	gob.Register(&net.TCPAddr{})
+	gob.Register([]Element{})
 	gob.Register([]*Element{})
 	gob.Register(&Element{})
 	gob.Register(Session{})
+	gob.Register(Job{})
 	gob.Register(Log{})
 	gob.Register([]Log{})
 	worker := new(Worker)
@@ -96,7 +97,8 @@ func main() {
 	worker.registerWithLB()
 	worker.connectToFS()
 	worker.getWorkers()
-	go worker.sendlocalElements()
+	go worker.sendLocalElements()
+	go worker.cache.Maintain()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	wg.Wait()
@@ -112,6 +114,9 @@ func (w *Worker) init() {
 	w.clientSessions = make(map[string][]string)
 	w.modifiedSessions = make(map[string]*Session)
 	w.logs = make(map[string][]Log)
+
+	w.cache = new(Cache)
+	w.cache.Init()
 	if _, err := os.Stat(EXEC_DIR); os.IsNotExist(err) {
 		os.Mkdir(EXEC_DIR, 0755)
 	}
@@ -123,139 +128,35 @@ func (w *Worker) connectToFS() {
 	w.fsServerConn = fsServerConn
 }
 
-//**CRDT CODE**//
-
-// Adds a character to the right of the prevID specified in the args
-func (w *Worker) addRight(prevID, content, sessionID string) error {
-	if !w.prevIDExists(prevID, sessionID) {
-		return nil
-	}
-	session := w.sessions[sessionID]
-	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
-	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false}
-	w.addToCRDT(newElement, session)
-	return nil
-}
-
-func (w *Worker) addToCRDT(newElement *Element, session *Session) error {
-	if w.firstCRDTEntry(newElement.ID, session) {
-		w.addElementAndIncrementCounter(newElement, session)
-		return nil
-	}
-	if w.replacingFirstElement(newElement, newElement.PrevID, newElement.ID, session) {
-		w.addElementAndIncrementCounter(newElement, session)
-		return nil
-	}
-
-	w.normalInsert(newElement, newElement.PrevID, newElement.ID, session)
-	w.addElementAndIncrementCounter(newElement, session)
-
-	return nil
-}
-
-func (w *Worker) deleteFromCRDT(element *Element, session *Session) error {
-	session.CRDT[element.ID].Deleted = true
-
-	return nil
-}
-
-// Check if the prevID actually exists; if true, continue with addRight
-func (w *Worker) prevIDExists(prevID, sessionID string) bool {
-	session := w.sessions[sessionID]
-	if session != nil {
-		if _, ok := session.CRDT[prevID]; ok || prevID == INITIAL_ID {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
-}
-
-// The case where the first content is entered into a CRDT
-func (w *Worker) firstCRDTEntry(elementID string, session *Session) bool {
-	if len(session.CRDT) <= 0 {
-		session.Head = elementID
-		return true
-	} else {
-		return false
-	}
-}
-
-// If your character is placed at the beginning of the message, it needs to become
-// the new firstElement so we can iterate through the CRDT properly
-func (w *Worker) replacingFirstElement(newElement *Element, prevID, elementID string, session *Session) bool {
-	if prevID == "" {
-		firstElement := session.CRDT[session.Head]
-		newElement.NextID = session.Head
-		firstElement.PrevID = elementID
-		session.Head = elementID
-		return true
-	} else {
-		return false
-	}
-}
-
-// Any other insert that doesn't take place at the beginning or end is handled here
-func (w *Worker) normalInsert(newElement *Element, prevID, elementID string, session *Session) {
-	w.logger.Println("prevID:", prevID)
-	newPrevID := w.samePlaceInsertCheck(newElement, prevID, elementID, session)
-	prevElement := session.CRDT[newPrevID]
-	newElement.NextID = prevElement.NextID
-	prevElement.NextID = elementID
-}
-
-// Checks if any other clients have made inserts to the same prevID. The algorithm
-// compares the prevElement's nextID to the incomingOp ID - if nextID is greater, incomingOp
-// will move further down the message until it is greater than the nextID
-func (w *Worker) samePlaceInsertCheck(newElement *Element, prevID, elementID string, session *Session) string {
-	prevElement := session.CRDT[prevID]
-	if prevElement.NextID != "" {
-		nextElementID := prevElement.NextID
-		for strings.Compare(nextElementID, elementID) == 1 && newElement.ClientID != session.CRDT[nextElementID].ClientID {
-			prevElement = session.CRDT[nextElementID]
-			nextElementID = prevElement.NextID
-		}
-		return prevElement.ID
-	} else {
-		return prevID
-	}
-
-}
-
-// Once all the CRDT pointers are updated, the op can be added to the CRDT and the op
-// number can be incremented
-func (w *Worker) addElementAndIncrementCounter(newElement *Element, session *Session) {
-	id := newElement.ID
-	session.CRDT[id] = newElement
-	w.localElements = append(w.localElements, newElement)
-	w.modifiedSessions[session.ID] = session
-	session.Next++
-}
-
 // Send all of the ops made locally on this worker to all other connected workers
 // After sending, wipe all localElements from the worker
-func (w *Worker) sendlocalElements() error {
+func (w *Worker) sendLocalElements() error {
 	for {
 		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
+
+		w.saveModifiedSessionsToFS()
+
 		//w.getWorkers() // checks all workers, connects to more if needed
-		request := new(WorkerRequest)
-		request.Payload = make([]interface{}, 1)
-		request.Payload[0] = w.localElements
-		response := new(WorkerResponse)
-		w.logger.Println("Map of connected workers:", w.workers)
-		w.saveModifiedSessionsToFS() // can't put this in loop since it won't run if there are no workers
-		for workerAddr, workerCon := range w.workers {
-			isConnected := false
-			workerCon.Call("Worker.PingWorker", "", &isConnected)
-			if isConnected {
-				workerCon.Call("Worker.ApplyIncomingElements", request, response)
-			} else {
-				delete(w.workers, workerAddr)
+		if len(w.localElements) > 0 {
+			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
+
+			request := new(WorkerRequest)
+			request.Payload = make([]interface{}, 1)
+			request.Payload[0] = w.localElements
+			response := new(WorkerResponse)
+			for workerAddr, workerCon := range w.workers {
+				isConnected := false
+				workerCon.Call("Worker.PingWorker", "", &isConnected)
+				if isConnected {
+					workerCon.Call("Worker.ApplyIncomingElements", request, response)
+				} else {
+					w.logger.Println("Lost worker: ", workerAddr)
+
+					delete(w.workers, workerAddr)
+				}
 			}
+			w.localElements = nil
 		}
-		w.localElements = nil
 	}
 	return nil
 }
@@ -264,18 +165,11 @@ func (w *Worker) sendlocalElements() error {
 // If it doesn't, skip over applying the op
 // If it has applied these ops already, skip over applying the op
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
-	elements := request.Payload[0].([]*Element)
+	elements := request.Payload[0].([]Element)
 	for _, element := range elements {
-		session := w.sessions[element.SessionID]
-		if session != nil {
-			if session.CRDT[element.ID] == nil {
-				w.addToCRDT(element, session)
-			}
-			if element.Deleted == true {
-				w.deleteFromCRDT(element, session)
-			}
-			w.sendToClients(element)
-		}
+		w.cache.Add(element)
+		w.addToSession(element)
+		w.sendToClients(element)
 	}
 
 	return nil
@@ -289,9 +183,12 @@ func (w *Worker) saveModifiedSessionsToFS() {
 		request.Payload[0] = session
 		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
 		if err != nil {
-			w.logger.Println("saveSessionToFS:", err)
+			w.logger.Println("Failed to save session "+sessionID+" to FS server.\n", err)
 			break
 		}
+
+		w.logger.Println("Saved session " + sessionID + " to FS server.")
+
 		delete(w.modifiedSessions, sessionID)
 	}
 }
@@ -326,13 +223,16 @@ func (w *Worker) LoadSession(sessionID string, response *bool) error {
 
 // Get the Session from a connected worker or get it from the FS
 func (w *Worker) getSessionAndLogs(sessionID string) bool {
+	// Mark the session as pending, so the cache doesn't flush
+	w.cache.AddPending(sessionID)
+
 	response := new(WorkerResponse)
 	for _, workerCon := range w.workers {
 		var isConnected bool
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
 		err := workerCon.Call("Worker.GetSession", sessionID, response)
 		if err != nil {
-			w.logger.Println("getSessionAndLogs:", err)
+			w.logger.Println("Failed to retrieve session and logs for session "+sessionID+"\n", err)
 		} else {
 			session := response.Payload[0].(Session)
 			logs := response.Payload[1].([]Log)
@@ -365,6 +265,17 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			return true
 		}
 	}
+
+	// Apply the cached elements to the session
+	if w.sessions[sessionID] != nil {
+		cachedElements := w.cache.Get(sessionID)
+		for _, element := range cachedElements {
+			w.addToSession(element)
+		}
+	}
+	// Remove pending status on session
+	w.cache.RemovePending(sessionID)
+
 	return false
 }
 
@@ -412,7 +323,9 @@ func (w *Worker) listenRPC() {
 
 func (w *Worker) listenHTTP() {
 	http.HandleFunc("/session", w.sessionHandler)
+	http.HandleFunc("/recover", w.recoveryHandler)
 	http.HandleFunc("/execute", w.executeJob)
+
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
 	checkError(err)
@@ -458,6 +371,8 @@ func (w *Worker) getWorkers() {
 		isConnected := false
 		workerCon.Call("Worker.PingWorker", "", &isConnected)
 		if !isConnected {
+			w.logger.Println("Lost worker: ", workerAddr)
+
 			delete(w.workers, workerAddr)
 		}
 	}
@@ -531,15 +446,31 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 			http.Error(wr, "Missing userID in URL parameter", http.StatusBadRequest)
 		}
 
-		w.logger.Println("Session ID", _sessionID)
-		w.logger.Println("User ID", _userID)
-
 		sessionID := _sessionID[0]
 		userID := _userID[0]
 
-		w.logger.Println("Got delete request", sessionID, userID)
-
 		w.deleteClients(sessionID, []string{userID})
+
+		w.logger.Println("User " + userID + " has closed session " + sessionID)
+	}
+}
+
+func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		_sessionID, _ := r.URL.Query()["sessionID"]
+		if len(_sessionID) == 0 {
+			http.Error(wr, "Missing sessionID in URL parameter", http.StatusBadRequest)
+		}
+
+		sessionID := _sessionID[0]
+
+		if w.sessions[sessionID] == nil {
+			w.getSessionAndLogs(sessionID)
+		}
+
+		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		wr.Header().Set("Access-Control-Allow-Origin", "*")
+		json.NewEncoder(wr).Encode(w.cache.Get(sessionID))
 	}
 }
 
@@ -642,36 +573,24 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 			w.logger.Println("Got element from "+userID+": ", element)
 		}
 
-		// Push to local elements
-		w.localElements = append(w.localElements, element)
-
-		// Update session CRDT accordingly
-		if element.Deleted == true {
-			w.deleteFromCRDT(element, w.sessions[element.SessionID])
-		} else {
-			w.addToCRDT(element, w.sessions[element.SessionID])
-		}
+		w.addToSession(*element)
 
 		// TODO remove because we will buffer the sends
-		w.sendToClients(element)
+		w.sendToClients(*element)
 	}
 }
 
-func (w *Worker) sendToClients(element *Element) {
+func (w *Worker) sendToClients(element Element) {
 	sessionID := element.SessionID
 
 	var clientsToDelete []string
 	for _, clientID := range w.clientSessions[sessionID] {
-		w.logger.Println("Sending " + element.ClientID + " to user " + clientID)
-		if clientID != element.ClientID {
-			conn := w.clients[clientID]
+		conn := w.clients[clientID]
+		err := conn.WriteJSON(element)
+		if err != nil {
+			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
 
-			err := conn.WriteJSON(element)
-			if err != nil {
-				w.logger.Println("Failed to send message to client '"+clientID+"':", err)
-
-				clientsToDelete = append(clientsToDelete, clientID)
-			}
+			clientsToDelete = append(clientsToDelete, clientID)
 		}
 	}
 
@@ -811,3 +730,133 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Usage: go run worker.go [LBServer ip:port] [FSServer ip:port]\n")
 	os.Exit(1)
 }
+
+//**CRDT CODE**//
+
+// Adds a character to the right of the prevID specified in the args
+func (w *Worker) addRight(prevID, content, sessionID string) error {
+	session := w.sessions[sessionID]
+	elementID := strconv.Itoa(session.Next) + strconv.Itoa(w.workerID)
+	newElement := &Element{sessionID, strconv.Itoa(w.workerID), elementID, prevID, "", content, false, time.Now().Unix()}
+	w.addToSession(*newElement)
+
+	return nil
+}
+
+func (w *Worker) addToSession(element Element) error {
+	_element := element
+
+	sessionID := element.SessionID
+	session := w.sessions[sessionID]
+	if session == nil {
+		return nil
+	}
+
+	var processed bool = false
+	if element.Deleted == true {
+		processed = session.Delete(element)
+	} else {
+		processed = session.Add(element)
+	}
+
+	if processed {
+		w.modifiedSessions[sessionID] = session
+		w.localElements = append(w.localElements, _element)
+	}
+
+	return nil
+}
+
+//****POC CODE***//
+
+// func (w *Worker) workerPrompt() {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleIntroCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// func (w *Worker) handleIntroCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "newSession":
+// 		w.newSession()
+// 	case "getSession":
+// 		w.getSession(args[1])
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+//
+//
+// func (w *Worker) crdtPrompt(sessionID string) {
+// 	reader := bufio.NewReader(os.Stdin)
+// 	for {
+// 		message := w.getMessage(w.sessions[sessionID])
+// 		fmt.Println("SessionID:", sessionID)
+// 		fmt.Println("Message:", message)
+// 		fmt.Print("Worker> ")
+// 		cmd, _ := reader.ReadString('\n')
+// 		if w.handleCommand(cmd) == 1 {
+// 			return
+// 		}
+// 	}
+// }
+//
+// // Iterate through the beginning of the CRDT to the end to show the message and
+// // specify the mapping of each character
+// func (w *Worker) getMessage(session *Session) string {
+// 	var buffer bytes.Buffer
+// 	crdt := session.CRDT
+// 	firstElement := crdt[session.Head]
+// 	for firstElement != nil {
+// 		fmt.Println(firstElement.ID, "->", firstElement.Text)
+// 		buffer.WriteString(firstElement.Text)
+// 		firstElement = crdt[firstElement.NextID]
+// 	}
+// 	return buffer.String()
+// }
+//
+// func (w *Worker) handleCommand(cmd string) int {
+// 	args := strings.Split(strings.TrimSpace(cmd), ",")
+//
+// 	switch args[0] {
+// 	case "addRight":
+// 		err := w.addRight(args[1], args[2], args[3])
+// 		if checkError(err) != nil {
+// 			return 0
+// 		}
+// 	case "exit":
+// 		return 1
+// 	default:
+// 		fmt.Println(" Invalid command.")
+// 	}
+//
+// 	return 0
+// }
+
+// Code for creating random strings: only for POC(CLI)
+// const charset = "abcdefghijklmnopqrstuvwxyz" +
+// 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+//
+// var seededRand *rand.Rand = rand.New(
+// 	rand.NewSource(time.Now().UnixNano()))
+//
+// func StringWithCharset(length int, charset string) string {
+// 	b := make([]byte, length)
+// 	for i := range b {
+// 		b[i] = charset[seededRand.Intn(len(charset))]
+// 	}
+// 	return string(b)
+// }
+//
+// func String(length int) string {
+// 	return StringWithCharset(length, charset)
+// }

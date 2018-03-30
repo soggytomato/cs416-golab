@@ -1,8 +1,8 @@
 /* =============================================================================
-							ELEMENT CLASS DEFINITION
+                            ELEMENT CLASS DEFINITION
    =============================================================================*/
 /*
-	An Element is simply an entry in the sequence CRDT.
+    An Element is simply an entry in the sequence CRDT.
 */
 class Element {
     constructor(id, prev, next, val, del) {
@@ -15,10 +15,10 @@ class Element {
 }
 
 /* =============================================================================
-							CRDT CLASS DEFINITION
+                            CRDT CLASS DEFINITION
    =============================================================================*/
 /*
-	A SeqCRDT is a local list of all elements that comprise a snippet.
+    A SeqCRDT is a local list of all elements that comprise a snippet.
 */
 class SeqCRDT {
     constructor(seqCRDT = new Array(), head) {
@@ -137,7 +137,9 @@ function initCRDT() {
     $.ajax({
         type: 'get',
         url: 'http://' + workerIP + '/session',
-        data: { sessionID: sessionID },
+        data: {
+            sessionID: sessionID
+        },
         success: function(data) {
             const crdt = data.CRDT;
 
