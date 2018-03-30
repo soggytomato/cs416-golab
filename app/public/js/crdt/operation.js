@@ -47,6 +47,7 @@ $(document).ready(function() {
         function(cm, change) {
             if (origin == DELETE_OP && change.from.hitSide) return;
 
+            // Push to queue of changes and init a new Promise
             changes.push(change);
             initOpPromise();
         }
@@ -63,7 +64,7 @@ function initOpPromise() {
     promise.then(initOpPromise, endOpPromise);
 }
 
-// Kicks of if the last promise saw the end of changes
+// Kicks of if the last Promise saw the end of changes
 function endOpPromise() {
     // It's possible that between kicking this off, a new
     // op has come in. If so, kick off a new Promise.
