@@ -48,39 +48,47 @@ $(document).ready(function() {
             if (origin == DELETE_OP && change.from.hitSide) return;
 
             changes.push(change);
-
-            // If no changes are currently in progress, kick off a new Promise
-            if (!changesInProgress) {
-                changesInProgress = true;
-
-                var promise = new Promise(
-                    function(resolve, reject) {
-                        handleOperation(changes[0]);
-                        
-                        changes.splice(0, 1);
-                        if (change.length > 0) {
-                            resolve();
-                        } else {
-                            reject();
-                        }
-                    }
-                );
-
-                promise.then(
-                    function() {
-                        var promise = new Promise(opPromise);
-                        promise.then(opResolve, opReject);
-                    }, 
-                    function() {
-                        changesInProgress = false;
-
-                        if (debugMode) CRDT.verify();
-                    }
-                );
-            }
+            initOpPromise();
         }
     );
 });
+
+// Starts a new Promise if changes are not being handled already
+function initOpPromise() {
+    if (changesInProgress) return;
+
+    changesInProgress = true;
+
+    var promise = new Promise(processOpPromise);
+    promise.then(initOpPromise, endOpPromise);
+}
+
+// Kicks of if the last promise saw the end of changes
+function endOpPromise() {
+    // It's possible that between kicking this off, a new
+    // op has come in. If so, kick off a new Promise.
+    if (changes.length > 0) {
+        initOpPromise();
+        return;
+    }
+
+    // Otherwise wrap things up.
+    changesInProgress = false;
+
+    if (debugMode) CRDT.verify();
+}
+
+// Processes the actual operation
+function processOpPromise(promise, promiseEnd) {
+    handleOperation(changes[0]);
+    
+    changes.splice(0, 1);
+    if (changes.length > 0) {
+        promise();
+    } else {
+        promiseEnd();
+    }
+}
 
 /*
     Dispatches input or delete to 'handleInput' and 'handleRemove'.
