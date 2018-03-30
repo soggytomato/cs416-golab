@@ -1,6 +1,10 @@
 package types
 
-import "encoding/gob"
+import (
+	"encoding/gob"
+
+	. "../session"
+)
 
 type FSRequest struct {
 	Payload []interface{}
@@ -17,23 +21,6 @@ type WorkerResponse struct {
 
 type WorkerRequest struct {
 	Payload []interface{}
-}
-
-type Session struct {
-	ID   string
-	CRDT map[string]*Element
-	Head string
-	Next int
-}
-
-type Element struct {
-	SessionID string
-	ClientID  string
-	ID        string
-	PrevID    string
-	NextID    string
-	Text      string
-	Deleted   bool
 }
 
 type Log struct {

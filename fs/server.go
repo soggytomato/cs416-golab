@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	. "../lib/session"
 	. "../lib/types"
 )
 
