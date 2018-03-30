@@ -1,11 +1,12 @@
 // Globals
-debugMode = false;
-userID = "";
-sessionID = "";
-currentSessions = [];
-currentWorkerIP = ""
-jobIDs = []
+debugMode = true;
+recovering = false;
+
 workerIP = '';
+userID = '';
+sessionID = '';
+currentSessions = [];
+jobIDs = [];
 
 $(document).ready(function() {
     $('.input-wrapper').resizable({
@@ -81,30 +82,7 @@ function formBindings() {
     $('#register').submit(function(e) {
         e.preventDefault();
 
-        var valid = verifyRegister();
-
-        if (valid) {
-            $.ajax({
-                type: 'post',
-                url: '/register',
-                dataType: 'json',
-                data: $('#register').serialize(),
-                success: function(data) {
-                    if (data.WorkerIP.length == 0) {
-                        alert("No available Workers, please try again later")
-                    } else {
-                        workerIP = data.WorkerIP;
-                        initWS()
-                        $('.register').css('display', 'none');
-                        $('.editor').slideDown('slow');
-                        currentWorkerIP = data.WorkerIP
-                        setTimeout(function() {
-                            editor.refresh();
-                        }, 500);
-                    }
-                }
-            })
-        }
+        if (verifyRegister()) register();
 
         return false;
     });
@@ -162,9 +140,18 @@ function verifyRegister() {
     return valid;
 }
 
+function openEditor() {
+    $('.register').css('display', 'none');
+    $('.editor').slideDown('slow');
+
+    setTimeout(function() {
+        editor.refresh()
+    }, 500);
+}
+
 function reset() {
     $('.log-selected').removeClass('log-selected');
-    
+
     editor.setValue(CRDT.toSnippet());
     editor.setOption("readOnly", false);
     document.getElementById('outputBox').innerHTML = "";
@@ -194,7 +181,7 @@ function execute() {
 
     $.ajax({
         type: 'post',
-        url: "http://" + currentWorkerIP + '/execute',
+        url: "http://" + workerIP + '/execute',
         dataType: 'json',
         data: $('#executeForm').serialize(),
         success: function(data) {
@@ -231,7 +218,7 @@ function matchLog(log) {
 
 function logClicked(log) {
     $('.log-selected').removeClass('log-selected');
-    $('#'+log.Job.JobID).addClass('log-selected');
+    $('#' + log.Job.JobID).addClass('log-selected');
 
     editor.setValue(log.Job.Snippet);
     editor.setOption("readOnly", true);
