@@ -64,6 +64,11 @@ type LogSettings struct {
 	Output string `json:"Output"`
 }
 
+type SessionAndLog struct {
+	SessionRecord *Session
+	LogRecord     []Log
+}
+
 type NoCRDTError string
 
 func (e NoCRDTError) Error() string {
@@ -434,7 +439,10 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
-		json.NewEncoder(wr).Encode(w.sessions[sessionID])
+		var sessionAndLog SessionAndLog
+		sessionAndLog.SessionRecord = w.sessions[sessionID]
+		sessionAndLog.LogRecord = w.logs[sessionID]
+		json.NewEncoder(wr).Encode(sessionAndLog)
 	} else if r.Method == "POST" {
 		_sessionID, _ := r.URL.Query()["sessionID"]
 		if len(_sessionID) == 0 {

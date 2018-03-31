@@ -42,6 +42,18 @@ $(document).ready(function() {
         lineNumbers: true
     });
 
+    editor_readOnly = CodeMirror.fromTextArea(document.getElementById("code_readOnly"), {
+        theme: "dracula",
+        matchBrackets: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: true,
+        electricChars: true,
+        smartIndent: false,
+        mode: "text/x-go",
+        lineNumbers: true
+    });
+
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
@@ -82,7 +94,7 @@ function endOpPromise() {
 // Processes the actual operation
 function processOpPromise(promise, promiseEnd) {
     handleOperation(changes[0]);
-    
+
     changes.splice(0, 1);
     if (changes.length > 0) {
         promise();

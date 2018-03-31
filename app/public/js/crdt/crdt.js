@@ -141,9 +141,10 @@ function initCRDT() {
             sessionID: sessionID
         },
         success: function(data) {
-            const crdt = data.CRDT;
+            // CRDT Init
+            const crdt = data.SessionRecord.CRDT;
 
-            const ids = Object.keys(data.CRDT);
+            const ids = Object.keys(data.SessionRecord.CRDT);
             ids.forEach(function(id) {
                 const element = crdt[id];
                 const prev = element.PrevID == "" ? undefined : element.PrevID;
@@ -160,6 +161,23 @@ function initCRDT() {
             mapping = CRDT.toMapping();
 
             editor.setValue(CRDT.toSnippet());
+
+            // Log Records Init 
+            const logs = data.LogRecord
+            for (var i = 0; i < logs.length; i++) {
+                jobIDs.push(logs[i].Job.JobID);
+                $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
+                if (logs[i].Job.Done) {
+                    var logOutput = document.getElementById(logs[i].Job.JobID);
+                    var _log = logs[i];
+                    (function(_log) {
+                        logOutput.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            logClicked(_log);
+                        }, false);
+                    })(_log);
+                }
+            }
         }
     })
 }
