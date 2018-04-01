@@ -673,7 +673,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
-
+	w.logger.Println("Done Job")
 	return nil
 }
 

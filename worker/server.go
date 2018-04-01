@@ -184,38 +184,52 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 		return nil
 	}
 
-	var nextWorker *Worker
-	for _, worker := range allWorkers.all {
-		if nextWorker == nil {
-			nextWorker = worker
-		} else if worker.NumClients < nextWorker.NumClients {
-			nextWorker = worker
+	workersAvailable := make(map[int]*Worker)
+	for k, v := range allWorkers.all {
+		workersAvailable[k] = v
+	}
+	for {
+		var nextWorker *Worker
+		for _, worker := range workersAvailable {
+			if nextWorker == nil {
+				nextWorker = worker
+			} else if worker.NumClients < nextWorker.NumClients {
+				nextWorker = worker
+			}
 		}
-	}
-	allWorkers.all[nextWorker.WorkerID].NumClients++
+		fmt.Println("Next worker: ", nextWorker)
+		fmt.Println("allWorkers[workerID]", allWorkers.all[nextWorker.WorkerID])
+		allWorkers.all[nextWorker.WorkerID].NumClients++
 
-	workerCon, err := rpc.Dial("tcp", nextWorker.RPCAddress.String())
-	defer workerCon.Close()
-	if err != nil {
-		fmt.Println("Error connecting to worker while registering")
-	}
-	var ignored bool
-
-	if sessionIDs[sessID] == false {
-		sessionIDs[sessID] = true
-		err = workerCon.Call("Worker.CreateNewSession", sessID, &ignored)
+		workerCon, err := rpc.Dial("tcp", nextWorker.RPCAddress.String())
+		defer workerCon.Close()
 		if err != nil {
-			fmt.Println("Error connecting to worker while calling CreateNewSession")
-		}
-	} else {
-		sessionIDs[sessID] = true
-		err = workerCon.Call("Worker.LoadSession", sessID, &ignored)
-		if err != nil {
-			fmt.Println("Error connecting to worker while calling LoadSession")
+			fmt.Println(err)
+			fmt.Println("Error connecting to worker %s while registering", nextWorker.RPCAddress.String())
+			delete(workersAvailable, nextWorker.WorkerID)
+		} else {
+			var ignored bool
+			var workerErr error
+			if sessionIDs[sessID] == false {
+				sessionIDs[sessID] = true
+				workerErr = workerCon.Call("Worker.CreateNewSession", sessID, &ignored)
+				if err != nil {
+					fmt.Println("Error connecting to worker while calling CreateNewSession")
+				}
+			} else {
+				sessionIDs[sessID] = true
+				workerErr = workerCon.Call("Worker.LoadSession", sessID, &ignored)
+				if err != nil {
+					fmt.Println("Error connecting to worker while calling LoadSession")
+				}
+			}
+			if workerErr == nil {
+				fmt.Println("Your worker is: ", nextWorker.HTTPAddress.String())
+				*retWorkerIP = nextWorker.HTTPAddress.String()
+				break
+			}
 		}
 	}
-
-	*retWorkerIP = nextWorker.HTTPAddress.String()
 	return nil
 }
 
@@ -299,41 +313,46 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 		return nil
 	}
 
-	var nextWorker *Worker
-	for _, worker := range allWorkers.all {
-		if nextWorker == nil {
-			nextWorker = worker
-		} else if worker.NumClients < nextWorker.NumClients {
-			nextWorker = worker
-		}
+	response := new(WorkerResponse)
+	request := new(WorkerRequest)
+	workersAvailable := make(map[int]*Worker)
+	for k, v := range allWorkers.all {
+		workersAvailable[k] = v
 	}
-	nextWorkerIP := nextWorker.RPCAddress.String()
+	for {
+		var nextWorker *Worker
+		for _, worker := range workersAvailable {
+			if nextWorker == nil {
+				nextWorker = worker
+			} else if worker.NumClients < nextWorker.NumClients {
+				nextWorker = worker
+			}
+		}
+		nextWorkerIP := nextWorker.RPCAddress.String()
 
-	workerCon, err := rpc.Dial("tcp", nextWorkerIP)
-	defer workerCon.Close()
-	if err != nil {
-		fmt.Println("Error connecting to worker to run job")
-	} else {
-		response := new(WorkerResponse)
-		request := new(WorkerRequest)
+		workerCon, _ := rpc.Dial("tcp", nextWorkerIP)
+		defer workerCon.Close()
 		request.Payload = make([]interface{}, 1)
 		request.Payload[0] = jobID
-		err = workerCon.Call("Worker.RunJob", request, response)
-		log := response.Payload[0].(Log)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			// Send out the new log
-			request = new(WorkerRequest)
-			request.Payload = make([]interface{}, 1)
-			request.Payload[0] = log
-			var ignored bool
+		err := workerCon.Call("Worker.RunJob", request, response)
+		if err == nil && response.Payload[0] != nil {
+			break
+		}
+		delete(workersAvailable, nextWorker.WorkerID)
+	}
 
-			fmt.Println(allWorkers.all)
-			for _, worker := range allWorkers.all {
-				workerCon, _ := rpc.Dial("tcp", worker.RPCAddress.String())
-				workerCon.Call("Worker.SendLog", request, &ignored)
-			}
+	log := response.Payload[0].(Log)
+	// Send out the new log
+	request = new(WorkerRequest)
+	request.Payload = make([]interface{}, 1)
+	request.Payload[0] = log
+	var ignored bool
+
+	fmt.Println(allWorkers.all)
+	for _, worker := range allWorkers.all {
+		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
+		if err == nil {
+			workerCon.Call("Worker.SendLog", request, &ignored)
 		}
 	}
 
