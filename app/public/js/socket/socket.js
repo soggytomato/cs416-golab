@@ -62,19 +62,19 @@ function sendElement(_element) {
 
     if (debugMode) {
         if (element.Deleted) {
-            console.log("=============DELETE===========\n"+
-                    "ID: "+element.ID+"\n"+
-                    "PREV ID: "+element.PrevID+"\n"+
-                    "TEXT: "+element.Text+"\n"+
-                    "=============================")
+            console.log("=============DELETE===========\n" +
+                "ID: " + element.ID + "\n" +
+                "PREV ID: " + element.PrevID + "\n" +
+                "TEXT: " + element.Text + "\n" +
+                "=============================")
         } else {
-            console.log("=============INSERT===========\n"+
-                    "ID: "+element.ID+"\n"+
-                    "PREV ID: "+element.PrevID+"\n"+
-                    "TEXT: "+element.Text+"\n"+
-                    "=============================")
+            console.log("=============INSERT===========\n" +
+                "ID: " + element.ID + "\n" +
+                "PREV ID: " + element.PrevID + "\n" +
+                "TEXT: " + element.Text + "\n" +
+                "=============================")
         }
-        
+
     }
 }
 
@@ -137,9 +137,30 @@ function recover() {
                 url: 'http://' + workerIP + '/recover?sessionID=' + sessionID,
                 success: function(data) {
                     if (data != null && data.length > 0) {
-                        data.forEach(function(element) {
+                        data.Session.forEach(function(element) {
                             handleRemoteOperation(element);
                         });
+                    }
+
+                    if (data.hasOwnProperty('LogRecord')) {
+                        $("#logList").empty();
+                        const logs = data.LogRecord
+                        for (var i = 0; i < logs.length; i++) {
+                            if (!jobIDs.includes(logs[i].Job.JobID)) {
+                                jobIDs.push(logs[i].Job.JobID);
+                                $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
+                                if (logs[i].Job.Done) {
+                                    var logOutput = document.getElementById(logs[i].Job.JobID);
+                                    var _log = logs[i];
+                                    (function(_log) {
+                                        logOutput.addEventListener('click', function(e) {
+                                            e.preventDefault();
+                                            logClicked(_log);
+                                        }, false);
+                                    })(_log);
+                                }
+                            }
+                        }
                     }
 
                     initWS();

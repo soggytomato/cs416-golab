@@ -318,13 +318,15 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 	for _, worker := range workersList {
 		nextWorkerIP := worker.RPCAddress.String()
 
-		workerCon, _ := rpc.Dial("tcp", nextWorkerIP)
-		defer workerCon.Close()
-		request.Payload = make([]interface{}, 1)
-		request.Payload[0] = jobID
-		err := workerCon.Call("Worker.RunJob", request, response)
-		if err == nil && response.Payload[0] != nil {
-			break
+		workerCon, err := rpc.Dial("tcp", nextWorkerIP)
+		if err == nil {
+			defer workerCon.Close()
+			request.Payload = make([]interface{}, 1)
+			request.Payload[0] = jobID
+			err := workerCon.Call("Worker.RunJob", request, response)
+			if err == nil && response.Payload[0] != nil {
+				break
+			}
 		}
 	}
 

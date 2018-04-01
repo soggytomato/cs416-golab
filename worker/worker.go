@@ -69,6 +69,11 @@ type SessionAndLog struct {
 	LogRecord     []Log
 }
 
+type ClientRecovery struct {
+	Session   []Element
+	LogRecord []Log
+}
+
 type NoCRDTError string
 
 func (e NoCRDTError) Error() string {
@@ -480,7 +485,10 @@ func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
 
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
-		json.NewEncoder(wr).Encode(w.cache.Get(sessionID))
+		var clientRec ClientRecovery
+		clientRec.Session = w.cache.Get(sessionID)
+		clientRec.LogRecord = w.logs[sessionID]
+		json.NewEncoder(wr).Encode(clientRec)
 	}
 }
 
