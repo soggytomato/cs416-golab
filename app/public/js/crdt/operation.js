@@ -78,15 +78,14 @@ function initOpPromise() {
 
 // Kicks of if the last Promise saw the end of changes
 function endOpPromise() {
+    changesInProgress = false;
+    
     // It's possible that between kicking this off, a new
     // op has come in. If so, kick off a new Promise.
     if (changes.length > 0) {
         initOpPromise();
         return;
     }
-
-    // Otherwise wrap things up.
-    changesInProgress = false;
 
     if (debugMode) CRDT.verify();
 }
