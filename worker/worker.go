@@ -365,6 +365,8 @@ func (w *Worker) startHeartBeat() {
 	for {
 		time.Sleep(time.Duration(w.settings.HeartBeat-TIME_BUFFER) * time.Millisecond)
 		request.Payload[1] = len(w.clients)
+		// w.logger.Println(len(w.clients))
+		// w.logger.Println(w.clientSessions)
 		w.loadBalancerConn.Call("LBServer.HeartBeat", request, &ignored)
 	}
 }

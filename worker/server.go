@@ -181,6 +181,13 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 //
 // Returns:
 // - AddressAlreadyRegisteredError if the server has already registered this address.
+
+type WorkersList []*Worker
+
+func (p WorkersList) Len() int           { return len(p) }
+func (p WorkersList) Less(i, j int) bool { return p[i].NumClients < p[j].NumClients }
+func (p WorkersList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
 func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 
 	allWorkers.Lock()
@@ -190,29 +197,13 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 		return nil
 	}
 
-	workersAvailable := make(map[int]*Worker)
-	for k, v := range allWorkers.all {
-		workersAvailable[k] = v
-	}
-	for {
-		var nextWorker *Worker
-		for _, worker := range workersAvailable {
-			if nextWorker == nil {
-				nextWorker = worker
-			} else if worker.NumClients < nextWorker.NumClients {
-				nextWorker = worker
-			}
-		}
-		if nextWorker == nil {
-			return nil
-		}
-		allWorkers.all[nextWorker.WorkerID].NumClients++
-
-		workerCon, err := rpc.Dial("tcp", nextWorker.RPCAddress.String())
+	workersList := sortWorkers()
+	for _, worker := range workersList {
+		allWorkers.all[worker.WorkerID].NumClients++
+		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
 		if err != nil {
 			fmt.Println(err)
-			fmt.Println("Error connecting to worker %s while registering", nextWorker.RPCAddress.String())
-			delete(workersAvailable, nextWorker.WorkerID)
+			fmt.Println("Error connecting to worker %s while registering", worker.RPCAddress.String())
 		} else {
 			defer workerCon.Close()
 			var ignored bool
@@ -231,8 +222,8 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 				}
 			}
 			if workerErr == nil {
-				fmt.Println("Your worker is: ", nextWorker.HTTPAddress.String())
-				*retWorkerIP = nextWorker.HTTPAddress.String()
+				fmt.Println("Your worker is: ", worker.HTTPAddress.String())
+				*retWorkerIP = worker.HTTPAddress.String()
 				break
 			}
 		}
@@ -323,20 +314,9 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 
 	response := new(WorkerResponse)
 	request := new(WorkerRequest)
-	workersAvailable := make(map[int]*Worker)
-	for k, v := range allWorkers.all {
-		workersAvailable[k] = v
-	}
-	for {
-		var nextWorker *Worker
-		for _, worker := range workersAvailable {
-			if nextWorker == nil {
-				nextWorker = worker
-			} else if worker.NumClients < nextWorker.NumClients {
-				nextWorker = worker
-			}
-		}
-		nextWorkerIP := nextWorker.RPCAddress.String()
+	workersList := sortWorkers()
+	for _, worker := range workersList {
+		nextWorkerIP := worker.RPCAddress.String()
 
 		workerCon, _ := rpc.Dial("tcp", nextWorkerIP)
 		defer workerCon.Close()
@@ -346,7 +326,6 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 		if err == nil && response.Payload[0] != nil {
 			break
 		}
-		delete(workersAvailable, nextWorker.WorkerID)
 	}
 
 	log := response.Payload[0].(Log)
@@ -364,6 +343,17 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 	}
 
 	return nil
+}
+
+func sortWorkers() WorkersList {
+	workersAvailable := make(WorkersList, len(allWorkers.all))
+	i := 0
+	for _, v := range allWorkers.all {
+		workersAvailable[i] = v
+		i++
+	}
+	sort.Sort(workersAvailable)
+	return workersAvailable
 }
 
 func handleErrorFatal(msg string, e error) {
