@@ -43,6 +43,7 @@ type Worker struct {
 	HTTPAddress     net.Addr
 	RecentHeartbeat int64
 	NumClients      int
+	Strike          int
 }
 
 type AllWorkers struct {
@@ -113,10 +114,14 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 	for {
 		allWorkers.Lock()
 		if time.Now().UnixNano()-allWorkers.all[workerID].RecentHeartbeat > int64(heartBeatInterval) {
-			outLog.Printf("%s timed out\n", allWorkers.all[workerID].RPCAddress.String())
-			delete(allWorkers.all, workerID)
-			allWorkers.Unlock()
-			return
+			if allWorkers.all[workerID].Strike > 0 {
+				outLog.Printf("%s timed out\n", allWorkers.all[workerID].RPCAddress.String())
+				delete(allWorkers.all, workerID)
+				allWorkers.Unlock()
+				return
+			} else {
+				allWorkers.all[workerID].Strike = 1
+			}
 		}
 		outLog.Printf("%s is alive with %d clients\n", allWorkers.all[workerID].RPCAddress.String(), allWorkers.all[workerID].NumClients)
 		allWorkers.Unlock()
@@ -150,6 +155,7 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 		w.RPCAddress,
 		w.HTTPAddress,
 		time.Now().UnixNano(),
+		0,
 		0,
 	}
 
@@ -197,17 +203,18 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 				nextWorker = worker
 			}
 		}
-		fmt.Println("Next worker: ", nextWorker)
-		fmt.Println("allWorkers[workerID]", allWorkers.all[nextWorker.WorkerID])
+		if nextWorker == nil {
+			return nil
+		}
 		allWorkers.all[nextWorker.WorkerID].NumClients++
 
 		workerCon, err := rpc.Dial("tcp", nextWorker.RPCAddress.String())
-		defer workerCon.Close()
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Error connecting to worker %s while registering", nextWorker.RPCAddress.String())
 			delete(workersAvailable, nextWorker.WorkerID)
 		} else {
+			defer workerCon.Close()
 			var ignored bool
 			var workerErr error
 			if sessionIDs[sessID] == false {
@@ -299,6 +306,7 @@ func (s *LBServer) HeartBeat(request WorkerRequest, _ignored *bool) error {
 
 	allWorkers.all[workerID].RecentHeartbeat = time.Now().UnixNano()
 	allWorkers.all[workerID].NumClients = numClient
+	allWorkers.all[workerID].Strike = 0
 
 	return nil
 }
@@ -348,7 +356,6 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 	request.Payload[0] = log
 	var ignored bool
 
-	fmt.Println(allWorkers.all)
 	for _, worker := range allWorkers.all {
 		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
 		if err == nil {
