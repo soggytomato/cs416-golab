@@ -7,6 +7,7 @@ EMPTY = '';
 // Operation constants
 INPUT_OP = '+input';
 DELETE_OP = '+delete';
+PASTE_OP = 'paste';
 REMOTE_INPUT_OP = '+remote_input';
 REMOTE_DELETE_OP = '+remote_delete';
 REMOTE_INPUT_OP_PREFIX = REMOTE_INPUT_OP + '_';
@@ -57,19 +58,23 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
-            if (origin == DELETE_OP && change.from.hitSide) return;
+            if (change.origin == DELETE_OP && change.from.hitSide) return;
 
-            // Push to queue of changes and init a new Promise
-            changes.push(change);
-            initOpPromise();
+            if (change.origin == PASTE_OP) {
+                handlePaste(change);
+            } else {
+                // Push to queue of changes
+                changes.push(change);
+            }
+
+            // Init a new Promise
+            if (!changesInProgress) initOpPromise();
         }
     );
 });
 
 // Starts a new Promise if changes are not being handled already
 function initOpPromise() {
-    if (changesInProgress) return;
-
     changesInProgress = true;
 
     var promise = new Promise(processOpPromise);
@@ -91,14 +96,50 @@ function endOpPromise() {
 }
 
 // Processes the actual operation
-function processOpPromise(promise, promiseEnd) {
+function processOpPromise(init, end) {
     handleOperation(changes[0]);
 
     changes.splice(0, 1);
     if (changes.length > 0) {
-        promise();
+        init();
     } else {
-        promiseEnd();
+        end();
+    }
+}
+
+function handlePaste(change) {
+    var line = change.from.line;
+    var ch = change.from.ch;
+
+    const numLines = change.text.length;
+    // Add return characters to ends of lines
+    if (numLines > 1) {
+        for (var i = 0; i < numLines - 1; i++) {
+            change.text[i] = change.text[i].concat(RETURN);
+        }
+    }
+
+    for (var i = 0; i < numLines; i++) {
+        if (i > 0) ch = 0;
+
+        const lineChars = change.text[i];
+        for (var j = 0; j < lineChars.length; j++) {
+            const inputChar = lineChars[j];
+
+            var text = null;
+            var to = null;
+            const from = {line: line + i, ch: ch + j};
+            if (inputChar == RETURN) {
+                text = ["", ""];
+                to = {line: line + i + 1, ch: 0};
+            } else {
+                text = [inputChar];
+                to = from;
+            }
+
+            const _change = {from: from, to: to, text: text, origin: INPUT_OP};
+            changes.push(_change);
+        }
     }
 }
 
@@ -115,7 +156,8 @@ function handleOperation(op) {
     var ch = op.from.ch;
 
     const origin = op.origin;
-    if (origin == INPUT_OP) {
+    if (origin == INPUT_OP) 
+    {
         var inputChar;
 
         // Is this a return case?
@@ -140,15 +182,21 @@ function handleOperation(op) {
         }
 
         handleLocalInput(line, ch, inputChar);
-    } else if (origin == DELETE_OP) {
+    } 
+    else if (origin == DELETE_OP) 
+    {
         // TODO deal with block deletion, or at least find a way to avoid it
 
         handleLocalDelete(line, ch);
-    } else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
+    } 
+    else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) 
+    {
         const id = origin.substring(REMOTE_INPUT_OP_PREFIX.length);
 
         mapping.update(line, ch, id);
-    } else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
+    } 
+    else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) 
+    {
         mapping.delete(line, ch);
     }
 }
