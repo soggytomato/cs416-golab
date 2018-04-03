@@ -147,11 +147,10 @@ function recover() {
                     }
 
                     if (data.hasOwnProperty('LogRecord')) {
-                        //$("#logList").empty(); Leaving this commented for now, doesn't seem like I need this anymore.. 
                         const logs = data.LogRecord
                         for (var i = 0; i < logs.length; i++) {
-                            if (!jobIDs.includes(logs[i].Job.JobID)) {
-                                jobIDs.push(logs[i].Job.JobID);
+                            if (jobIDs.get(logs[i].Job.JobID.toString()) == undefined) {
+                                jobIDs.set(logs[i].Job.JobID, logs[i].Job.Done)
                                 $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
                                 if (logs[i].Job.Done) {
                                     var logOutput = document.getElementById(logs[i].Job.JobID);

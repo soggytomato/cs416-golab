@@ -6,7 +6,7 @@ workerIP = '';
 userID = '';
 sessionID = '';
 currentSessions = [];
-jobIDs = [];
+jobIDs = new Map();
 
 $(document).ready(function() {
     $('.input-wrapper').resizable({
@@ -191,7 +191,8 @@ function execute() {
         dataType: 'json',
         data: $('#executeForm').serialize(),
         success: function(data) {
-            jobIDs.push(data.JobID);
+            jobIDs.set(data.JobID, false);
+            //jobIDs.push(data.JobID);
             $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
         }
     })
@@ -201,8 +202,9 @@ function execute() {
 function matchLog(log) {
     if (log.Job.SessionID == sessionID) {
         var isExist = false;
-        for (var i = 0; i < jobIDs.length; i++) {
-            if (jobIDs[i] == log.Job.JobID) {
+        for (var [key, value] of jobIDs) {
+            if (key == log.Job.JobID) {
+                jobIDs.set(log.Job.JobID, true);
                 isExist = true;
                 var logOutput = document.getElementById(log.Job.JobID);
                 logOutput.addEventListener('click', function(e) {
@@ -212,6 +214,7 @@ function matchLog(log) {
             }
         }
         if (!isExist) {
+            jobIDs.set(log.Job.JobID, log.Job.Done);
             $("#logList").prepend("<li><a href=# id=" + log.Job.JobID + ">" + log.Job.JobID + "</a></li>")
             var logOutput = document.getElementById(log.Job.JobID);
             logOutput.addEventListener('click', function(e) {
