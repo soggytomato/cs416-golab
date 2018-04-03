@@ -1,3 +1,6 @@
+// Flags whether to print the ops in the console
+printOps = false;
+
 // String constants
 RETURN = '\n';
 TAB = '\t';
@@ -8,6 +11,7 @@ EMPTY = '';
 INPUT_OP = '+input';
 DELETE_OP = '+delete';
 PASTE_OP = 'paste';
+IGNORE_OP = 'ignore';
 REMOTE_INPUT_OP = '+remote_input';
 REMOTE_DELETE_OP = '+remote_delete';
 REMOTE_INPUT_OP_PREFIX = REMOTE_INPUT_OP + '_';
@@ -58,6 +62,7 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
+            if (change.origin == IGNORE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
             if (change.origin == PASTE_OP) {
@@ -83,20 +88,6 @@ function initOpPromise() {
     promise.then(initOpPromise, endOpPromise);
 }
 
-// Kicks of if the last Promise saw the end of changes
-function endOpPromise() {
-    changesInProgress = false;
-    
-    // It's possible that between kicking this off, a new
-    // op has come in. If so, kick off a new Promise.
-    if (changes.length > 0) {
-        initOpPromise();
-        return;
-    }
-
-    if (debugMode) CRDT.verify();
-}
-
 // Processes the actual operation
 function processOpPromise(init, end) {
     handleOperation(changes[0]);
@@ -107,6 +98,21 @@ function processOpPromise(init, end) {
     } else {
         end();
     }
+}
+
+// Kicks off if the last Promise saw the end of changes
+function endOpPromise() {
+    changesInProgress = false;
+    
+    // It's possible that between kicking this off, a new
+    // op has come in. If so, kick off a new Promise.
+    if (changes.length > 0) {
+        initOpPromise();
+        return;
+    }
+
+    cleanExtraCarriageReturns();
+    if (debugMode) CRDT.verify();
 }
 
 /*
@@ -462,6 +468,28 @@ function getEffectedIDs(change) {
 
 /******************************* UTILITY *******************************/
 
+/*
+    Removes extra carriage returns at the ends of lines
+    by finding the invalid characters and deleting them from
+    the editor.
+*/
+function cleanExtraCarriageReturns() {
+    const $lines = $('.CodeMirror-line');
+    $lines.each(function(lineNum, line){
+        const $line = $(line);
+        const $spans = $line.find('>span').children();
+
+        if ($spans.last().hasClass('cm-invalidchar')) {
+            const lineTokens = editor.getLineTokens(lineNum);
+            const token = lineTokens[lineTokens.length - 1];
+
+            const to = {line: lineNum, ch: token.end};
+            const from = {line: lineNum, ch: to.ch - 1};
+            editor.getDoc().replaceRange('', from, to, IGNORE_OP);
+        }
+    });
+}
+
 // Array of all changes -- only for debug purposing to replay until
 // a sync problem is observed
 ops = []
@@ -494,8 +522,10 @@ function replayOperations(ops, rate = 500) {
 }
 
 function logOpsString() {
-    const opsString = "'" + JSON.stringify(ops) + "'";
-    console.log("Operation string: \n" + opsString);
+    if (printOps) {
+        const opsString = "'" + JSON.stringify(ops) + "'";
+        console.log("Operation string: \n" + opsString);
+    }
 }
 
 function getOpsFromString(opsString) {
