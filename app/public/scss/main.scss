@@ -41,7 +41,7 @@ html { height: 100%; width: 100%; margin: 0;
 
 		.reset { float: right; height: 27px; margin-top: 7px; font-size: smaller; width: 77px;
 			img { width: 12px; margin-top: 3px; }
-			span { float: right; }
+			span { float:  right; }
 		}
 
 		.CodeMirror { height: 100%!important; border-radius: $border-radius; }
@@ -60,7 +60,7 @@ html { height: 100%; width: 100%; margin: 0;
 	.title { text-align: center; }
 }
 
-.logo {	width: 360px; margin-left: auto; display: block; margin-right: auto; }
+.logo {	width: 250px; margin-left: auto; display: block; margin-right: auto; padding-top: 100px; }
 .gopher { width: 90px; position: relative; z-index: 10000; left: 92%; bottom: 140px; }
 
 label, .subtitle {
