@@ -147,26 +147,24 @@ function recover() {
                     }
 
                     if (data.hasOwnProperty('LogRecord')) {
-                        $("#logList").empty();
-                        
                         const logs = data.LogRecord
                         if (logs != null) {
                             for (var i = 0; i < logs.length; i++) {
-                            if (!jobIDs.includes(logs[i].Job.JobID)) {
-                                jobIDs.push(logs[i].Job.JobID);
-                                $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
-                                if (logs[i].Job.Done) {
-                                    var logOutput = document.getElementById(logs[i].Job.JobID);
-                                    var _log = logs[i];
-                                    (function(_log) {
-                                        logOutput.addEventListener('click', function(e) {
-                                            e.preventDefault();
-                                            logClicked(_log);
-                                        }, false);
-                                    })(_log);
+                                if (jobIDs.get(logs[i].Job.JobID.toString()) == undefined) {
+                                    jobIDs.set(logs[i].Job.JobID, logs[i].Job.Done)
+                                    $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
+                                    if (logs[i].Job.Done) {
+                                        var logOutput = document.getElementById(logs[i].Job.JobID);
+                                        var _log = logs[i];
+                                        (function(_log) {
+                                            logOutput.addEventListener('click', function(e) {
+                                                e.preventDefault();
+                                                logClicked(_log);
+                                            }, false);
+                                        })(_log);
+                                    }
                                 }
                             }
-                        }
                         }
                     }
 
