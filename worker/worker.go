@@ -91,6 +91,7 @@ func main() {
 		usage()
 	}
 	gob.Register(map[string]*Element{})
+	gob.Register(map[string]Log{})
 	gob.Register(&net.TCPAddr{})
 	gob.Register([]Element{})
 	gob.Register([]*Element{})
@@ -161,8 +162,10 @@ func (w *Worker) sendLocalElements() error {
 					workerCon.Call("Worker.ApplyIncomingElements", request, response)
 				} else {
 					w.logger.Println("Lost worker: ", workerAddr)
-
 					delete(w.workers, workerAddr)
+					if len(w.workers) < w.settings.MinNumWorkerConnections {
+						w.getWorkers()
+					}
 				}
 			}
 			w.localElements = nil
@@ -245,18 +248,14 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			w.logger.Println("Failed to retrieve session and logs for session "+sessionID+"\n", err)
 		} else {
 			session := response.Payload[0].(Session)
-			logs := response.Payload[1].([]Log)
+			logs := response.Payload[1].(map[string]Log)
 			if len(logs) > 0 {
 				if _, exists := w.logs[sessionID]; exists {
 					for _, log := range logs {
 						w.logs[sessionID][log.Job.JobID] = log
 					}
 				} else {
-					tempLogMap := make(map[string]Log)
-					for _, log := range logs {
-						tempLogMap[log.Job.JobID] = log
-					}
-					w.logs[sessionID] = tempLogMap
+					w.logs[sessionID] = logs
 				}
 				// w.logs[sessionID] = append(w.logs[sessionID], logs...)
 			}
