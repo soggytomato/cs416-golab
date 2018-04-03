@@ -69,6 +69,11 @@ type SessionAndLog struct {
 	LogRecord     []Log
 }
 
+type ClientRecovery struct {
+	Session   []Element
+	LogRecord []Log
+}
+
 type NoCRDTError string
 
 func (e NoCRDTError) Error() string {
@@ -365,6 +370,8 @@ func (w *Worker) startHeartBeat() {
 	for {
 		time.Sleep(time.Duration(w.settings.HeartBeat-TIME_BUFFER) * time.Millisecond)
 		request.Payload[1] = len(w.clients)
+		// w.logger.Println(len(w.clients))
+		// w.logger.Println(w.clientSessions)
 		w.loadBalancerConn.Call("LBServer.HeartBeat", request, &ignored)
 	}
 }
@@ -478,7 +485,10 @@ func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
 
 		wr.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
-		json.NewEncoder(wr).Encode(w.cache.Get(sessionID))
+		var clientRec ClientRecovery
+		clientRec.Session = w.cache.Get(sessionID)
+		clientRec.LogRecord = w.logs[sessionID]
+		json.NewEncoder(wr).Encode(clientRec)
 	}
 }
 
@@ -673,7 +683,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	// Acks back to Load Balancer that it is done
 	response.Payload = make([]interface{}, 1)
 	response.Payload[0] = log
-
+	w.logger.Println("Done Job")
 	return nil
 }
 

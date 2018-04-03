@@ -43,6 +43,7 @@ type Worker struct {
 	HTTPAddress     net.Addr
 	RecentHeartbeat int64
 	NumClients      int
+	Strike          int
 }
 
 type AllWorkers struct {
@@ -113,10 +114,14 @@ func monitor(workerID int, heartBeatInterval time.Duration) {
 	for {
 		allWorkers.Lock()
 		if time.Now().UnixNano()-allWorkers.all[workerID].RecentHeartbeat > int64(heartBeatInterval) {
-			outLog.Printf("%s timed out\n", allWorkers.all[workerID].RPCAddress.String())
-			delete(allWorkers.all, workerID)
-			allWorkers.Unlock()
-			return
+			if allWorkers.all[workerID].Strike > 0 {
+				outLog.Printf("%s timed out\n", allWorkers.all[workerID].RPCAddress.String())
+				delete(allWorkers.all, workerID)
+				allWorkers.Unlock()
+				return
+			} else {
+				allWorkers.all[workerID].Strike = 1
+			}
 		}
 		outLog.Printf("%s is alive with %d clients\n", allWorkers.all[workerID].RPCAddress.String(), allWorkers.all[workerID].NumClients)
 		allWorkers.Unlock()
@@ -151,6 +156,7 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 		w.HTTPAddress,
 		time.Now().UnixNano(),
 		0,
+		0,
 	}
 
 	allWorkers.all[newWorkerID] = newWorker
@@ -175,6 +181,13 @@ func (s *LBServer) RegisterNewWorker(w WorkerInfo, r *WorkerNetSettings) error {
 //
 // Returns:
 // - AddressAlreadyRegisteredError if the server has already registered this address.
+
+type WorkersList []*Worker
+
+func (p WorkersList) Len() int           { return len(p) }
+func (p WorkersList) Less(i, j int) bool { return p[i].NumClients < p[j].NumClients }
+func (p WorkersList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
 func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 
 	allWorkers.Lock()
@@ -184,38 +197,37 @@ func (s *LBServer) RegisterNewClient(sessID string, retWorkerIP *string) error {
 		return nil
 	}
 
-	var nextWorker *Worker
-	for _, worker := range allWorkers.all {
-		if nextWorker == nil {
-			nextWorker = worker
-		} else if worker.NumClients < nextWorker.NumClients {
-			nextWorker = worker
-		}
-	}
-	allWorkers.all[nextWorker.WorkerID].NumClients++
-
-	workerCon, err := rpc.Dial("tcp", nextWorker.RPCAddress.String())
-	defer workerCon.Close()
-	if err != nil {
-		fmt.Println("Error connecting to worker while registering")
-	}
-	var ignored bool
-
-	if sessionIDs[sessID] == false {
-		sessionIDs[sessID] = true
-		err = workerCon.Call("Worker.CreateNewSession", sessID, &ignored)
+	workersList := sortWorkers()
+	for _, worker := range workersList {
+		allWorkers.all[worker.WorkerID].NumClients++
+		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
 		if err != nil {
-			fmt.Println("Error connecting to worker while calling CreateNewSession")
-		}
-	} else {
-		sessionIDs[sessID] = true
-		err = workerCon.Call("Worker.LoadSession", sessID, &ignored)
-		if err != nil {
-			fmt.Println("Error connecting to worker while calling LoadSession")
+			fmt.Println(err)
+			fmt.Println("Error connecting to worker %s while registering", worker.RPCAddress.String())
+		} else {
+			defer workerCon.Close()
+			var ignored bool
+			var workerErr error
+			if sessionIDs[sessID] == false {
+				sessionIDs[sessID] = true
+				workerErr = workerCon.Call("Worker.CreateNewSession", sessID, &ignored)
+				if err != nil {
+					fmt.Println("Error connecting to worker while calling CreateNewSession")
+				}
+			} else {
+				sessionIDs[sessID] = true
+				workerErr = workerCon.Call("Worker.LoadSession", sessID, &ignored)
+				if err != nil {
+					fmt.Println("Error connecting to worker while calling LoadSession")
+				}
+			}
+			if workerErr == nil {
+				fmt.Println("Your worker is: ", worker.HTTPAddress.String())
+				*retWorkerIP = worker.HTTPAddress.String()
+				break
+			}
 		}
 	}
-
-	*retWorkerIP = nextWorker.HTTPAddress.String()
 	return nil
 }
 
@@ -285,6 +297,7 @@ func (s *LBServer) HeartBeat(request WorkerRequest, _ignored *bool) error {
 
 	allWorkers.all[workerID].RecentHeartbeat = time.Now().UnixNano()
 	allWorkers.all[workerID].NumClients = numClient
+	allWorkers.all[workerID].Strike = 0
 
 	return nil
 }
@@ -299,45 +312,50 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 		return nil
 	}
 
-	var nextWorker *Worker
-	for _, worker := range allWorkers.all {
-		if nextWorker == nil {
-			nextWorker = worker
-		} else if worker.NumClients < nextWorker.NumClients {
-			nextWorker = worker
-		}
-	}
-	nextWorkerIP := nextWorker.RPCAddress.String()
+	response := new(WorkerResponse)
+	request := new(WorkerRequest)
+	workersList := sortWorkers()
+	for _, worker := range workersList {
+		nextWorkerIP := worker.RPCAddress.String()
 
-	workerCon, err := rpc.Dial("tcp", nextWorkerIP)
-	defer workerCon.Close()
-	if err != nil {
-		fmt.Println("Error connecting to worker to run job")
-	} else {
-		response := new(WorkerResponse)
-		request := new(WorkerRequest)
-		request.Payload = make([]interface{}, 1)
-		request.Payload[0] = jobID
-		err = workerCon.Call("Worker.RunJob", request, response)
-		log := response.Payload[0].(Log)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			// Send out the new log
-			request = new(WorkerRequest)
+		workerCon, err := rpc.Dial("tcp", nextWorkerIP)
+		if err == nil {
+			defer workerCon.Close()
 			request.Payload = make([]interface{}, 1)
-			request.Payload[0] = log
-			var ignored bool
-
-			fmt.Println(allWorkers.all)
-			for _, worker := range allWorkers.all {
-				workerCon, _ := rpc.Dial("tcp", worker.RPCAddress.String())
-				workerCon.Call("Worker.SendLog", request, &ignored)
+			request.Payload[0] = jobID
+			err := workerCon.Call("Worker.RunJob", request, response)
+			if err == nil && response.Payload[0] != nil {
+				break
 			}
 		}
 	}
 
+	log := response.Payload[0].(Log)
+	// Send out the new log
+	request = new(WorkerRequest)
+	request.Payload = make([]interface{}, 1)
+	request.Payload[0] = log
+	var ignored bool
+
+	for _, worker := range allWorkers.all {
+		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
+		if err == nil {
+			workerCon.Call("Worker.SendLog", request, &ignored)
+		}
+	}
+
 	return nil
+}
+
+func sortWorkers() WorkersList {
+	workersAvailable := make(WorkersList, len(allWorkers.all))
+	i := 0
+	for _, v := range allWorkers.all {
+		workersAvailable[i] = v
+		i++
+	}
+	sort.Sort(workersAvailable)
+	return workersAvailable
 }
 
 func handleErrorFatal(msg string, e error) {
