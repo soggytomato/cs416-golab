@@ -78,10 +78,11 @@ html {
     text-align: center; }
 
 .logo {
-  width: 360px;
+  width: 250px;
   margin-left: auto;
   display: block;
-  margin-right: auto; }
+  margin-right: auto;
+  padding-top: 100px; }
 
 .gopher {
   width: 90px;
