@@ -16,7 +16,7 @@ function initWS() {
     socket.onerror = onError;
 
     keepAlive = setInterval(function(){
-        socket.send();
+        socket.send(null);
     }, 1000);
 }
 
@@ -45,7 +45,10 @@ function onError(e) {
 
 function onMessage(_msg) {
     const element = JSON.parse(_msg.data);
-    if (element.hasOwnProperty('Job')) {
+
+    if (element == undefined) {
+        return;
+    } else if (element.hasOwnProperty('Job')) {
         matchLog(element);
     } else {
         handleRemoteOperation(element);
