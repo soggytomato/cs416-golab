@@ -2,6 +2,8 @@ socket = undefined;
 unload = false;
 
 $(window).on('beforeunload', function(event) {
+    unload = true;
+
     closeSession();
 });
 
@@ -94,8 +96,6 @@ function sendCachedElements() {
 }
 
 function closeSession() {
-    unload = true;
-
     $.ajax({
         type: 'post',
         url: 'http://' + workerIP + '/session?userID=' + userID + '&sessionID=' + sessionID
