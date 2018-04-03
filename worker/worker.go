@@ -591,6 +591,11 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 			w.logger.Println("Got element from "+userID+": ", element)
 		}
 
+		// If this is a ping, ping back
+		if (element.ID == "") {
+			w.clients[userID].WriteJSON(nil)
+		}
+
 		w.addToSession(*element)
 
 		// TODO remove because we will buffer the sends

@@ -1,5 +1,7 @@
 socket = undefined;
 unload = false;
+keepAlive = null;
+
 $(window).on('beforeunload', function(event) {
     closeSession();
 });
@@ -12,6 +14,10 @@ function initWS() {
     socket.onclose = onClose;
     socket.onmessage = onMessage;
     socket.onerror = onError;
+
+    keepAlive = setInterval(function(){
+        socket.send(null);
+    }, 1000);
 }
 
 function onOpen() {
@@ -39,7 +45,10 @@ function onError(e) {
 
 function onMessage(_msg) {
     const element = JSON.parse(_msg.data);
-    if (element.hasOwnProperty('Job')) {
+
+    if (element == undefined) {
+        return;
+    } else if (element.hasOwnProperty('Job')) {
         matchLog(element);
     } else {
         handleRemoteOperation(element);
@@ -96,6 +105,8 @@ function closeSession() {
         type: 'post',
         url: 'http://' + workerIP + '/session?userID=' + userID + '&sessionID=' + sessionID
     });
+
+    clearInterval(keepAlive);
 
     if (socket.readyState == 0 || socket.readyState == 1) socket.close();
 }
