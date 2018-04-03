@@ -26,37 +26,39 @@ $(document).ready(function() {
 });
 
 $(document).ready(function() {
+    getSessionAndUsernames();
+    formBindings();
+});
+
+function getSessionAndUsernames() {
     $.ajax({
         type: 'get',
         url: '/sessions',
         success: function(data) {
-            var select = document.getElementById("sessionSelect");
+            var sessSelect = document.getElementById("sessionSelect");
+            $("#sessionSelect").empty();
             for (var i = 0; i < data.ExistingSessions.length; i++) {
                 var opt = data.ExistingSessions[i];
                 var el = document.createElement("option");
                 el.textContent = opt;
                 el.value = opt;
-                select.appendChild(el);
+                sessSelect.appendChild(el);
             }
-            currentSessions = data.ExistingSessions
-        }
-    })
-    $.ajax({
-        type: 'get',
-        url: '/usernames',
-        success: function(data) {
-            var select = document.getElementById("userSelect");
+            var userSelect = document.getElementById("userSelect");
+            $("#userSelect").empty();
             for (var i = 0; i < data.AllUsernames.length; i++) {
                 var opt = data.AllUsernames[i];
                 var el = document.createElement("option");
                 el.textContent = opt;
                 el.value = opt;
-                select.appendChild(el);
+                userSelect.appendChild(el);
             }
+            currentSessions = data.ExistingSessions
         }
+    }).then(function() {
+        setTimeout(getSessionAndUsernames, 2000);
     })
-    formBindings();
-});
+}
 
 function formBindings() {
     $('#newUserRadio').on('click', function() {
