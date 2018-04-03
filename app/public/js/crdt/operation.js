@@ -7,6 +7,7 @@ EMPTY = '';
 // Operation constants
 INPUT_OP = '+input';
 DELETE_OP = '+delete';
+PASTE_OP = 'paste';
 REMOTE_INPUT_OP = '+remote_input';
 REMOTE_DELETE_OP = '+remote_delete';
 REMOTE_INPUT_OP_PREFIX = REMOTE_INPUT_OP + '_';
@@ -57,19 +58,25 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
-            if (origin == DELETE_OP && change.from.hitSide) return;
+            if (change.origin == DELETE_OP && change.from.hitSide) return;
 
-            // Push to queue of changes and init a new Promise
-            changes.push(change);
-            initOpPromise();
+            if (change.origin == PASTE_OP) {
+                handleBulkInput(change);
+            } else if (change.origin == DELETE_OP && isBulk(change)) {
+                handleBulkDelete(change);
+            } else {
+                // Push to queue of changes
+                changes.push(change);
+            }
+
+            // Init a new Promise
+            if (!changesInProgress) initOpPromise();
         }
     );
 });
 
 // Starts a new Promise if changes are not being handled already
 function initOpPromise() {
-    if (changesInProgress) return;
-
     changesInProgress = true;
 
     var promise = new Promise(processOpPromise);
@@ -91,14 +98,14 @@ function endOpPromise() {
 }
 
 // Processes the actual operation
-function processOpPromise(promise, promiseEnd) {
+function processOpPromise(init, end) {
     handleOperation(changes[0]);
 
     changes.splice(0, 1);
     if (changes.length > 0) {
-        promise();
+        init();
     } else {
-        promiseEnd();
+        end();
     }
 }
 
@@ -115,7 +122,8 @@ function handleOperation(op) {
     var ch = op.from.ch;
 
     const origin = op.origin;
-    if (origin == INPUT_OP) {
+    if (origin == INPUT_OP) 
+    {
         var inputChar;
 
         // Is this a return case?
@@ -140,20 +148,26 @@ function handleOperation(op) {
         }
 
         handleLocalInput(line, ch, inputChar);
-    } else if (origin == DELETE_OP) {
+    } 
+    else if (origin == DELETE_OP) 
+    {
         // TODO deal with block deletion, or at least find a way to avoid it
 
         handleLocalDelete(line, ch);
-    } else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
+    } 
+    else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) 
+    {
         const id = origin.substring(REMOTE_INPUT_OP_PREFIX.length);
 
         mapping.update(line, ch, id);
-    } else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
+    } 
+    else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) 
+    {
         mapping.delete(line, ch);
     }
 }
 
-/******************************* LOCAL HANDLERS *******************************/
+/******************************* LOCAL OPERATIONS *******************************/
 
 // Cache of local elements that haven't been ACK'd yet
 cache = []
@@ -195,8 +209,18 @@ function handleLocalDelete(line, ch) {
     if (mapping.length() == 0) return;
 
     const id = mapping.get(line, ch);
-    const elem = CRDT.get(id);
+    handleLocalDeleteByID(id, line, ch);
+}
 
+function handleLocalDeleteByID(id, line, ch) {
+    if (line == undefined || ch == undefined) {
+        const pos = mapping.getPosition(id);
+
+        line = pos.line;
+        ch = pos.ch;
+    }
+
+    const elem = CRDT.get(id);
     if (elem === undefined) return;
     else elem.del = true;
 
@@ -211,7 +235,7 @@ function handleLocalDelete(line, ch) {
     if (debugMode) console.log("Observed remove at line: " + line + " pos: " + ch);
 }
 
-/******************************* REMOTE HANDLERS *******************************/
+/******************************* REMOTE OPERATIONS *******************************/
 
 function handleRemoteOperation(op) {
     const id = op.ID;
@@ -322,10 +346,7 @@ function handleRemoteDelete(id) {
 
     // Apply to the editor
     const pos1 = mapping.getPosition(id);
-    var pos2 = {
-        line: undefined,
-        ch: undefined
-    };
+    var pos2 = { line: undefined, ch: undefined };
     if (elem.val == RETURN) {
         pos2.line = pos1.line + 1;
         pos2.ch = 0;
@@ -337,6 +358,106 @@ function handleRemoteDelete(id) {
     if (pos1.line != undefined && pos1.ch !== undefined) editor.getDoc().replaceRange('', pos1, pos2, REMOTE_DELETE_OP_PREFIX + id);
 
     if (debugMode) console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
+}
+
+/******************************* BULK OPERATIONS *******************************/
+
+/*
+    Handles bulk input by breaking the operation into multiple
+    operations -- one for each character.
+
+    CodeMirror will apply this automatically but the broken
+    down ops are pushed to the cache and handled incrementally.
+*/
+function handleBulkInput(change) {
+    var line = change.from.line;
+    var ch = change.from.ch;
+
+    const numLines = change.text.length;
+    // Add return characters to ends of lines
+    if (numLines > 1) {
+        for (var i = 0; i < numLines - 1; i++) {
+            change.text[i] = change.text[i].concat(RETURN);
+        }
+    }
+
+    // For every character in the line, construct a new 
+    // 'change' object and push to the cache
+    for (var i = 0; i < numLines; i++) {
+        if (i > 0) ch = 0;
+
+        const lineChars = change.text[i];
+        for (var j = 0; j < lineChars.length; j++) {
+            const inputChar = lineChars[j];
+
+            var text = null;
+            const from = {line: line + i, ch: ch + j};
+            var to = {line: line + i, ch: ch + j};
+            if (inputChar == RETURN) {
+                text = ["", ""];
+
+                to.line = line + i + 1;
+                to.ch = 0;
+            } else {
+                text = [inputChar];
+            }
+
+            const _change = {from: from, to: to, text: text, origin: INPUT_OP};
+            changes.push(_change);
+        }
+    }
+}
+
+/*
+    Handles bulkd elete by deleting all effected elements in the operation by ID.
+
+    Note: these deletes are not pushed to the cache to be dealt
+            with later, as they effect of a delete is trivial.
+*/
+function handleBulkDelete(change) {
+    const ids = getEffectedIDs(change);
+
+    ids.forEach(function(id){
+        handleLocalDeleteByID(id);
+    });
+}
+
+/*
+    Determines whether a change effects more than one element.
+*/
+function isBulk(change) {
+    return getEffectedIDs(change).length > 1;
+}
+
+/*
+    Gets all the element IDs in the mapping spanningthe 'from' 
+    position to the 'to' position.
+*/
+function getEffectedIDs(change) {
+    var ids = [];
+
+    const from = change.from;
+    const to = change.to;
+
+    var line = from.line;
+    var ch = from.ch;
+
+    var id = mapping.get(line, ch);
+    while (id != undefined && !(line > to.line || (line == to.line && ch >= to.ch))) {
+        ids.push(id)
+
+        ch++;
+        id = mapping.get(line, ch)
+
+        if (id == undefined) {
+            line++;
+            ch = 0;
+
+            id = mapping.get(line, ch)
+        }
+    }
+
+    return ids;
 }
 
 /******************************* UTILITY *******************************/
