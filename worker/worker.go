@@ -54,7 +54,7 @@ type Worker struct {
 	sessions         map[string]*Session
 	modifiedSessions map[string]*Session
 	clientSessions   map[string][]string
-	logs             map[string][]Log
+	logs             map[string]map[string]Log
 	localElements    []Element
 	cache            *Cache
 }
@@ -123,7 +123,7 @@ func (w *Worker) init() {
 	w.clients = make(map[string]*websocket.Conn)
 	w.clientSessions = make(map[string][]string)
 	w.modifiedSessions = make(map[string]*Session)
-	w.logs = make(map[string][]Log)
+	w.logs = make(map[string]map[string]Log)
 
 	w.cache = new(Cache)
 	w.cache.Init()
@@ -134,7 +134,7 @@ func (w *Worker) init() {
 
 func (w *Worker) connectToFS() {
 	fsServerConn, err := rpc.Dial("tcp", w.fserverAddr)
-	checkError(err)
+	w.checkError(err)
 	w.fsServerConn = fsServerConn
 }
 
@@ -247,7 +247,18 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			session := response.Payload[0].(Session)
 			logs := response.Payload[1].([]Log)
 			if len(logs) > 0 {
-				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+				if _, exists := w.logs[sessionID]; exists {
+					for _, log := range logs {
+						w.logs[sessionID][log.Job.JobID] = log
+					}
+				} else {
+					tempLogMap := make(map[string]Log)
+					for _, log := range logs {
+						tempLogMap[log.Job.JobID] = log
+					}
+					w.logs[sessionID] = tempLogMap
+				}
+				// w.logs[sessionID] = append(w.logs[sessionID], logs...)
 			}
 			w.sessions[sessionID] = &session
 			return true
@@ -267,8 +278,16 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			session := fsResponse.Payload[0].(Session)
 			logs := fsResponse.Payload[1].([]Log)
 			w.logger.Println(logs)
-			if len(logs) > 0 {
-				w.logs[sessionID] = append(w.logs[sessionID], logs...)
+			if _, exists := w.logs[sessionID]; exists {
+				for _, log := range logs {
+					w.logs[sessionID][log.Job.JobID] = log
+				}
+			} else {
+				tempLogMap := make(map[string]Log)
+				for _, log := range logs {
+					tempLogMap[log.Job.JobID] = log
+				}
+				w.logs[sessionID] = tempLogMap
 			}
 			w.sessions[sessionID] = &session
 			// TODO handle cached elements
@@ -315,9 +334,9 @@ func (w *Worker) listenRPC() {
 	}
 	externalIP = externalIP + ":0"
 	tcpAddr, err := net.ResolveTCPAddr("tcp", externalIP)
-	checkError(err)
+	w.checkError(err)
 	listener, err := net.ListenTCP("tcp", tcpAddr)
-	checkError(err)
+	w.checkError(err)
 	rpc.Register(w)
 	w.localRPCAddr = listener.Addr()
 	rpc.Register(w)
@@ -338,9 +357,9 @@ func (w *Worker) listenHTTP() {
 
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
-	checkError(err)
+	w.checkError(err)
 	listener, err := net.ListenTCP("tcp", httpAddr)
-	checkError(err)
+	w.checkError(err)
 	w.localHTTPAddr = listener.Addr()
 	go http.Serve(listener, nil)
 	w.logger.Println("listening for HTTP on: ", listener.Addr().String())
@@ -348,11 +367,11 @@ func (w *Worker) listenHTTP() {
 
 func (w *Worker) registerWithLB() {
 	loadBalancerConn, err := rpc.Dial("tcp", w.serverAddr)
-	checkError(err)
+	w.checkError(err)
 	settings := new(WorkerNetSettings)
 	info := &WorkerInfo{w.localRPCAddr, w.localHTTPAddr}
 	err = loadBalancerConn.Call("LBServer.RegisterNewWorker", info, settings)
-	checkError(err)
+	w.checkError(err)
 	w.settings = settings
 	w.workerID = settings.WorkerID
 	go w.startHeartBeat()
@@ -400,7 +419,7 @@ func (w *Worker) connectToWorkers(addrs []net.Addr) {
 		if w.workers[workerAddr.String()] == nil {
 			workerCon, err := rpc.Dial("tcp", workerAddr.String())
 			if err != nil {
-				w.logger.Println(err)
+				w.checkError(err)
 				delete(w.workers, workerAddr.String())
 			} else {
 				w.workers[workerAddr.String()] = workerCon
@@ -448,7 +467,9 @@ func (w *Worker) sessionHandler(wr http.ResponseWriter, r *http.Request) {
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
 		var sessionAndLog SessionAndLog
 		sessionAndLog.SessionRecord = w.sessions[sessionID]
-		sessionAndLog.LogRecord = w.logs[sessionID]
+		for _, log := range w.logs[sessionID] {
+			sessionAndLog.LogRecord = append(sessionAndLog.LogRecord, log)
+		}
 		json.NewEncoder(wr).Encode(sessionAndLog)
 	} else if r.Method == "POST" {
 		_sessionID, _ := r.URL.Query()["sessionID"]
@@ -487,7 +508,9 @@ func (w *Worker) recoveryHandler(wr http.ResponseWriter, r *http.Request) {
 		wr.Header().Set("Access-Control-Allow-Origin", "*")
 		var clientRec ClientRecovery
 		clientRec.Session = w.cache.Get(sessionID)
-		clientRec.LogRecord = w.logs[sessionID]
+		for _, log := range w.logs[sessionID] {
+			clientRec.LogRecord = append(clientRec.LogRecord, log)
+		}
 		json.NewEncoder(wr).Encode(clientRec)
 	}
 }
@@ -545,7 +568,7 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
 		err := r.ParseForm()
-		checkError(err)
+		w.checkError(err)
 		sessionID := r.FormValue("sessionID")
 		snippet := r.FormValue("snippet")
 		log := new(Log)
@@ -562,7 +585,7 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		request.Payload[0] = log
 		var ignored bool
 		err = w.fsServerConn.Call("Server.SaveLog", request, &ignored)
-		checkError(err)
+		w.checkError(err)
 		// Sending back jobID
 		logSettings := *new(LogSettings)
 		logSettings.JobID = jobID
@@ -631,9 +654,17 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 	fsResponse := new(FSResponse)
 
 	// Gets log from File System
-	err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
-	checkError(err)
-	log := fsResponse.Payload[0].(Log)
+	var log Log
+	for {
+		w.logger.Println("Trying to get Log: ", jobID)
+		err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
+		w.checkError(err)
+		if err == nil && len(fsResponse.Payload) > 0 {
+			log = fsResponse.Payload[0].(Log)
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 
 	if !log.Job.Done { // Check if log has been executed yet already
 		// 		- saves and compiles the file locally
@@ -689,10 +720,18 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 
 func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 	log := request.Payload[0].(Log)
-	w.logs[log.Job.SessionID] = append(w.logs[log.Job.SessionID], log)
+	if _, exists := w.logs[log.Job.SessionID]; exists {
+		w.logs[log.Job.SessionID][log.Job.JobID] = log
+	} else {
+		tempLogMap := make(map[string]Log)
+		tempLogMap[log.Job.JobID] = log
+		w.logs[log.Job.SessionID] = tempLogMap
+	}
+	//w.logs[log.Job.SessionID][log.Job.JobID] = log
+	//w.logs[log.Job.SessionID] = append(w.logs[log.Job.SessionID], log)
 	for _, clientConn := range w.clients {
 		err := clientConn.WriteJSON(log)
-		checkError(err)
+		w.checkError(err)
 	}
 	return nil
 }
@@ -735,9 +774,9 @@ func sliceOutput(output string, fileName string) string {
 	return logOutput
 }
 
-func checkError(err error) error {
+func (w *Worker) checkError(err error) error {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		w.logger.Println("Error:", err)
 		return err
 	}
 
@@ -848,7 +887,7 @@ func (w *Worker) addToSession(element Element) error {
 // 	switch args[0] {
 // 	case "addRight":
 // 		err := w.addRight(args[1], args[2], args[3])
-// 		if checkError(err) != nil {
+// 		if w.checkError(err) != nil {
 // 			return 0
 // 		}
 // 	case "exit":
