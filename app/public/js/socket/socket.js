@@ -147,7 +147,7 @@ function recover() {
                     }
 
                     if (data.hasOwnProperty('LogRecord')) {
-                        $("#logList").empty();
+                        //$("#logList").empty(); Leaving this commented for now, doesn't seem like I need this anymore.. 
                         const logs = data.LogRecord
                         for (var i = 0; i < logs.length; i++) {
                             if (!jobIDs.includes(logs[i].Job.JobID)) {
