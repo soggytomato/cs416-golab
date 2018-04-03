@@ -32,7 +32,7 @@ func main() {
 		Head: "element-0",
 		Next: 4}
 	session.CRDT["element-0"] = &Element{
-		SessionID: "element-0",
+		SessionID: "session-0",
 		ClientID: "client-0",
 		ID:       "element-0",
 		PrevID:   "",
@@ -40,7 +40,7 @@ func main() {
 		Text:     "a",
 		Deleted:  false}
 	session.CRDT["element-1"] = &Element{
-		SessionID: "element-0",
+		SessionID: "session-0",
 		ClientID: "client-0",
 		ID:       "element-1",
 		PrevID:   "element-0",
@@ -48,7 +48,7 @@ func main() {
 		Text:     "b",
 		Deleted:  false}
 	session.CRDT["element-2"] = &Element{
-		SessionID: "element-0",
+		SessionID: "session-0",
 		ClientID: "client-0",
 		ID:       "element-2",
 		PrevID:   "element-1",
