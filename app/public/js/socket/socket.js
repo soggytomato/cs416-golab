@@ -148,8 +148,10 @@ function recover() {
 
                     if (data.hasOwnProperty('LogRecord')) {
                         $("#logList").empty();
+                        
                         const logs = data.LogRecord
-                        for (var i = 0; i < logs.length; i++) {
+                        if (logs != null) {
+                            for (var i = 0; i < logs.length; i++) {
                             if (!jobIDs.includes(logs[i].Job.JobID)) {
                                 jobIDs.push(logs[i].Job.JobID);
                                 $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
@@ -164,6 +166,7 @@ function recover() {
                                     })(_log);
                                 }
                             }
+                        }
                         }
                     }
 
