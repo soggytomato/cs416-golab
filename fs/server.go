@@ -5,14 +5,15 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/rpc"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
-	"math/rand"
 
+	. "../lib/session"
 	. "../lib/types"
 )
 
@@ -132,7 +133,7 @@ func (s *Server) listenRPC() {
 		for {
 			conn, err := listener.Accept()
 			checkError(err)
-			s.logger.Println("New connection from "+conn.RemoteAddr().String())
+			s.logger.Println("New connection from " + conn.RemoteAddr().String())
 			go rpc.ServeConn(conn)
 		}
 	}()

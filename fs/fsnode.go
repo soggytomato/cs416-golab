@@ -3,18 +3,19 @@ package main
 // Usage: go run fsnode.go [server ip:port]
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/rpc"
 	"os"
-	"time"
-	"sync"
-	"encoding/gob"
-	"bytes"
 	"path"
-	"io/ioutil"
+	"sync"
+	"time"
 
+	. "../lib/session"
 	. "../lib/types"
 )
 

@@ -29,8 +29,6 @@ type Users struct {
 	AllUsernames []string `json:"AllUsernames"`
 }
 
-// TODO: Get rid of Globals!
-
 type AppServer struct {
 	LBConn          *rpc.Client
 	CurrentSessions []string
@@ -41,14 +39,14 @@ type AppServer struct {
 func main() {
 	appserver := new(AppServer)
 	appserver.logger = log.New(os.Stdout, "[AppServer] ", log.Lshortfile)
+
 	// Getting load balancer IP from cmd line argument
 	args := os.Args[1:]
-	if len(args) != 1 {
-		appserver.logger.Fatalln("Missing Args Usage: go run main.go [LBServer IP:Port]")
+	if len(args) != 2 {
+		appserver.logger.Fatalln("Missing Args Usage: go run main.go [LBServer IP:Port] [port]")
 	}
-
-	PORT := ":8080"
 	lbAddr := args[0]
+	PORT := ":" + args[1]
 	lbConn, err := rpc.Dial("tcp", lbAddr)
 	if err != nil {
 		appserver.logger.Fatalln("Couldn't connect to Load Balancer")

@@ -1,11 +1,14 @@
 // Globals
 debugMode = true;
-userID = "";
-sessionID = "";
-currentSessions = [];
-workerIP = '';
+recovering = false;
 
-$(document).ready(function(){
+workerIP = '';
+userID = '';
+sessionID = '';
+currentSessions = [];
+jobIDs = [];
+
+$(document).ready(function() {
     $('.input-wrapper').resizable({
         handles: 's',
         resize: function() {
@@ -79,32 +82,7 @@ function formBindings() {
     $('#register').submit(function(e) {
         e.preventDefault();
 
-        var valid = verifyRegister();
-
-        if (valid) {
-            $.ajax({
-                type: 'post',
-                url: '/register',
-                dataType: 'json',
-                data: $('#register').serialize(),
-                success: function(data) {
-                    if (data.WorkerIP.length == 0) {
-                        alert("No available Workers, please try again later")
-                    } else {
-                        workerIP = data.WorkerIP;
-
-                        initWS()
-
-                        $('.register').css('display', 'none');
-                        $('.editor').slideDown('slow');
-
-                        setTimeout(function() {
-                            editor.refresh();
-                        }, 500);
-                    }
-                }
-            })
-        }
+        if (verifyRegister()) register();
 
         return false;
     });
@@ -160,4 +138,105 @@ function verifyRegister() {
     }
 
     return valid;
+}
+
+function openEditor() {
+    $('.register-wrapper').css('display', 'none');
+    $('.editor').slideDown('slow');
+
+    setTimeout(function() {
+        editor.refresh()
+    }, 500);
+}
+
+function reset() {
+    $('.log-selected').removeClass('log-selected');
+
+    editor.setValue(CRDT.toSnippet());
+
+    $('#editArea').show();
+    setTimeout(function() {
+        editor.refresh()
+    }, 500);
+    $('#readOnlyArea').hide();
+
+    document.getElementById('outputBox').innerHTML = "";
+    document.getElementById("snipTitle").style.color = ''
+    document.getElementById('snipTitle').innerHTML = "Snippet:"
+}
+
+function execute() {
+    var newForm = document.createElement('form');
+    newForm.setAttribute('id', 'executeForm');
+    newForm.setAttribute('form', 'executeForm');
+
+    var sessInput = document.createElement('input');
+    sessInput.setAttribute('name', 'sessionID');
+    sessInput.setAttribute('value', sessionID);
+    sessInput.setAttribute('type', 'hidden');
+
+    var snippet = document.createElement('textarea');
+    snippet.setAttribute('name', 'snippet');
+    snippet.value = CRDT.toSnippet();
+    snippet.setAttribute('class', 'text');
+    snippet.setAttribute('form', 'executeForm');
+
+    newForm.append(sessInput);
+    newForm.append(snippet);
+    $("body").append(newForm);
+
+    $.ajax({
+        type: 'post',
+        url: "http://" + workerIP + '/execute',
+        dataType: 'json',
+        data: $('#executeForm').serialize(),
+        success: function(data) {
+            jobIDs.push(data.JobID);
+            $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
+        }
+    })
+    newForm.parentNode.removeChild(newForm);
+}
+
+function matchLog(log) {
+    if (log.Job.SessionID == sessionID) {
+        var isExist = false;
+        for (var i = 0; i < jobIDs.length; i++) {
+            if (jobIDs[i] == log.Job.JobID) {
+                isExist = true;
+                var logOutput = document.getElementById(log.Job.JobID);
+                logOutput.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    logClicked(log);
+                }, false);
+            }
+        }
+        if (!isExist) {
+            $("#logList").prepend("<li><a href=# id=" + log.Job.JobID + ">" + log.Job.JobID + "</a></li>")
+            var logOutput = document.getElementById(log.Job.JobID);
+            logOutput.addEventListener('click', function(e) {
+                e.preventDefault();
+                logClicked(log);
+            }, false);
+        }
+    }
+}
+
+function logClicked(log) {
+    $('.log-selected').removeClass('log-selected');
+    $('#' + log.Job.JobID).addClass('log-selected');
+
+    editor_readOnly.setValue(log.Job.Snippet);
+    editor_readOnly.setOption("readOnly", true);
+    setTimeout(function() {
+        editor_readOnly.refresh()
+    }, 500);
+
+    $('#editArea').hide();
+    $('#readOnlyArea').show();
+
+    str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
+    document.getElementById('outputBox').innerHTML = str;
+    document.getElementById("snipTitle").style.color = '#d00'
+    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
 }

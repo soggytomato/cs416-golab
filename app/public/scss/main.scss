@@ -1,6 +1,6 @@
 $background-color: #333;
-$title-color: cadetblue;
-$subtitle-color: #8c8c8c;
+$title-color: #76d99e;
+$subtitle-color: white;
 $grey-fill: rgba(95,98, 117, 0.5);
 $border-radius: 10px;
 
@@ -17,33 +17,34 @@ html { height: 100%; width: 100%; margin: 0;
 
 		.left, .right { height: inherit; }
 
-		.title 		{ float: right; }
+		.title 		{ float: left; }
 		.subtitle 	{ font-size: 20px; }
 
 		.logs, .output { background-color: $grey-fill; }
 
 		.input-wrapper { height: 75%; 
-			.input { height: 95%; }
+			.input { height: 95%; min-height: 150px; }
 		}
 
 		.output-wrapper { height: 25%;
-			.output { height: 89%; border-radius: $border-radius; }	
+			.output { height: 89%; border-radius: $border-radius; color: white; padding: 5px 10px; }	
 		}
 
 		.logs-wrapper { margin-top: .5rem; height: 82%;
-			.logs { height: 100%; border-radius: $border-radius; }
+			.logs { height: 100%; border-radius: $border-radius; color: cadetblue;
+				ul { display: inline-block; }
+			}
+			.log-selected { color: #d00; }
 		}
 
-		.execute, .share {
-			height: 50px;
-			border-radius: 5px;
-			width: 100%;
+		.execute { height: 50px; border-radius: 5px; width: 100%; }
+
+		.reset { float: right; height: 27px; margin-top: 7px; font-size: smaller; width: 77px;
+			img { width: 12px; margin-top: 3px; }
+			span { float: right; }
 		}
 
-		.CodeMirror {
-			height: 100%!important;
-			border-radius: $border-radius;
-		}
+		.CodeMirror { height: 100%!important; border-radius: $border-radius; }
 	}
 }
 
@@ -53,15 +54,16 @@ html { height: 100%; width: 100%; margin: 0;
 	font-family: Consolas, monaco, monospace;
 }
 
-.register { background-color: black; border-radius: $border-radius; margin-top: 15%;
+.register { background-color: rgba(220,220, 220, 0.19); border-radius: $border-radius; margin-top: 5%;
 	#submitForm { margin-bottom: 10px; }
 
 	.title { text-align: center; }
 }
 
+.logo {	width: 360px; margin-left: auto; display: block; margin-right: auto; }
+.gopher { width: 90px; position: relative; z-index: 10000; left: 92%; bottom: 140px; }
+
 label, .subtitle {
 	font-family: Consolas, monaco, monospace;
 	color: $subtitle-color;
 }
-
-
