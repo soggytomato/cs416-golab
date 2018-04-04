@@ -45,7 +45,7 @@ function getSessionAndUsernames() {
                     el.textContent = opt;
                     el.value = opt;
                     sessSelect.appendChild(el);
-                    currentSessions.push(opt)
+                    currentSessions.push(opt);
                 }
             }
             var userSelect = document.getElementById("userSelect");
