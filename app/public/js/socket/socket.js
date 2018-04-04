@@ -133,6 +133,7 @@ function recover() {
     getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
             alert("Lost worker connection! Please re-try later.")
+            setTimeout(recover(), 2000);
         } else {
             workerIP = data.WorkerIP;
 
@@ -140,6 +141,7 @@ function recover() {
                 type: 'get',
                 url: 'http://' + workerIP + '/recover?sessionID=' + sessionID,
                 success: function(data) {
+                    alert("Reconnected to Worker");
                     if (data != null && data.length > 0) {
                         data.Session.forEach(function(element) {
                             handleRemoteOperation(element);
