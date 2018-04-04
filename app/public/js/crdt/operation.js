@@ -6,11 +6,15 @@ RETURN = '\n';
 TAB = '\t';
 SPACE = ' ';
 EMPTY = '';
+RETURN_ESCAPE = '%0A';
 
 // Operation constants
 INPUT_OP = '+input';
 DELETE_OP = '+delete';
 PASTE_OP = 'paste';
+UNDO_OP = 'undo';
+REDO_OP = 'redo';
+CUT_OP = 'cut';
 IGNORE_OP = 'ignore';
 REMOTE_INPUT_OP = '+remote_input';
 REMOTE_DELETE_OP = '+remote_delete';
@@ -64,6 +68,11 @@ $(document).ready(function() {
         function(cm, change) {
             allowExecute = true;
             
+            if (escape(change.text[0]) == RETURN_ESCAPE) {
+                change.cancel();
+                return;
+            }
+            
             if (change.origin == IGNORE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
@@ -71,6 +80,20 @@ $(document).ready(function() {
                 handleBulkInput(change);
             } else if (change.origin == DELETE_OP && isBulk(change)) {
                 handleBulkDelete(change);
+            } else if ((change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP) && change.text.length == 1 && change.text[0] == EMPTY) {
+                if (isBulk(change)) {
+                    handleBulkDelete(change);
+                } else {
+                    changes.push(change);
+                    change.origin = DELETE_OP;
+                }
+            } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
+                if (isBulk(change)) {
+                    handleBulkInput(change);
+                } else {
+                    changes.push(change);
+                    change.origin = INPUT_OP;
+                }
             } else {
                 // Push to queue of changes
                 changes.push(change);
@@ -434,6 +457,13 @@ function handleBulkDelete(change) {
     Determines whether a change effects more than one element.
 */
 function isBulk(change) {
+    // More than one line
+    if (change.text.length > 1) return true;
+    
+    // One line with length greater than 1
+    if (change.text[0].length > 1) return true;
+
+    // By analysis of effected IDs
     return getEffectedIDs(change).length > 1;
 }
 
