@@ -149,6 +149,8 @@ func (w *Worker) sendLocalElements() error {
 
 		//w.getWorkers() // checks all workers, connects to more if needed
 		if len(w.localElements) > 0 {
+			success := false
+
 			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
 
 			request := new(WorkerRequest)
@@ -159,6 +161,8 @@ func (w *Worker) sendLocalElements() error {
 				isConnected := false
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
 				if isConnected {
+					success = true
+
 					workerCon.Call("Worker.ApplyIncomingElements", request, response)
 				} else {
 					w.logger.Println("Lost worker: ", workerAddr)
@@ -169,7 +173,10 @@ func (w *Worker) sendLocalElements() error {
 				}
 			}
 
-			w.ackElements()
+			if success {
+				w.ackElements()
+			}
+
 			w.localElements = nil
 		}
 	}
