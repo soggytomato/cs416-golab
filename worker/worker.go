@@ -168,6 +168,8 @@ func (w *Worker) sendLocalElements() error {
 					}
 				}
 			}
+
+			w.ackElements()
 			w.localElements = nil
 		}
 	}
@@ -611,9 +613,12 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 		}
 
 		w.addToSession(*element)
+	}
+}
 
-		// TODO remove because we will buffer the sends
-		w.sendToClients(*element)
+func (w *Worker) ackElements() {
+	for _, element := range w.localElements {
+		w.sendToClients(element)
 	}
 }
 
