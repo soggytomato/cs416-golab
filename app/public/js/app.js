@@ -168,7 +168,8 @@ function reset() {
 
 function execute() {
     if (!allowExecute) {
-        alert('Log already exists for this code! See last log or edit before attempting execute.');
+        alert('No edits observed since last execution! See last log.');
+
         return;
     } else {
         allowExecute = false;
@@ -248,6 +249,6 @@ function logClicked(log) {
 
     str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
     document.getElementById('outputBox').innerHTML = str;
-    document.getElementById("snipTitle").style.color = '#d00'
+    document.getElementById("snipTitle").style.color = '#dd7000'
     document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
 }

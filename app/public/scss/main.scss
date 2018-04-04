@@ -58,12 +58,17 @@ html {
                 height: 100%;
                 border-radius: $border-radius;
                 color: cadetblue;
+                overflow: scroll;
                 ul {
                     display: inline-block;
                 }
+
+                a {
+                    color: rgba(0, 255, 208, 0.5);
+                }
             }
             .log-selected {
-                color: #d00;
+                color: rgba(221, 112, 0, 1)!important;
             }
         }
         .execute {
