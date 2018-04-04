@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	. "../lib/session"
 	. "../lib/types"
 )
 

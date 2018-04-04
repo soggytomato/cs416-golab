@@ -15,6 +15,8 @@ import (
 
 	. "../lib/session"
 	. "../lib/types"
+
+	"github.com/DistributedClocks/GoVector/govec"
 )
 
 // The maximum time in milliseconds since the most recent heartbeat
@@ -33,6 +35,7 @@ type Server struct {
 	sessions *Sessions
 	logs     *Logs
 	index    *Index
+	golog    *govec.GoLog
 }
 
 // A map of node IDs to file system nodes.
@@ -102,6 +105,7 @@ func (s *Server) init() {
 	s.sessions = &Sessions{all: make(map[string]map[string]*FSNode)}
 	s.logs = &Logs{all: make(map[string]map[string]*FSNode)}
 	s.index = &Index{logs: make(map[string]map[string]bool)}
+	s.golog = govec.InitGoVector("FSServer", "FSServer")
 
 	rand.Seed(time.Now().Unix())
 }
@@ -147,42 +151,55 @@ func (s *Server) listenRPC() {
 // now has an outdated version).
 //
 func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
-	s.logger.Println("Saving session [" + session.ID + "] to node [" + node.nodeID + "]")
+	logMsg := "Saving session [" + session.ID + "] to node [" + node.nodeID + "]"
+	s.logger.Println(logMsg)
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = *session
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	ok := false
 	err := node.nodeConn.Call("FSNode.SaveSession", request, &ok)
 	checkError(err)
 
 	if ok {
 		s.sessions.addNode(session.ID, node)
-		s.logger.Println("Session [" + session.ID + "] saved")
+		logMsg = "Session [" + session.ID + "] saved"
 	} else {
 		s.sessions.removeNode(session.ID, node.nodeID)
-		s.logger.Println("Session [" + session.ID + "] could not be saved")
+		logMsg = "Session [" + session.ID + "] could not be saved"
 	}
+
+	s.logger.Println(logMsg)
+	s.golog.LogLocalEvent(logMsg)
 }
 
 // Attempts to retrieve a session from a specified node.
 //
 func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
-	s.logger.Println("Retrieving session [" + sessionID + "] from node [" + node.nodeID + "]")
+	logMsg := "Retrieving session [" + sessionID + "] from node [" + node.nodeID + "]"
+	s.logger.Println(logMsg)
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = sessionID
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	response := new(FSResponse)
 	err := node.nodeConn.Call("FSNode.GetSession", request, response)
 	checkError(err)
 
 	if len(response.Payload) == 0 {
-		s.logger.Println("Session [" + sessionID + "] could not be retrieved")
+		logMsg = "Session [" + sessionID + "] could not be retrieved"
+		s.logger.Println(logMsg)
+		s.golog.LogLocalEvent(logMsg)
 		return nil
 	} else {
-		s.logger.Println("Session [" + sessionID + "] retrieved")
+		logMsg = "Session [" + sessionID + "] retrieved"
+		s.logger.Println(logMsg)
 		session := response.Payload[0].(Session)
+		var ignored []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &ignored)
+
 		return &session
 	}
 }
@@ -247,42 +264,54 @@ func (s *Server) getLogs(sessionID string) []Log {
 // version).
 //
 func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
-	s.logger.Println("Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]")
+	logMsg := "Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]"
+	s.logger.Println(logMsg)
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = *_log
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	ok := false
 	err := node.nodeConn.Call("FSNode.SaveLog", request, &ok)
 	checkError(err)
 
 	if ok {
 		s.logs.addNode(_log.Job.JobID, node)
-		s.logger.Println("Log [" + _log.Job.JobID + "] saved")
+		logMsg = "Log [" + _log.Job.JobID + "] saved"
 	} else {
 		s.logs.removeNode(_log.Job.JobID, node.nodeID)
-		s.logger.Println("Log [" + _log.Job.JobID + "] could not be saved")
+		logMsg = "Log [" + _log.Job.JobID + "] could not be saved"
 	}
+
+	s.logger.Println(logMsg)
+	s.golog.LogLocalEvent(logMsg)
 }
 
 // Attempts to retrieve a log from a specified node.
 //
 func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
-	s.logger.Println("Retrieving log [" + jobID + "] from node [" + node.nodeID + "]")
+	logMsg := "Retrieving log [" + jobID + "] from node [" + node.nodeID + "]"
+	s.logger.Println(logMsg)
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = jobID
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	response := new(FSResponse)
 	err := node.nodeConn.Call("FSNode.GetLog", request, response)
 	checkError(err)
 
 	if len(response.Payload) == 0 {
-		s.logger.Println("Log [" + jobID + "] could not be retrieved")
+		logMsg = "Log [" + jobID + "] could not be retrieved"
+		s.logger.Println(logMsg)
+		s.golog.LogLocalEvent(logMsg)
 		return nil
 	} else {
-		s.logger.Println("Log [" + jobID + "] retrieved")
+		logMsg = "Log [" + jobID + "] retrieved"
+		s.logger.Println(logMsg)
 		_log := response.Payload[0].(Log)
+		var ignored []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &ignored)
 		return &_log
 	}
 }
