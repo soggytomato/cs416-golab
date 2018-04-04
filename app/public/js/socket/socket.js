@@ -141,7 +141,6 @@ function recover() {
                 type: 'get',
                 url: 'http://' + workerIP + '/recover?sessionID=' + sessionID,
                 success: function(data) {
-                    alert("Reconnected to Worker");
                     if (data != null && data.length > 0) {
                         data.Session.forEach(function(element) {
                             handleRemoteOperation(element);
