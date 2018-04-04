@@ -66,11 +66,13 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
+            allowExecute = true;
+            
             if (escape(change.text[0]) == RETURN_ESCAPE) {
                 change.cancel();
                 return;
             }
-
+            
             if (change.origin == IGNORE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 

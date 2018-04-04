@@ -13,13 +13,15 @@ html {
   html .editor {
     height: inherit;
     margin: 10px !important; }
-    html .editor .left, html .editor .right {
+    html .editor .left,
+    html .editor .right {
       height: inherit; }
     html .editor .title {
       float: left; }
     html .editor .subtitle {
       font-size: 20px; }
-    html .editor .logs, html .editor .output {
+    html .editor .logs,
+    html .editor .output {
       background-color: rgba(95, 98, 117, 0.5); }
     html .editor .input-wrapper {
       height: 75%; }
@@ -32,18 +34,22 @@ html {
         height: 89%;
         border-radius: 10px;
         color: white;
-        padding: 5px 10px; }
+        padding: 5px 10px;
+        overflow: scroll; }
     html .editor .logs-wrapper {
       margin-top: .5rem;
       height: 82%; }
       html .editor .logs-wrapper .logs {
         height: 100%;
         border-radius: 10px;
-        color: cadetblue; }
+        color: cadetblue;
+        overflow: scroll; }
         html .editor .logs-wrapper .logs ul {
           display: inline-block; }
+        html .editor .logs-wrapper .logs a {
+          color: rgba(0, 255, 208, 0.5); }
       html .editor .logs-wrapper .log-selected {
-        color: #d00; }
+        color: #dd7000 !important; }
     html .editor .execute {
       height: 50px;
       border-radius: 5px;
@@ -91,7 +97,8 @@ html {
   left: 92%;
   bottom: 140px; }
 
-label, .subtitle {
+label,
+.subtitle {
   font-family: Consolas, monaco, monospace;
   color: white; }
 

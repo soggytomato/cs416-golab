@@ -56,6 +56,7 @@ type Worker struct {
 	clientSessions   map[string][]string
 	logs             map[string]map[string]Log
 	localElements    []Element
+	elementsToAck    []Element
 	cache            *Cache
 }
 
@@ -149,6 +150,8 @@ func (w *Worker) sendLocalElements() error {
 
 		//w.getWorkers() // checks all workers, connects to more if needed
 		if len(w.localElements) > 0 {
+			success := false
+
 			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
 
 			request := new(WorkerRequest)
@@ -159,6 +162,8 @@ func (w *Worker) sendLocalElements() error {
 				isConnected := false
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
 				if isConnected {
+					success = true
+
 					workerCon.Call("Worker.ApplyIncomingElements", request, response)
 				} else {
 					w.logger.Println("Lost worker: ", workerAddr)
@@ -168,6 +173,13 @@ func (w *Worker) sendLocalElements() error {
 					}
 				}
 			}
+
+			if success {
+				w.ackElements()
+			} else {
+				w.elementsToAck = append(w.elementsToAck, w.localElements...)
+			}
+
 			w.localElements = nil
 		}
 	}
@@ -611,9 +623,19 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 		}
 
 		w.addToSession(*element)
+	}
+}
 
-		// TODO remove because we will buffer the sends
-		w.sendToClients(*element)
+func (w *Worker) ackElements() {
+	numAcks := len(w.elementsToAck)
+	for _, element := range w.elementsToAck {
+		w.sendToClients(element)
+	}
+
+	w.elementsToAck = w.elementsToAck[numAcks:]
+
+	for _, element := range w.localElements {
+		w.sendToClients(element)
 	}
 }
 

@@ -1,6 +1,7 @@
 // Globals
 debugMode = true;
 recovering = false;
+allowExecute = true;
 
 workerIP = '';
 userID = '';
@@ -168,6 +169,14 @@ function reset() {
 }
 
 function execute() {
+    if (!allowExecute) {
+        alert('No edits observed since last execution! See last log.');
+
+        return;
+    } else {
+        allowExecute = false;
+    }
+
     var newForm = document.createElement('form');
     newForm.setAttribute('id', 'executeForm');
     newForm.setAttribute('form', 'executeForm');
@@ -242,6 +251,6 @@ function logClicked(log) {
 
     str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
     document.getElementById('outputBox').innerHTML = str;
-    document.getElementById("snipTitle").style.color = '#d00'
+    document.getElementById("snipTitle").style.color = '#dd7000'
     document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
 }
