@@ -164,18 +164,20 @@ function initCRDT() {
 
             // Log Records Init 
             const logs = data.LogRecord
-            for (var i = 0; i < logs.length; i++) {
-                jobIDs.set(logs[i].Job.JobID, logs[i].Job.Done);
-                $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
-                if (logs[i].Job.Done) {
-                    var logOutput = document.getElementById(logs[i].Job.JobID);
-                    var _log = logs[i];
-                    (function(_log) {
-                        logOutput.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            logClicked(_log);
-                        }, false);
-                    })(_log);
+            if (logs != null) {
+                for (var i = 0; i < logs.length; i++) {
+                    jobIDs.set(logs[i].Job.JobID, logs[i].Job.Done);
+                    $("#logList").prepend("<li><a href=# id=" + logs[i].Job.JobID + ">" + logs[i].Job.JobID + "</a></li>")
+                    if (logs[i].Job.Done) {
+                        var logOutput = document.getElementById(logs[i].Job.JobID);
+                        var _log = logs[i];
+                        (function(_log) {
+                            logOutput.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                logClicked(_log);
+                            }, false);
+                        })(_log);
+                    }
                 }
             }
         }
