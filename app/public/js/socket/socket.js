@@ -1,5 +1,6 @@
 socket = undefined;
 unload = false;
+disconnectAlerted = false
 
 $(window).on('beforeunload', function(event) {
     unload = true;
@@ -132,14 +133,18 @@ function recover() {
 
     getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
-            alert("Lost worker connection! Please re-try later.")
-        } else {
+            recoverFail();
+
+            setTimeout(recover(), 2000);
+        } else {      
             workerIP = data.WorkerIP;
 
             $.ajax({
                 type: 'get',
                 url: 'http://' + workerIP + '/recover?sessionID=' + sessionID,
                 success: function(data) {
+                    recoverSuccess();
+
                     if (data != null && data.length > 0) {
                         data.Session.forEach(function(element) {
                             handleRemoteOperation(element);
@@ -171,9 +176,21 @@ function recover() {
                     initWS();
                 },
                 error: function() {
-                    alert("Lost worker connection! Please re-try later.")
+                    recoverFail();
                 }
             });
         }
     });
+}
+
+function recoverSuccess() {
+    alert("Worker connection re-established!");
+    disconnectAlerted = false;
+}
+
+function recoverFail(){
+    if (!disconnectAlerted) {
+        alert("Warning: Lost worker connection!\n Input operations will not be delivered until re-connected.")
+        disconnectAlerted = true;
+    }
 }
