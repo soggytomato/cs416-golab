@@ -58,6 +58,9 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
+            allowExecute = true;
+
+            if (change.origin == IGNORE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
             if (change.origin == PASTE_OP) {

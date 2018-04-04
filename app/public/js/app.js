@@ -1,6 +1,7 @@
 // Globals
 debugMode = true;
 recovering = false;
+allowExecute = true;
 
 workerIP = '';
 userID = '';
@@ -166,6 +167,13 @@ function reset() {
 }
 
 function execute() {
+    if (!allowExecute) {
+        alert('Log already exists for this code! See last log or edit before attempting execute.');
+        return;
+    } else {
+        allowExecute = false;
+    }
+
     var newForm = document.createElement('form');
     newForm.setAttribute('id', 'executeForm');
     newForm.setAttribute('form', 'executeForm');
