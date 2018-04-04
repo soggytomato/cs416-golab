@@ -183,7 +183,7 @@ func (f *FSNode) createDirectories() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 // <RPC METHODS>
 
-func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
+func (f *FSNode) SaveSession(request *FSRequest, response *FSResponse) (_ error) {
 	session := request.Payload[0].(Session)
 	logMsg := "Saving session [" + session.ID + "] to disk"
 
@@ -191,7 +191,6 @@ func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
 	var recbuf []byte
 	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
-	*ok = false
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(session)
@@ -214,10 +213,13 @@ func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
 	}
 
 	file.Sync()
-	*ok = true
+
 	logMsg = "Session [" + session.ID + "] saved"
 	f.logger.Println(logMsg)
-	f.golog.LogLocalEvent(logMsg)
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }
@@ -258,7 +260,7 @@ func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 	return
 }
 
-func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
+func (f *FSNode) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	_log := request.Payload[0].(Log)
 	logMsg := "Saving log [" + _log.Job.JobID + "] to disk"
 
@@ -266,7 +268,6 @@ func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
 	var recbuf []byte
 	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
-	*ok = false
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(_log)
@@ -288,10 +289,13 @@ func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
 	}
 
 	file.Sync()
-	*ok = true
+
 	logMsg = "Log [" + _log.Job.JobID + "] saved"
 	f.logger.Println(logMsg)
-	f.golog.LogLocalEvent(logMsg)
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }

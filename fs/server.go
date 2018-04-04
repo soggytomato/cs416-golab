@@ -158,20 +158,22 @@ func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = *session
 	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
-	ok := false
-	err := node.nodeConn.Call("FSNode.SaveSession", request, &ok)
+	response := new(FSResponse)
+	err := node.nodeConn.Call("FSNode.SaveSession", request, response)
 	checkError(err)
 
-	if ok {
+	if len(response.Payload) > 0 && response.Payload[0].(bool) {
 		s.sessions.addNode(session.ID, node)
 		logMsg = "Session [" + session.ID + "] saved"
+		s.logger.Println(logMsg)
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		s.sessions.removeNode(session.ID, node.nodeID)
 		logMsg = "Session [" + session.ID + "] could not be saved"
+		s.logger.Println(logMsg)
+		s.golog.LogLocalEvent(logMsg)
 	}
-
-	s.logger.Println(logMsg)
-	s.golog.LogLocalEvent(logMsg)
 }
 
 // Attempts to retrieve a session from a specified node.
@@ -271,20 +273,22 @@ func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = *_log
 	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
-	ok := false
-	err := node.nodeConn.Call("FSNode.SaveLog", request, &ok)
+	response := new(FSResponse)
+	err := node.nodeConn.Call("FSNode.SaveLog", request, response)
 	checkError(err)
 
-	if ok {
+	if len(response.Payload) > 0 && response.Payload[0].(bool) {
 		s.logs.addNode(_log.Job.JobID, node)
 		logMsg = "Log [" + _log.Job.JobID + "] saved"
+		s.logger.Println(logMsg)
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		s.logs.removeNode(_log.Job.JobID, node.nodeID)
 		logMsg = "Log [" + _log.Job.JobID + "] could not be saved"
+		s.logger.Println(logMsg)
+		s.golog.LogLocalEvent(logMsg)
 	}
-
-	s.logger.Println(logMsg)
-	s.golog.LogLocalEvent(logMsg)
 }
 
 // Attempts to retrieve a log from a specified node.
