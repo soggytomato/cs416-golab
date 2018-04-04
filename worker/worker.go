@@ -56,6 +56,7 @@ type Worker struct {
 	clientSessions   map[string][]string
 	logs             map[string]map[string]Log
 	localElements    []Element
+	elementsToAck    []Element
 	cache            *Cache
 }
 
@@ -175,6 +176,8 @@ func (w *Worker) sendLocalElements() error {
 
 			if success {
 				w.ackElements()
+			} else {
+				w.elementsToAck = append(w.elementsToAck, w.localElements...)
 			}
 
 			w.localElements = nil
@@ -624,6 +627,13 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 }
 
 func (w *Worker) ackElements() {
+	numAcks := len(w.elementsToAck)
+	for _, element := range w.elementsToAck {
+		w.sendToClients(element)
+	}
+
+	w.elementsToAck = w.elementsToAck[numAcks:]
+
 	for _, element := range w.localElements {
 		w.sendToClients(element)
 	}
