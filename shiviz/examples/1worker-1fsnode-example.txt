@@ -1,0 +1,122 @@
+TestWorker {"TestWorker":1}
+Initialization Complete
+TestWorker {"TestWorker":2}
+Saving session
+TestWorker {"TestWorker":3}
+Saving log
+TestWorker {"TestWorker":4}
+Getting log
+TestWorker {"TestWorker":5, "FSServer":11, "FSNode_isiVM":7}
+Got log
+TestWorker {"TestWorker":6, "FSServer":11, "FSNode_isiVM":7}
+Saving log
+TestWorker {"FSNode_isiVM":7, "TestWorker":7, "FSServer":11}
+Saving log
+TestWorker {"FSNode_isiVM":7, "TestWorker":8, "FSServer":11}
+Saving log
+TestWorker {"FSNode_isiVM":7, "TestWorker":9, "FSServer":11}
+Getting session
+TestWorker {"FSNode_isiVM":21, "TestWorker":10, "FSServer":30}
+Got session
+FSServer {"FSServer":1}
+Initialization Complete
+FSServer {"FSServer":2, "TestWorker":2}
+Saving session [session-0] to file system
+FSServer {"FSServer":3, "TestWorker":2}
+Saving session [session-0] to node [isiVM]
+FSServer {"FSServer":4, "TestWorker":2}
+Session [session-0] saved
+FSServer {"FSServer":5, "TestWorker":3}
+Saving log [job-0] to file system
+FSServer {"FSServer":6, "TestWorker":3}
+Saving log [job-0] to node [isiVM]
+FSServer {"FSServer":7, "TestWorker":3}
+Log [job-0] saved
+FSServer {"FSServer":8, "TestWorker":4}
+Retrieving log [job-0] from file system
+FSServer {"FSServer":9, "TestWorker":4}
+Retrieving log [job-0] from node [isiVM]
+FSServer {"FSServer":10, "TestWorker":4, "FSNode_isiVM":7}
+Log [job-0] retrieved
+FSServer {"FSNode_isiVM":7, "FSServer":11, "TestWorker":4}
+Sending log [job-0] to worker
+FSServer {"FSNode_isiVM":7, "FSServer":12, "TestWorker":6}
+Saving log [job-1] to file system
+FSServer {"FSServer":13, "TestWorker":6, "FSNode_isiVM":7}
+Saving log [job-1] to node [isiVM]
+FSServer {"FSServer":14, "TestWorker":7, "FSNode_isiVM":7}
+Saving log [job-2] to file system
+FSServer {"FSNode_isiVM":7, "FSServer":15, "TestWorker":7}
+Saving log [job-2] to node [isiVM]
+FSServer {"FSServer":16, "TestWorker":8, "FSNode_isiVM":7}
+Saving log [job-3] to file system
+FSServer {"TestWorker":8, "FSNode_isiVM":7, "FSServer":17}
+Saving log [job-3] to node [isiVM]
+FSServer {"FSServer":18, "TestWorker":8, "FSNode_isiVM":7}
+Log [job-1] saved
+FSServer {"TestWorker":8, "FSNode_isiVM":7, "FSServer":19}
+Log [job-2] saved
+FSServer {"FSServer":20, "TestWorker":8, "FSNode_isiVM":7}
+Log [job-3] saved
+FSServer {"FSServer":21, "TestWorker":9, "FSNode_isiVM":7}
+Retrieving session [session-0] from file system
+FSServer {"FSServer":22, "TestWorker":9, "FSNode_isiVM":7}
+Retrieving session [session-0] from node [isiVM]
+FSServer {"FSServer":23, "TestWorker":9, "FSNode_isiVM":15}
+Session [session-0] retrieved
+FSServer {"FSServer":24, "TestWorker":9, "FSNode_isiVM":15}
+Retrieving log [job-3] from node [isiVM]
+FSServer {"FSNode_isiVM":17, "FSServer":25, "TestWorker":9}
+Log [job-3] retrieved
+FSServer {"TestWorker":9, "FSNode_isiVM":17, "FSServer":26}
+Retrieving log [job-0] from node [isiVM]
+FSServer {"TestWorker":9, "FSNode_isiVM":19, "FSServer":27}
+Log [job-0] retrieved
+FSServer {"FSServer":28, "TestWorker":9, "FSNode_isiVM":19}
+Retrieving log [job-1] from node [isiVM]
+FSServer {"FSNode_isiVM":21, "FSServer":29, "TestWorker":9}
+Log [job-1] retrieved
+FSServer {"FSNode_isiVM":21, "FSServer":30, "TestWorker":9}
+Sending session [session-0] to worker
+FSNode_isiVM {"FSNode_isiVM":1}
+Initialization Complete
+FSNode_isiVM {"FSNode_isiVM":2, "FSServer":3, "TestWorker":2}
+Saving session [session-0] to disk
+FSNode_isiVM {"FSNode_isiVM":3, "FSServer":3, "TestWorker":2}
+Session [session-0] saved
+FSNode_isiVM {"FSNode_isiVM":4, "FSServer":6, "TestWorker":3}
+Saving log [job-0] to disk
+FSNode_isiVM {"FSNode_isiVM":5, "FSServer":6, "TestWorker":3}
+Log [job-0] saved
+FSNode_isiVM {"TestWorker":4, "FSNode_isiVM":6, "FSServer":9}
+Retrieving log [job-0] from disk
+FSNode_isiVM {"FSNode_isiVM":7, "FSServer":9, "TestWorker":4}
+Sending log [job-0] to server
+FSNode_isiVM {"TestWorker":6, "FSNode_isiVM":8, "FSServer":13}
+Saving log [job-1] to disk
+FSNode_isiVM {"TestWorker":6, "FSNode_isiVM":9, "FSServer":13}
+Log [job-1] saved
+FSNode_isiVM {"TestWorker":7, "FSNode_isiVM":10, "FSServer":15}
+Saving log [job-2] to disk
+FSNode_isiVM {"TestWorker":8, "FSNode_isiVM":11, "FSServer":17}
+Saving log [job-3] to disk
+FSNode_isiVM {"TestWorker":8, "FSNode_isiVM":12, "FSServer":17}
+Log [job-2] saved
+FSNode_isiVM {"TestWorker":8, "FSNode_isiVM":13, "FSServer":17}
+Log [job-3] saved
+FSNode_isiVM {"FSNode_isiVM":14, "FSServer":22, "TestWorker":9}
+Retrieving session [session-0] from disk
+FSNode_isiVM {"TestWorker":9, "FSNode_isiVM":15, "FSServer":22}
+Sending session [session-0] to server
+FSNode_isiVM {"TestWorker":9, "FSNode_isiVM":16, "FSServer":24}
+Retrieving log [job-3] from disk
+FSNode_isiVM {"TestWorker":9, "FSNode_isiVM":17, "FSServer":24}
+Sending log [job-3] to server
+FSNode_isiVM {"FSNode_isiVM":18, "FSServer":26, "TestWorker":9}
+Retrieving log [job-0] from disk
+FSNode_isiVM {"TestWorker":9, "FSNode_isiVM":19, "FSServer":26}
+Sending log [job-0] to server
+FSNode_isiVM {"FSNode_isiVM":20, "FSServer":28, "TestWorker":9}
+Retrieving log [job-1] from disk
+FSNode_isiVM {"TestWorker":9, "FSNode_isiVM":21, "FSServer":28}
+Sending log [job-1] to server

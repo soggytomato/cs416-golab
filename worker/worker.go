@@ -31,6 +31,7 @@ import (
 	. "../lib/session"
 	. "../lib/types"
 	"github.com/gorilla/websocket"
+	"github.com/DistributedClocks/GoVector/govec"
 )
 
 type WorkerInfo struct {
@@ -57,6 +58,7 @@ type Worker struct {
 	logs             map[string]map[string]Log
 	localElements    []Element
 	cache            *Cache
+	golog            *govec.GoLog
 }
 
 type LogSettings struct {
@@ -191,18 +193,25 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 func (w *Worker) saveModifiedSessionsToFS() {
 	var ignored bool
 	for sessionID, session := range w.modifiedSessions {
+		logMsg := "Saving session [" + sessionID + "] to file system"
+		w.logger.Println(logMsg)
+
 		request := new(FSRequest)
-		request.Payload = make([]interface{}, 1)
+		request.Payload = make([]interface{}, 2)
 		request.Payload[0] = session
+		request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+
 		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
-		if err != nil {
-			w.logger.Println("Failed to save session "+sessionID+" to FS server.\n", err)
-			break
+		if err == nil {
+			logMsg = "Session [" + sessionID + "] saved"
+			delete(w.modifiedSessions, sessionID)
+		} else {
+			w.logger.Println("saveModifiedSessionsToFS:", err)
+			logMsg = "Session [" + sessionID + "] could not be saved"
 		}
 
-		w.logger.Println("Saved session " + sessionID + " to FS server.")
-
-		delete(w.modifiedSessions, sessionID)
+		w.logger.Println(logMsg)
+		w.golog.LogLocalEvent(logMsg)
 	}
 }
 
@@ -210,18 +219,28 @@ func (w *Worker) saveModifiedSessionsToFS() {
 // using an ID it has not seen before. Worker stores a new Session locally and saves
 // it to the FS
 func (w *Worker) CreateNewSession(sessionID string, response *bool) error {
+	logMsg := "Saving session [" + sessionID + "] to file system"
+	w.logger.Println(logMsg)
+
 	request := new(FSRequest)
 	session := &Session{sessionID, make(map[string]*Element), "", 1}
 
 	w.sessions[sessionID] = session
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = w.sessions[sessionID]
+	request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+
 	var ignored bool
 	err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
-	if err != nil {
+	if err == nil {
+		logMsg = "Session [" + sessionID + "] saved"
+	} else {
 		w.logger.Println("CreateNewSession:", err)
+		logMsg = "Session [" + sessionID + "] could not be saved"
 	}
-	return nil
+
+	w.logger.Println(logMsg)
+	w.golog.LogLocalEvent(logMsg)
 }
 
 // If worker doesn't have Session, contact other workers/FS to load the Session
@@ -265,17 +284,29 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 
 	// If worker's neighbours cannot provide the session, contact the file server for the session
 	if w.sessions[sessionID] == nil {
+		logMsg := "Retrieving session [" + sessionID + "] from file system"
+		w.logger.Println(logMsg)
+
 		fsRequest := new(FSRequest)
 		fsResponse := new(FSResponse)
-		fsRequest.Payload = make([]interface{}, 1)
+		fsRequest.Payload = make([]interface{}, 2)
 		fsRequest.Payload[0] = sessionID
+		request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+
 		err := w.fsServerConn.Call("Server.GetSession", fsRequest, fsResponse)
 		if err != nil {
 			w.logger.Println("getSessionAndLogs:", err)
+			logMsg = "Session [" + sessionID + "] could not be retrieved"
+			w.logger.Println(logMsg)
+			w.golog.LogLocalEvent(logMsg)
 		} else {
+			logMsg = "Session [" + sessionID + "] retrieved"
+			w.logger.Println(logMsg)
 			session := fsResponse.Payload[0].(Session)
 			logs := fsResponse.Payload[1].([]Log)
-			w.logger.Println(logs)
+			var recbuf []byte
+			w.golog.UnpackReceive(logMsg, response.Payload[2].([]byte), &recbuf)
+
 			if _, exists := w.logs[sessionID]; exists {
 				for _, log := range logs {
 					w.logs[sessionID][log.Job.JobID] = log
@@ -372,6 +403,8 @@ func (w *Worker) registerWithLB() {
 	w.checkError(err)
 	w.settings = settings
 	w.workerID = settings.WorkerID
+	w.golog = govec.InitGoVector("Worker_" + w.workerID, "Worker_" + w.workerID)
+
 	go w.startHeartBeat()
 	w.logger.SetPrefix("[Worker: " + strconv.Itoa(w.workerID) + "] ")
 	w.loadBalancerConn = loadBalancerConn
@@ -576,9 +609,14 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		log.Job.JobID = jobID
 
 		// Save to FileSystem
+		logMsg := "Saving log [" + jobID + "] to file system"
+		w.logger.Println(logMsg)
+
 		request := new(FSRequest)
-		request.Payload = make([]interface{}, 1)
+		request.Payload = make([]interface{}, 2)
 		request.Payload[0] = log
+		request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+
 		var ignored bool
 		err = w.fsServerConn.Call("Server.SaveLog", request, &ignored)
 		w.checkError(err)
@@ -644,20 +682,31 @@ func (w *Worker) sendToClients(element Element) {
 func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
 	w.logger.Println("RunJob Request")
 	jobID := request.Payload[0].(string)
-	fsRequest := new(FSRequest)
-	fsRequest.Payload = make([]interface{}, 1)
-	fsRequest.Payload[0] = jobID
-	fsResponse := new(FSResponse)
 
 	// Gets log from File System
 	var log Log
 	for {
-		w.logger.Println("Trying to get Log: ", jobID)
+		logMsg := "Retrieving log [" + jobID + "] from file system"
+		w.logger.Println(logMsg)
+
+		fsRequest := new(FSRequest)
+		fsRequest.Payload = make([]interface{}, 2)
+		fsRequest.Payload[0] = jobID
+		fsRequest.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+		fsResponse := new(FSResponse)
+
 		err := w.fsServerConn.Call("Server.GetLog", fsRequest, fsResponse)
 		w.checkError(err)
 		if err == nil && len(fsResponse.Payload) > 0 {
+			logMsg = "Log [" + jobID + "] retrieved"
 			log = fsResponse.Payload[0].(Log)
+			var recbuf []byte
+			w.golog.UnpackReceive(logMsg, fsResponse.Payload[1].([]byte), &recbuf)
 			break
+		} else {
+			logMsg = "Log [" + jobID + "] could not be retrieved"
+			w.logger.Println(logMsg)
+			w.golog.LogLocalEvent(logMsg)
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
@@ -699,8 +748,16 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 			log.Output = sliceOutput(stderr.String(), fileName)
 		}
 		log.Job.Done = true
+
+		logMsg = "Saving log [" + jobID + "] to file system"
+		w.logger.Println(logMsg)
+
+		fsRequest := new(FSRequest)
+		fsRequest.Payload = make([]interface{}, 2)
+
 		var ignored bool
 		fsRequest.Payload[0] = log
+		fsRequest.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
 
 		// saves the log to File system
 		w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)

@@ -30,6 +30,8 @@ const HEARTBEAT_INTERVAL = 500
 // and logs, allowing for multiple FSNodes to be run from the same
 // directory.
 //
+// To avoid clutter, you can run cleanup.go to remove temporary files.
+//
 const TEMP_MODE = true
 
 type FSNode struct {
@@ -186,8 +188,8 @@ func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
 	logMsg := "Saving session [" + session.ID + "] to disk"
 
 	f.logger.Println(logMsg)
-	var ignored []byte
-	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &ignored)
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	*ok = false
 	var buffer bytes.Buffer
@@ -225,8 +227,8 @@ func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 	logMsg := "Retrieving session [" + sessionID + "] from disk"
 
 	f.logger.Println(logMsg)
-	var ignored []byte
-	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &ignored)
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	filePath := path.Join(f.sessionDir, sessionID)
 	sessionExists, err := checkFileOrDirectory(filePath)
@@ -248,6 +250,7 @@ func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 
 	logMsg = "Sending session [" + sessionID + "] to server"
 	f.logger.Println(logMsg)
+
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = *session
 	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
@@ -260,8 +263,8 @@ func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
 	logMsg := "Saving log [" + _log.Job.JobID + "] to disk"
 
 	f.logger.Println(logMsg)
-	var ignored []byte
-	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &ignored)
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	*ok = false
 	var buffer bytes.Buffer
@@ -298,8 +301,8 @@ func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	logMsg := "Retrieving log [" + jobID + "] from disk"
 
 	f.logger.Println(logMsg)
-	var ignored []byte
-	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &ignored)
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	filePath := path.Join(f.logDir, jobID)
 	logExists, err := checkFileOrDirectory(filePath)
@@ -320,6 +323,7 @@ func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 
 	logMsg = "Sending log [" + jobID + "] to server"
 	f.logger.Println(logMsg)
+
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = *_log
 	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})

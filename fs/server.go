@@ -197,8 +197,8 @@ func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
 		logMsg = "Session [" + sessionID + "] retrieved"
 		s.logger.Println(logMsg)
 		session := response.Payload[0].(Session)
-		var ignored []byte
-		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &ignored)
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 
 		return &session
 	}
@@ -310,8 +310,8 @@ func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
 		logMsg = "Log [" + jobID + "] retrieved"
 		s.logger.Println(logMsg)
 		_log := response.Payload[0].(Log)
-		var ignored []byte
-		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &ignored)
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 		return &_log
 	}
 }
@@ -344,7 +344,7 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 
 	if len(nodeID) == 0 {
 		now := time.Now().UnixNano()
-		nodeID = generateNodeID(16)
+		nodeID = generateNodeID(5)
 		node := &FSNode{
 			nodeID: nodeID,
 			nodeAddr: nodeAddr,
@@ -379,6 +379,11 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 //
 func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 	session := request.Payload[0].(Session)
+	logMsg := "Saving session [" + session.ID + "] to file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	nodes := s.nodes.getAll()
 	for _, node := range nodes {
@@ -398,15 +403,26 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 //
 func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) {
 	sessionID := request.Payload[0].(string)
+	logMsg := "Retrieving session [" + sessionID + "] from file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	nodes := s.sessions.get(sessionID)
 
 	for _, node := range nodes {
 		if isConnected(node) {
 			session := s.getSessionFromNode(sessionID, node)
 			if session != nil {
-				response.Payload = make([]interface{}, 2)
+				logMsg = "Sending session [" + sessionID + "] to worker"
+				s.logger.Println(logMsg)
+
+				response.Payload = make([]interface{}, 3)
 				response.Payload[0] = *session
 				response.Payload[1] = s.getLogs(sessionID)
+				response.Payload[2] = s.golog.PrepareSend(logMsg, []byte{})
+
 				break
 			} else {
 				s.sessions.removeNode(sessionID, node.nodeID)
@@ -422,6 +438,11 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 //
 func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
 	_log := request.Payload[0].(Log)
+	logMsg := "Saving log [" + _log.Job.JobID + "] to file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	nodes := s.nodes.getAll()
 	for _, node := range nodes {
@@ -441,10 +462,20 @@ func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
 //
 func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	jobID := request.Payload[0].(string)
+	logMsg := "Retrieving log [" + jobID + "] from file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	_log := s.getLog(jobID)
 	if _log != nil {
-		response.Payload = make([]interface{}, 1)
+		logMsg = "Sending log [" + jobID + "] to worker"
+		s.logger.Println(logMsg)
+
+		response.Payload = make([]interface{}, 2)
 		response.Payload[0] = *_log
+		response.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	}
 
 	return
