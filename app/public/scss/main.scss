@@ -1,69 +1,138 @@
 $background-color: #333;
 $title-color: #76d99e;
 $subtitle-color: white;
-$grey-fill: rgba(95,98, 117, 0.5);
+$grey-fill: rgba(95, 98, 117, 0.5);
 $border-radius: 10px;
+html {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    body {
+        height: 98%;
+        width: inherit;
+        overflow-y: hidden;
+        background-color: $background-color!important;
+    }
+    .btn-icon {
+        width: 30px;
+        float: left;
+    }
+    .editor {
+        height: inherit;
+        margin: 10px!important;
+        .left,
+        .right {
+            height: inherit;
+        }
+        .title {
+            float: left;
+        }
+        .subtitle {
+            font-size: 20px;
+        }
+        .logs,
+        .output {
+            background-color: $grey-fill;
+        }
+        .input-wrapper {
+            height: 75%;
+            .input {
+                height: 95%;
+                min-height: 150px;
+            }
+        }
+        .output-wrapper {
+            height: 25%;
+            .output {
+                height: 89%;
+                border-radius: $border-radius;
+                color: white;
+                padding: 5px 10px;
+                overflow: scroll;
+            }
+        }
+        .logs-wrapper {
+            margin-top: .5rem;
+            height: 82%;
+            .logs {
+                height: 100%;
+                border-radius: $border-radius;
+                color: cadetblue;
+                overflow: scroll;
+                ul {
+                    display: inline-block;
+                }
 
-html { height: 100%; width: 100%; margin: 0; 
-
-	body { height: 98%; width: inherit; 
-		overflow-y: hidden;
-		background-color: $background-color!important;
-	} 
-
-	.btn-icon { width: 30px; float: left; }
-
-	.editor { height: inherit; margin: 10px!important;
-
-		.left, .right { height: inherit; }
-
-		.title 		{ float: left; }
-		.subtitle 	{ font-size: 20px; }
-
-		.logs, .output { background-color: $grey-fill; }
-
-		.input-wrapper { height: 75%; 
-			.input { height: 95%; min-height: 150px; }
-		}
-
-		.output-wrapper { height: 25%;
-			.output { height: 89%; border-radius: $border-radius; color: white; padding: 5px 10px; }	
-		}
-
-		.logs-wrapper { margin-top: .5rem; height: 82%;
-			.logs { height: 100%; border-radius: $border-radius; color: cadetblue;
-				ul { display: inline-block; }
-			}
-			.log-selected { color: #d00; }
-		}
-
-		.execute { height: 50px; border-radius: 5px; width: 100%; }
-
-		.reset { float: right; height: 27px; margin-top: 7px; font-size: smaller; width: 77px;
-			img { width: 12px; margin-top: 3px; }
-			span { float:  right; }
-		}
-
-		.CodeMirror { height: 100%!important; border-radius: $border-radius; }
-	}
+                a {
+                    color: rgba(0, 255, 208, 0.5);
+                }
+            }
+            .log-selected {
+                color: rgba(221, 112, 0, 1)!important;
+            }
+        }
+        .execute {
+            height: 50px;
+            border-radius: 5px;
+            width: 100%;
+        }
+        .reset {
+            float: right;
+            height: 27px;
+            margin-top: 7px;
+            font-size: smaller;
+            width: 77px;
+            img {
+                width: 12px;
+                margin-top: 3px;
+            }
+            span {
+                float: right;
+            }
+        }
+        .CodeMirror {
+            height: 100%!important;
+            border-radius: $border-radius;
+        }
+    }
 }
 
 .title-text {
-	font-size: 50px;
-	color: $title-color;
-	font-family: Consolas, monaco, monospace;
+    font-size: 50px;
+    color: $title-color;
+    font-family: Consolas, monaco, monospace;
 }
 
-.register { background-color: rgba(220,220, 220, 0.19); border-radius: $border-radius; margin-top: 5%;
-	#submitForm { margin-bottom: 10px; }
-
-	.title { text-align: center; }
+.register {
+    background-color: rgba(220, 220, 220, 0.19);
+    border-radius: $border-radius;
+    margin-top: 5%;
+    #submitForm {
+        margin-bottom: 10px;
+    }
+    .title {
+        text-align: center;
+    }
 }
 
-.logo {	width: 250px; margin-left: auto; display: block; margin-right: auto; padding-top: 100px; }
-.gopher { width: 90px; position: relative; z-index: 10000; left: 92%; bottom: 140px; }
+.logo {
+    width: 250px;
+    margin-left: auto;
+    display: block;
+    margin-right: auto;
+    padding-top: 100px;
+}
 
-label, .subtitle {
-	font-family: Consolas, monaco, monospace;
-	color: $subtitle-color;
+.gopher {
+    width: 90px;
+    position: relative;
+    z-index: 10000;
+    left: 92%;
+    bottom: 140px;
+}
+
+label,
+.subtitle {
+    font-family: Consolas, monaco, monospace;
+    color: $subtitle-color;
 }
