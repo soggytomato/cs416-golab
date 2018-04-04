@@ -241,6 +241,8 @@ func (w *Worker) CreateNewSession(sessionID string, response *bool) error {
 
 	w.logger.Println(logMsg)
 	w.golog.LogLocalEvent(logMsg)
+
+	return nil
 }
 
 // If worker doesn't have Session, contact other workers/FS to load the Session
@@ -291,7 +293,7 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 		fsResponse := new(FSResponse)
 		fsRequest.Payload = make([]interface{}, 2)
 		fsRequest.Payload[0] = sessionID
-		request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+		fsRequest.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
 
 		err := w.fsServerConn.Call("Server.GetSession", fsRequest, fsResponse)
 		if err != nil {
@@ -403,7 +405,8 @@ func (w *Worker) registerWithLB() {
 	w.checkError(err)
 	w.settings = settings
 	w.workerID = settings.WorkerID
-	w.golog = govec.InitGoVector("Worker_" + w.workerID, "Worker_" + w.workerID)
+	logID := "Worker_" + strconv.Itoa(w.workerID)
+	w.golog = govec.InitGoVector(logID, logID)
 
 	go w.startHeartBeat()
 	w.logger.SetPrefix("[Worker: " + strconv.Itoa(w.workerID) + "] ")
@@ -749,7 +752,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 		}
 		log.Job.Done = true
 
-		logMsg = "Saving log [" + jobID + "] to file system"
+		logMsg := "Saving log [" + jobID + "] to file system"
 		w.logger.Println(logMsg)
 
 		fsRequest := new(FSRequest)
