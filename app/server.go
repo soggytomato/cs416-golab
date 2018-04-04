@@ -21,12 +21,9 @@ type SessionSettings struct {
 	SessID   string `json:"SessID"`
 }
 
-type Sessions struct {
+type SessionsAndUsers struct {
 	ExistingSessions []string `json:"ExistingSessions"`
-}
-
-type Users struct {
-	AllUsernames []string `json:"AllUsernames"`
+	AllUsernames     []string `json:"AllUsernames"`
 }
 
 type AppServer struct {
@@ -59,7 +56,6 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir("./public")))
 	http.HandleFunc("/register", appserver.RegisterHandler)
 	http.HandleFunc("/sessions", appserver.SessionHandler)
-	http.HandleFunc("/usernames", appserver.UsernameHandler)
 	appserver.logger.Println("Listening on: ", PORT)
 	http.ListenAndServe(PORT, nil)
 }
@@ -131,19 +127,10 @@ func (ap *AppServer) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 // Function to return current sessions to the browser for the user to choose from
 func (ap *AppServer) SessionHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		sessions := *new(Sessions)
-		sessions.ExistingSessions = ap.CurrentSessions
+		sessAndUsers := *new(SessionsAndUsers)
+		sessAndUsers.ExistingSessions = ap.CurrentSessions
+		sessAndUsers.AllUsernames = ap.AllUsernames
 		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		json.NewEncoder(w).Encode(sessions)
-	}
-}
-
-// Function to return any active or inactive username for the user to choose from
-func (ap *AppServer) UsernameHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		users := *new(Users)
-		users.AllUsernames = ap.AllUsernames
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-		json.NewEncoder(w).Encode(users)
+		json.NewEncoder(w).Encode(sessAndUsers)
 	}
 }
