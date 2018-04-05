@@ -646,9 +646,12 @@ func (w *Worker) sendToClients(element Element) {
 	for _, clientID := range w.clientSessions[sessionID] {
 		conn := w.clients[clientID]
 		err := conn.WriteJSON(element)
-		if err != nil {
-			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
-
+		if conn != nil {
+			if err != nil {
+				w.logger.Println("Failed to send message to client '"+clientID+"':", err)
+				clientsToDelete = append(clientsToDelete, clientID)
+			}
+		} else {
 			clientsToDelete = append(clientsToDelete, clientID)
 		}
 	}
@@ -747,10 +750,16 @@ func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 	}
 	//w.logs[log.Job.SessionID][log.Job.JobID] = log
 	//w.logs[log.Job.SessionID] = append(w.logs[log.Job.SessionID], log)
-	for _, clientConn := range w.clients {
-		err := clientConn.WriteJSON(log)
-		w.checkError(err)
+	var clientsToDelete []string
+	for clientID, clientConn := range w.clients {
+		if clientConn != nil {
+			err := clientConn.WriteJSON(log)
+			w.checkError(err)
+		} else {
+			clientsToDelete = append(clientsToDelete, clientID)
+		}
 	}
+	w.deleteClients(log.Job.SessionID, clientsToDelete)
 	return nil
 }
 
