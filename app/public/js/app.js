@@ -7,6 +7,7 @@ workerIP = '';
 userID = '';
 sessionID = '';
 currentSessions = [];
+currentUsers = [];
 jobIDs = new Map();
 
 $(document).ready(function() {
@@ -37,24 +38,27 @@ function getSessionAndUsernames() {
         url: '/sessions',
         success: function(data) {
             var sessSelect = document.getElementById("sessionSelect");
-            $("#sessionSelect").empty();
             for (var i = 0; i < data.ExistingSessions.length; i++) {
-                var opt = data.ExistingSessions[i];
-                var el = document.createElement("option");
-                el.textContent = opt;
-                el.value = opt;
-                sessSelect.appendChild(el);
+                if (!currentSessions.includes(data.ExistingSessions[i])) {
+                    var opt = data.ExistingSessions[i];
+                    var el = document.createElement("option");
+                    el.textContent = opt;
+                    el.value = opt;
+                    sessSelect.appendChild(el);
+                    currentSessions.push(opt);
+                }
             }
             var userSelect = document.getElementById("userSelect");
-            $("#userSelect").empty();
             for (var i = 0; i < data.AllUsernames.length; i++) {
-                var opt = data.AllUsernames[i];
-                var el = document.createElement("option");
-                el.textContent = opt;
-                el.value = opt;
-                userSelect.appendChild(el);
+                if (!currentUsers.includes(data.AllUsernames[i])) {
+                    var opt = data.AllUsernames[i];
+                    var el = document.createElement("option");
+                    el.textContent = opt;
+                    el.value = opt;
+                    userSelect.appendChild(el);
+                    currentUsers.push(opt);
+                }
             }
-            currentSessions = data.ExistingSessions
         }
     }).then(function() {
         setTimeout(getSessionAndUsernames, 2000);
