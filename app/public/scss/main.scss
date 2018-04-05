@@ -24,9 +24,11 @@ html {
         .right {
             height: inherit;
         }
+
         .title {
             float: left;
         }
+
         .subtitle {
             font-size: 20px;
         }
@@ -53,7 +55,7 @@ html {
         }
         .logs-wrapper {
             margin-top: .5rem;
-            height: 82%;
+            height: 65%;
             .logs {
                 height: 100%;
                 border-radius: $border-radius;
@@ -66,6 +68,10 @@ html {
                 a {
                     color: rgba(0, 255, 208, 0.5);
                 }
+
+                #logList {
+                    margin-top: 10px!important;
+                }
             }
             .log-selected {
                 color: rgba(221, 112, 0, 1)!important;
@@ -75,7 +81,23 @@ html {
             height: 50px;
             border-radius: 5px;
             width: 100%;
+            background-color: #494a54;
+            color: white;
         }
+
+        .execute:active {
+            background-color: rgba(0, 255, 208, 0.5);
+        }
+
+        #snipTitle {
+            padding-right: 10px;
+        }
+
+        .reset-icon {
+            width: 20px;
+            margin-bottom: 5px;
+        }
+
         .reset {
             float: right;
             height: 27px;
@@ -115,12 +137,21 @@ html {
     }
 }
 
-.logo {
+.logo-welcome {
     width: 250px;
     margin-left: auto;
     display: block;
     margin-right: auto;
     padding-top: 100px;
+}
+
+.logo-editor {
+    width: 150px;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    padding-top: 15px;
+    padding-bottom: 20px;
 }
 
 .gopher {

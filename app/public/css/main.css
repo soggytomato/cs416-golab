@@ -38,7 +38,7 @@ html {
         overflow: scroll; }
     html .editor .logs-wrapper {
       margin-top: .5rem;
-      height: 82%; }
+      height: 65%; }
       html .editor .logs-wrapper .logs {
         height: 100%;
         border-radius: 10px;
@@ -48,12 +48,23 @@ html {
           display: inline-block; }
         html .editor .logs-wrapper .logs a {
           color: rgba(0, 255, 208, 0.5); }
+        html .editor .logs-wrapper .logs #logList {
+          margin-top: 10px !important; }
       html .editor .logs-wrapper .log-selected {
         color: #dd7000 !important; }
     html .editor .execute {
       height: 50px;
       border-radius: 5px;
-      width: 100%; }
+      width: 100%;
+      background-color: #494a54;
+      color: white; }
+    html .editor .execute:active {
+      background-color: rgba(0, 255, 208, 0.5); }
+    html .editor #snipTitle {
+      padding-right: 10px; }
+    html .editor .reset-icon {
+      width: 20px;
+      margin-bottom: 5px; }
     html .editor .reset {
       float: right;
       height: 27px;
@@ -83,12 +94,20 @@ html {
   .register .title {
     text-align: center; }
 
-.logo {
+.logo-welcome {
   width: 250px;
   margin-left: auto;
   display: block;
   margin-right: auto;
   padding-top: 100px; }
+
+.logo-editor {
+  width: 150px;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+  padding-top: 15px;
+  padding-bottom: 20px; }
 
 .gopher {
   width: 90px;

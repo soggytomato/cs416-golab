@@ -164,8 +164,9 @@ function reset() {
     $('#readOnlyArea').hide();
 
     document.getElementById('outputBox').innerHTML = "";
-    document.getElementById("snipTitle").style.color = ''
-    document.getElementById('snipTitle').innerHTML = "Snippet:"
+    document.getElementById("snipTitle").style.color = '';
+    document.getElementById('snipTitle').innerHTML = "Snippet:";
+    $('.reset-btn').css('display', 'none');
 }
 
 function execute() {
@@ -237,6 +238,12 @@ function matchLog(log) {
 }
 
 function logClicked(log) {
+    if ($('#' + log.Job.JobID).hasClass('log-selected')) {
+        reset();
+
+        return;
+    }
+
     $('.log-selected').removeClass('log-selected');
     $('#' + log.Job.JobID).addClass('log-selected');
 
@@ -251,6 +258,8 @@ function logClicked(log) {
 
     str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
     document.getElementById('outputBox').innerHTML = str;
-    document.getElementById("snipTitle").style.color = '#dd7000'
-    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
+    document.getElementById("snipTitle").style.color = '#dd7000';
+    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY";
+
+    $('.reset-btn').css('display', 'inline');
 }
