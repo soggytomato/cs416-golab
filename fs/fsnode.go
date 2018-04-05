@@ -23,6 +23,7 @@ import (
 
 const NODE_ID_PATH = "nodeID"
 const HEARTBEAT_INTERVAL = 500
+const VERBOSE_LOG = false
 
 // Setting TEMP_MODE to true will turn off persistence for
 // file server nodes. It will attempt to connect to the server as a
@@ -187,7 +188,9 @@ func (f *FSNode) SaveSession(request *FSRequest, response *FSResponse) (_ error)
 	session := request.Payload[0].(Session)
 	logMsg := "Saving session [" + session.ID + "] to disk"
 
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 	var recbuf []byte
 	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
@@ -215,7 +218,9 @@ func (f *FSNode) SaveSession(request *FSRequest, response *FSResponse) (_ error)
 	file.Sync()
 
 	logMsg = "Session [" + session.ID + "] saved"
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = true
@@ -228,7 +233,9 @@ func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 	sessionID := request.Payload[0].(string)
 	logMsg := "Retrieving session [" + sessionID + "] from disk"
 
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 	var recbuf []byte
 	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
@@ -251,7 +258,9 @@ func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 	}
 
 	logMsg = "Sending session [" + sessionID + "] to server"
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = *session
@@ -264,7 +273,9 @@ func (f *FSNode) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	_log := request.Payload[0].(Log)
 	logMsg := "Saving log [" + _log.Job.JobID + "] to disk"
 
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 	var recbuf []byte
 	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
@@ -291,7 +302,9 @@ func (f *FSNode) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	file.Sync()
 
 	logMsg = "Log [" + _log.Job.JobID + "] saved"
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = true
@@ -304,7 +317,9 @@ func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	jobID := request.Payload[0].(string)
 	logMsg := "Retrieving log [" + jobID + "] from disk"
 
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 	var recbuf []byte
 	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
@@ -326,7 +341,9 @@ func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	}
 
 	logMsg = "Sending log [" + jobID + "] to server"
-	f.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
 
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = *_log

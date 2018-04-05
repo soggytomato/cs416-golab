@@ -23,6 +23,7 @@ import (
 // for a node to be considered disconnected.
 //
 const HEARTBEAT_INTERVAL = 2000
+const VERBOSE_LOG = false
 
 // nodes:    All known FS nodes, connected or not
 // sessions: All known sessions
@@ -152,7 +153,9 @@ func (s *Server) listenRPC() {
 //
 func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	logMsg := "Saving session [" + session.ID + "] to node [" + node.nodeID + "]"
-	s.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
 	request.Payload = make([]interface{}, 2)
@@ -162,25 +165,29 @@ func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
 	err := node.nodeConn.Call("FSNode.SaveSession", request, response)
 	checkError(err)
 
-	if len(response.Payload) > 0 && response.Payload[0].(bool) {
+	if len(response.Payload) > 0 {
 		s.sessions.addNode(session.ID, node)
 		logMsg = "Session [" + session.ID + "] saved"
-		s.logger.Println(logMsg)
 		var recbuf []byte
 		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		s.sessions.removeNode(session.ID, node.nodeID)
 		logMsg = "Session [" + session.ID + "] could not be saved"
-		s.logger.Println(logMsg)
 		s.golog.LogLocalEvent(logMsg)
+	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
 	}
 }
 
 // Attempts to retrieve a session from a specified node.
 //
-func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
+func (s *Server) getSessionFromNode(sessionID string, node *FSNode) (sess *Session) {
 	logMsg := "Retrieving session [" + sessionID + "] from node [" + node.nodeID + "]"
-	s.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
 	request.Payload = make([]interface{}, 2)
@@ -192,18 +199,21 @@ func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
 
 	if len(response.Payload) == 0 {
 		logMsg = "Session [" + sessionID + "] could not be retrieved"
-		s.logger.Println(logMsg)
 		s.golog.LogLocalEvent(logMsg)
-		return nil
+		sess = nil
 	} else {
 		logMsg = "Session [" + sessionID + "] retrieved"
-		s.logger.Println(logMsg)
 		session := response.Payload[0].(Session)
 		var recbuf []byte
 		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
-
-		return &session
+		sess = &session
 	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
+
+	return
 }
 
 // A helper function for retrieving a single log specified by the
@@ -267,7 +277,9 @@ func (s *Server) getLogs(sessionID string) []Log {
 //
 func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	logMsg := "Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]"
-	s.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
 	request.Payload = make([]interface{}, 2)
@@ -280,22 +292,26 @@ func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
 	if len(response.Payload) > 0 && response.Payload[0].(bool) {
 		s.logs.addNode(_log.Job.JobID, node)
 		logMsg = "Log [" + _log.Job.JobID + "] saved"
-		s.logger.Println(logMsg)
 		var recbuf []byte
 		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		s.logs.removeNode(_log.Job.JobID, node.nodeID)
 		logMsg = "Log [" + _log.Job.JobID + "] could not be saved"
-		s.logger.Println(logMsg)
 		s.golog.LogLocalEvent(logMsg)
+	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
 	}
 }
 
 // Attempts to retrieve a log from a specified node.
 //
-func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
+func (s *Server) getLogFromNode(jobID string, node *FSNode) (l *Log) {
 	logMsg := "Retrieving log [" + jobID + "] from node [" + node.nodeID + "]"
-	s.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
 	request.Payload = make([]interface{}, 2)
@@ -307,17 +323,21 @@ func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
 
 	if len(response.Payload) == 0 {
 		logMsg = "Log [" + jobID + "] could not be retrieved"
-		s.logger.Println(logMsg)
 		s.golog.LogLocalEvent(logMsg)
-		return nil
+		l = nil
 	} else {
 		logMsg = "Log [" + jobID + "] retrieved"
-		s.logger.Println(logMsg)
 		_log := response.Payload[0].(Log)
 		var recbuf []byte
 		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
-		return &_log
+		l = &_log
 	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
+
+	return
 }
 
 // </PRIVATE METHODS>
@@ -399,7 +419,9 @@ func (s *Server) SaveSession(request *FSRequest, response *FSResponse) (_ error)
 	}
 
 	logMsg = "Session [" + session.ID + "] save started"
-	s.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = true
@@ -427,7 +449,9 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 			session := s.getSessionFromNode(sessionID, node)
 			if session != nil {
 				logMsg = "Sending session [" + sessionID + "] to worker"
-				s.logger.Println(logMsg)
+				if VERBOSE_LOG {
+					s.logger.Println(logMsg)
+				}
 
 				response.Payload = make([]interface{}, 3)
 				response.Payload[0] = *session
@@ -467,7 +491,9 @@ func (s *Server) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	s.index.addLog(_log.Job.SessionID, _log.Job.JobID)
 
 	logMsg = "Log [" + _log.Job.SessionID + "] save started"
-	s.logger.Println(logMsg)
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = true
@@ -489,7 +515,9 @@ func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	_log := s.getLog(jobID)
 	if _log != nil {
 		logMsg = "Sending log [" + jobID + "] to worker"
-		s.logger.Println(logMsg)
+		if VERBOSE_LOG {
+			s.logger.Println(logMsg)
+		}
 
 		response.Payload = make([]interface{}, 2)
 		response.Payload[0] = *_log
