@@ -202,7 +202,6 @@ function execute() {
     $("body").append(newForm);
 
     recoverLog = $('#executeForm').serialize();
-    console.log(recoverLog);
     $.ajax({
         type: 'post',
         url: "http://" + workerIP + '/execute',
@@ -213,7 +212,6 @@ function execute() {
             //jobIDs.push(data.JobID);
             $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
             recoverLog = "";
-            console.log(recoverLog);
         }
     })
     newForm.parentNode.removeChild(newForm);
