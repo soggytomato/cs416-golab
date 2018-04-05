@@ -136,7 +136,7 @@ function recover() {
             recoverFail();
 
             setTimeout(recover(), 2000);
-        } else {      
+        } else {
             workerIP = data.WorkerIP;
 
             $.ajax({
@@ -173,6 +173,22 @@ function recover() {
                         }
                     }
 
+                    if (recoverLog) {
+                        $.ajax({
+                            type: 'post',
+                            url: "http://" + workerIP + '/execute',
+                            dataType: 'json',
+                            data: recoverLog,
+                            success: function(data) {
+                                jobIDs.set(data.JobID, false);
+                                //jobIDs.push(data.JobID);
+                                $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
+                                recoverLog = "";
+                                console.log(recoverLog);
+                            }
+                        })
+                    }
+
                     initWS();
                 },
                 error: function() {
@@ -188,7 +204,7 @@ function recoverSuccess() {
     disconnectAlerted = false;
 }
 
-function recoverFail(){
+function recoverFail() {
     if (!disconnectAlerted) {
         alert("Warning: Lost worker connection!\n Input operations will not be delivered until re-connected.")
         disconnectAlerted = true;
