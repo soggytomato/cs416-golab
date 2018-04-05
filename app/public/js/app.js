@@ -166,7 +166,6 @@ function reset() {
     document.getElementById('outputBox').innerHTML = "";
     document.getElementById("snipTitle").style.color = '';
     document.getElementById('snipTitle').innerHTML = "Snippet:";
-    $('.reset-btn').css('display', 'none');
 }
 
 function execute() {
@@ -260,6 +259,4 @@ function logClicked(log) {
     document.getElementById('outputBox').innerHTML = str;
     document.getElementById("snipTitle").style.color = '#dd7000';
     document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY";
-
-    $('.reset-btn').css('display', 'inline');
 }

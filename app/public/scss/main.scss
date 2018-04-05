@@ -88,8 +88,11 @@ html {
             padding-right: 10px;
         }
         .reset-icon {
-            width: 20px;
-            margin-bottom: 5px;
+            z-index: 10000;
+            position: fixed;
+            left: 94%;
+            top: 55px;
+            width: 40px;
         }
         .reset {
             float: right;
