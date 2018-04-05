@@ -381,7 +381,7 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 // Save a session to the file system. The file server will attempt to
 // save the session to all connected file system nodes.
 //
-func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
+func (s *Server) SaveSession(request *FSRequest, response *FSResponse) (_ error) {
 	session := request.Payload[0].(Session)
 	logMsg := "Saving session [" + session.ID + "] to file system"
 
@@ -397,6 +397,13 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 			s.sessions.removeNode(session.ID, node.nodeID)
 		}
 	}
+
+	logMsg = "Session [" + session.ID + "] save started"
+	s.logger.Println(logMsg)
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }
@@ -440,7 +447,7 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 // Save a log to the file system. The file server will attempt to save
 // the log to all connected file system nodes.
 //
-func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
+func (s *Server) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	_log := request.Payload[0].(Log)
 	logMsg := "Saving log [" + _log.Job.JobID + "] to file system"
 
@@ -458,6 +465,13 @@ func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
 	}
 
 	s.index.addLog(_log.Job.SessionID, _log.Job.JobID)
+
+	logMsg = "Log [" + _log.Job.SessionID + "] save started"
+	s.logger.Println(logMsg)
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }

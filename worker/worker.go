@@ -203,7 +203,6 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 }
 
 func (w *Worker) saveModifiedSessionsToFS() {
-	var ignored bool
 	for sessionID, session := range w.modifiedSessions {
 		logMsg := "Saving session [" + sessionID + "] to file system"
 		w.logger.Println(logMsg)
@@ -212,25 +211,28 @@ func (w *Worker) saveModifiedSessionsToFS() {
 		request.Payload = make([]interface{}, 2)
 		request.Payload[0] = session
 		request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+		response := new(FSResponse)
 
-		err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
-		if err == nil {
-			logMsg = "Session [" + sessionID + "] saved"
+		err := w.fsServerConn.Call("Server.SaveSession", request, response)
+		if err == nil && len(response.Payload) > 0 {
+			logMsg = "Session [" + sessionID + "] sent"
 			delete(w.modifiedSessions, sessionID)
+			w.logger.Println(logMsg)
+			var recbuf []byte
+			w.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 		} else {
 			w.logger.Println("saveModifiedSessionsToFS:", err)
-			logMsg = "Session [" + sessionID + "] could not be saved"
+			logMsg = "Session [" + sessionID + "] could not be sent"
+			w.logger.Println(logMsg)
+			w.golog.LogLocalEvent(logMsg)
 		}
-
-		w.logger.Println(logMsg)
-		w.golog.LogLocalEvent(logMsg)
 	}
 }
 
 // Load balancer calls CreateNewSession when it receives a request from a client
 // using an ID it has not seen before. Worker stores a new Session locally and saves
 // it to the FS
-func (w *Worker) CreateNewSession(sessionID string, response *bool) error {
+func (w *Worker) CreateNewSession(sessionID string, _ *bool) error {
 	logMsg := "Saving session [" + sessionID + "] to file system"
 	w.logger.Println(logMsg)
 
@@ -241,18 +243,20 @@ func (w *Worker) CreateNewSession(sessionID string, response *bool) error {
 	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = w.sessions[sessionID]
 	request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+	response := new(FSResponse)
 
-	var ignored bool
-	err := w.fsServerConn.Call("Server.SaveSession", request, &ignored)
-	if err == nil {
-		logMsg = "Session [" + sessionID + "] saved"
+	err := w.fsServerConn.Call("Server.SaveSession", request, response)
+	if err == nil && len(response.Payload) > 0 {
+		logMsg = "Session [" + sessionID + "] sent"
+		w.logger.Println(logMsg)
+		var recbuf []byte
+		w.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		w.logger.Println("CreateNewSession:", err)
-		logMsg = "Session [" + sessionID + "] could not be saved"
+		logMsg = "Session [" + sessionID + "] could not be sent"
+		w.logger.Println(logMsg)
+		w.golog.LogLocalEvent(logMsg)
 	}
-
-	w.logger.Println(logMsg)
-	w.golog.LogLocalEvent(logMsg)
 
 	return nil
 }
@@ -608,7 +612,6 @@ type test_struct struct {
 }
 
 func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
-
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
 		err := r.ParseForm()
@@ -631,10 +634,21 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		request.Payload = make([]interface{}, 2)
 		request.Payload[0] = log
 		request.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+		response := new(FSResponse)
 
-		var ignored bool
-		err = w.fsServerConn.Call("Server.SaveLog", request, &ignored)
-		w.checkError(err)
+		err = w.fsServerConn.Call("Server.SaveLog", request, response)
+		if err == nil && len(response.Payload) > 0 {
+			logMsg = "Log [" + jobID + "] sent"
+			w.logger.Println(logMsg)
+			var recbuf []byte
+			w.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
+		} else {
+			w.logger.Println("executeJob:", err)
+			logMsg = "Log [" + jobID + "] could not be sent"
+			w.logger.Println(logMsg)
+			w.golog.LogLocalEvent(logMsg)
+		}
+
 		// Sending back jobID
 		logSettings := *new(LogSettings)
 		logSettings.JobID = jobID
@@ -643,6 +657,7 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(wr).Encode(logSettings)
 
 		// Sending with go routine to not wait for return value
+		var ignored bool
 		go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
 	}
 
@@ -779,13 +794,24 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 
 		fsRequest := new(FSRequest)
 		fsRequest.Payload = make([]interface{}, 2)
-
-		var ignored bool
 		fsRequest.Payload[0] = log
 		fsRequest.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+		fsResponse := new(FSResponse)
 
 		// saves the log to File system
-		w.fsServerConn.Call("Server.SaveLog", fsRequest, &ignored)
+		err := w.fsServerConn.Call("Server.SaveLog", fsRequest, fsResponse)
+		if err == nil && len(fsResponse.Payload) > 0 {
+			logMsg = "Log [" + jobID + "] sent"
+			w.logger.Println(logMsg)
+			var recbuf []byte
+			w.golog.UnpackReceive(logMsg, fsResponse.Payload[1].([]byte), &recbuf)
+		} else {
+			w.logger.Println("executeJob:", err)
+			logMsg = "Log [" + jobID + "] could not be sent"
+			w.logger.Println(logMsg)
+			w.golog.LogLocalEvent(logMsg)
+		}
+
 		os.Remove(filePath)
 	}
 
