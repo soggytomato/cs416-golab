@@ -27,13 +27,10 @@
 <body>
     <div class="editor row" style="display:none">
         <div class="left col">
-            <span class="title title-text">GoLab</span>
+            <img src="img/logo.svg" class="logo-editor">
             <button type="button" onclick="execute()" class="btn btn-default btn-lg mb-2 execute">
               <img src="img/play-circle.svg" alt="play-circle" class="btn-icon"><span>Execute</span>
             </button>
-            <button type="button" onclick="reset()" class="btn btn-default btn-sm reset">
-                <img src="img/reload.svg" alt="play-circle" class="btn-icon"><span>Reset</span>
-              </button>
             <div class="logs-wrapper">
                 <span class="subtitle">Logs:</span>
                 <div class="logs">
@@ -43,12 +40,17 @@
         </div>
         <div class="right col-10">
             <div class="input-wrapper mr-1">
-                <span id="snipTitle" class="subtitle">Snippet:</span>
+                <div class="title-wrapper">
+                    <span id="snipTitle" class="subtitle">Snippet:</span>
+                </div>
                 <div class="mb-1 input" id="editArea">
                     <textarea id="code" name="code" style="display:none;"></textarea>
                     <img src="img/gopher-left.png" class="gopher">
                 </div>
                 <div class="mb-1 input" id="readOnlyArea" style="display:none;">
+                    <a href="javascript:reset()" class="reset-btn">
+                        <img class="reset-icon" src="img/action-undo.svg">
+                    </a>
                     <textarea id="code_readOnly" name="code_readOnly" style="display:none;"></textarea>
                     <img src="img/gopher-left.png" class="gopher">
                 </div>
@@ -62,7 +64,7 @@
     </div>
 
     <div class="register-wrapper">
-        <img src="img/logo.svg" class="logo">
+        <img src="img/logo.svg" class="logo-welcome">
         <div class="container register">
             <form id="register">
                 <!--method="POST" action="/register" -->
