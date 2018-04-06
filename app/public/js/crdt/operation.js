@@ -308,7 +308,8 @@ function handleRemoteInput(id, prevId, val) {
 
         prevElem.next = id;
     } else {
-        // WHAT THE FUCK DO I DO?!?!??!
+        nextElem = CRDT.head;
+        next = nextElem.id;
     }
 
     if (next !== undefined) {
