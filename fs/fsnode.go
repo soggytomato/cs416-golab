@@ -36,7 +36,7 @@ const VERBOSE_LOG = false
 //
 // To avoid clutter, run cleanup.go to remove temporary files.
 //
-const TEMP_MODE = true
+const TEMP_MODE = false
 
 type FSNode struct {
 	logger     *log.Logger

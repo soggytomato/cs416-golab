@@ -90,7 +90,7 @@ const ELEMENT_DELAY int = 2
 // Turn off AUTO_SAVE to disable auto saving of sessions to the file
 // system. This can be helpful for improving the comprehensibility of
 // ShiViz logs during certain workflows.
-const AUTO_SAVE bool = false
+const AUTO_SAVE bool = true
 
 const EXEC_DIR = "./execute"
 
