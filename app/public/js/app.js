@@ -9,6 +9,7 @@ sessionID = '';
 currentSessions = [];
 currentUsers = [];
 jobIDs = new Map();
+recoverLog = "";
 
 $(document).ready(function() {
     $('.input-wrapper').resizable({
@@ -168,8 +169,8 @@ function reset() {
     $('#readOnlyArea').hide();
 
     document.getElementById('outputBox').innerHTML = "";
-    document.getElementById("snipTitle").style.color = ''
-    document.getElementById('snipTitle').innerHTML = "Snippet:"
+    document.getElementById("snipTitle").style.color = '';
+    document.getElementById('snipTitle').innerHTML = "Snippet:";
 }
 
 function execute() {
@@ -200,6 +201,7 @@ function execute() {
     newForm.append(snippet);
     $("body").append(newForm);
 
+    recoverLog = $('#executeForm').serialize();
     $.ajax({
         type: 'post',
         url: "http://" + workerIP + '/execute',
@@ -209,6 +211,7 @@ function execute() {
             jobIDs.set(data.JobID, false);
             //jobIDs.push(data.JobID);
             $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
+            recoverLog = "";
         }
     })
     newForm.parentNode.removeChild(newForm);
@@ -241,6 +244,12 @@ function matchLog(log) {
 }
 
 function logClicked(log) {
+    if ($('#' + log.Job.JobID).hasClass('log-selected')) {
+        reset();
+
+        return;
+    }
+
     $('.log-selected').removeClass('log-selected');
     $('#' + log.Job.JobID).addClass('log-selected');
 
@@ -255,6 +264,6 @@ function logClicked(log) {
 
     str = log.Output.replace(/(?:\r\n|\r|\n)/g, '<br />');
     document.getElementById('outputBox').innerHTML = str;
-    document.getElementById("snipTitle").style.color = '#dd7000'
-    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY"
+    document.getElementById("snipTitle").style.color = '#dd7000';
+    document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY";
 }

@@ -158,22 +158,21 @@ func (w *Worker) sendLocalElements() error {
 		}
 
 		//w.getWorkers() // checks all workers, connects to more if needed
-		if len(w.localElements) > 0 {
-			success := false
+		if len(w.localElements) > 0 || len(w.elementsToAck) > 0 {
+			success := 0
 
 			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
 
 			request := new(WorkerRequest)
 			request.Payload = make([]interface{}, 1)
-			request.Payload[0] = w.localElements
+			request.Payload[0] = append(w.localElements, w.elementsToAck...)
 			response := new(WorkerResponse)
 			for workerAddr, workerCon := range w.workers {
 				isConnected := false
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
 				if isConnected {
-					success = true
-
 					workerCon.Call("Worker.ApplyIncomingElements", request, response)
+					success++
 				} else {
 					w.logger.Println("Lost worker: ", workerAddr)
 					delete(w.workers, workerAddr)
@@ -183,10 +182,9 @@ func (w *Worker) sendLocalElements() error {
 				}
 			}
 
-			if success {
+			// If the ACK elements sent to enough workers, we can ACK them
+			if success >= w.settings.MinNumWorkerConnections {
 				w.ackElements()
-			} else {
-				w.elementsToAck = append(w.elementsToAck, w.localElements...)
 			}
 
 			w.localElements = nil
@@ -202,8 +200,12 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 	elements := request.Payload[0].([]Element)
 	for _, element := range elements {
 		w.cache.Add(element)
-		w.addToSession(element)
-		w.sendToClients(element)
+
+		// Send to clients if we actually added to the CRDT
+		// if not, we already had it...
+		if w.addToSession(element) {
+			w.sendToClients(element)
+		}
 	}
 
 	return nil
@@ -705,41 +707,58 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 			w.logger.Println("Got element from "+userID+": ", element)
 		}
 
-		w.addToSession(*element)
+		if w.addToSession(*element) {
+			w.elementsToAck = append(w.elementsToAck, *element)
+
+			w.sendToClients(*element)
+		}
 	}
 }
 
 func (w *Worker) ackElements() {
 	numAcks := len(w.elementsToAck)
-	for _, element := range w.elementsToAck {
-		w.sendToClients(element)
+	for i := 0; i < numAcks; i++ {
+		element := w.elementsToAck[i]
+		clientID := element.ClientID
+
+		w.sendToClient(clientID, element)
 	}
 
 	w.elementsToAck = w.elementsToAck[numAcks:]
-
-	for _, element := range w.localElements {
-		w.sendToClients(element)
-	}
 }
 
 func (w *Worker) sendToClients(element Element) {
 	sessionID := element.SessionID
+	clientID := element.ClientID
 
-	var clientsToDelete []string
-	for _, clientID := range w.clientSessions[sessionID] {
-		conn := w.clients[clientID]
-		err := conn.WriteJSON(element)
-		if conn != nil {
-			if err != nil {
-				w.logger.Println("Failed to send message to client '"+clientID+"':", err)
-				clientsToDelete = append(clientsToDelete, clientID)
-			}
-		} else {
-			clientsToDelete = append(clientsToDelete, clientID)
+	for _, _clientID := range w.clientSessions[sessionID] {
+		if _clientID == clientID {
+			continue
 		}
+
+		w.sendToClient(_clientID, element)
+	}
+}
+
+func (w *Worker) sendToClient(clientID string, element Element) (sent bool, err error) {
+	sent = true
+
+	conn := w.clients[clientID]
+	if conn != nil {
+		err = conn.WriteJSON(element)
+		if err != nil {
+			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
+			sent = false
+		}
+	} else {
+		sent = false
 	}
 
-	w.deleteClients(sessionID, clientsToDelete)
+	if !sent || err != nil {
+		w.deleteClients(element.SessionID, []string{clientID})
+	}
+
+	return
 }
 
 // Runs a job called by the load balancer
@@ -959,16 +978,15 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 	return nil
 }
 
-func (w *Worker) addToSession(element Element) error {
+func (w *Worker) addToSession(element Element) (processed bool) {
 	_element := element
 
 	sessionID := element.SessionID
 	session := w.sessions[sessionID]
 	if session == nil {
-		return nil
+		return false
 	}
 
-	var processed bool = false
 	if element.Deleted == true {
 		processed = session.Delete(element)
 	} else {
@@ -980,7 +998,7 @@ func (w *Worker) addToSession(element Element) error {
 		w.localElements = append(w.localElements, _element)
 	}
 
-	return nil
+	return
 }
 
 //****POC CODE***//
