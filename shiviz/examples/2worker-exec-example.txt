@@ -1,0 +1,170 @@
+Worker_0 {"Worker_0":1}
+Initialization Complete
+Worker_0 {"Worker_0":2}
+Saving session [newSession] to file system
+Worker_0 {"Worker_0":3, "FSServer":3}
+Session [newSession] sent
+Worker_0 {"Worker_0":4, "FSServer":3}
+Saving log [newSession20180405194604] to file system
+Worker_0 {"Worker_0":5, "FSServer":7, "FSNode_fJ8GO":3}
+Log [newSession20180405194604] sent
+Worker_0 {"FSNode_fJ8GO":3, "Worker_0":6, "FSServer":7}
+Sending job [newSession20180405194604] to load balancer
+Worker_0 {"FSNode_fJ8GO":7, "Worker_0":7, "FSServer":15, "Worker_1":7, "LBServer":5}
+Received log [newSession20180405194604] from load balancer
+Worker_0 {"FSNode_fJ8GO":7, "Worker_0":8, "FSServer":15, "Worker_1":7, "LBServer":5}
+Log [newSession20180405194604] sent to clients
+Worker_0 {"Worker_1":7, "LBServer":7, "FSNode_fJ8GO":7, "Worker_0":9, "FSServer":15}
+Job [newSession20180405194604] sent and finished
+Worker_0 {"FSNode_fJ8GO":7, "Worker_0":10, "FSServer":15, "Worker_1":7, "LBServer":7}
+Saving log [newSession20180405194609] to file system
+Worker_0 {"FSServer":19, "Worker_1":7, "LBServer":7, "FSNode_fJ8GO":9, "Worker_0":11}
+Log [newSession20180405194609] sent
+Worker_0 {"LBServer":7, "FSNode_fJ8GO":9, "Worker_0":12, "FSServer":19, "Worker_1":7}
+Sending job [newSession20180405194609] to load balancer
+Worker_0 {"Worker_0":13, "FSServer":27, "Worker_1":15, "LBServer":13, "FSNode_fJ8GO":13}
+Job [newSession20180405194609] sent and finished
+Worker_1 {"Worker_1":1}
+Initialization Complete
+Worker_1 {"Worker_1":2, "FSServer":7, "FSNode_fJ8GO":3, "LBServer":3, "Worker_0":6}
+Running job [newSession20180405194604]
+Worker_1 {"Worker_1":3, "FSServer":7, "FSNode_fJ8GO":3, "LBServer":3, "Worker_0":6}
+Retrieving log [newSession20180405194604] from file system
+Worker_1 {"LBServer":3, "Worker_0":6, "Worker_1":4, "FSServer":13, "FSNode_fJ8GO":7}
+Log [newSession20180405194604] retrieved
+Worker_1 {"FSNode_fJ8GO":7, "LBServer":3, "Worker_0":6, "Worker_1":5, "FSServer":13}
+Saving log [newSession20180405194604] to file system
+Worker_1 {"LBServer":3, "Worker_0":6, "Worker_1":6, "FSServer":15, "FSNode_fJ8GO":7}
+Log [newSession20180405194604] sent
+Worker_1 {"LBServer":3, "Worker_0":6, "Worker_1":7, "FSServer":15, "FSNode_fJ8GO":7}
+Job [newSession20180405194604] finished
+Worker_1 {"Worker_1":8, "FSServer":19, "FSNode_fJ8GO":9, "LBServer":9, "Worker_0":12}
+Running job [newSession20180405194609]
+Worker_1 {"Worker_0":12, "Worker_1":9, "FSServer":19, "FSNode_fJ8GO":9, "LBServer":9}
+Retrieving log [newSession20180405194609] from file system
+Worker_1 {"FSServer":25, "FSNode_fJ8GO":13, "LBServer":9, "Worker_0":12, "Worker_1":10}
+Log [newSession20180405194609] retrieved
+Worker_1 {"Worker_1":11, "FSServer":25, "FSNode_fJ8GO":13, "LBServer":9, "Worker_0":12}
+Saving log [newSession20180405194609] to file system
+Worker_1 {"FSServer":27, "FSNode_fJ8GO":13, "LBServer":9, "Worker_0":12, "Worker_1":12}
+Log [newSession20180405194609] sent
+Worker_1 {"FSNode_fJ8GO":13, "LBServer":9, "Worker_0":12, "Worker_1":13, "FSServer":27}
+Job [newSession20180405194609] finished
+Worker_1 {"FSServer":27, "FSNode_fJ8GO":13, "LBServer":11, "Worker_0":12, "Worker_1":14}
+Received log [newSession20180405194609] from load balancer
+Worker_1 {"Worker_1":15, "FSServer":27, "FSNode_fJ8GO":13, "LBServer":11, "Worker_0":12}
+Log [newSession20180405194609] sent to clients
+LBServer {"LBServer":1}
+Initialization Complete
+LBServer {"LBServer":2, "Worker_0":6, "FSServer":7, "FSNode_fJ8GO":3}
+Got job [newSession20180405194604] from worker [0]
+LBServer {"FSNode_fJ8GO":3, "LBServer":3, "Worker_0":6, "FSServer":7}
+Running job [newSession20180405194604] at worker [1]
+LBServer {"FSNode_fJ8GO":7, "LBServer":4, "Worker_0":6, "FSServer":15, "Worker_1":7}
+Job [newSession20180405194604] finished
+LBServer {"Worker_1":7, "FSNode_fJ8GO":7, "LBServer":5, "Worker_0":6, "FSServer":15}
+Sending log [newSession20180405194604] at worker [0]
+LBServer {"Worker_0":8, "FSServer":15, "Worker_1":7, "FSNode_fJ8GO":7, "LBServer":6}
+Log [newSession20180405194604] sent
+LBServer {"FSNode_fJ8GO":7, "LBServer":7, "Worker_0":8, "FSServer":15, "Worker_1":7}
+Job [newSession20180405194604] complete
+LBServer {"Worker_0":12, "FSServer":19, "Worker_1":7, "FSNode_fJ8GO":9, "LBServer":8}
+Got job [newSession20180405194609] from worker [0]
+LBServer {"FSServer":19, "Worker_1":7, "FSNode_fJ8GO":9, "LBServer":9, "Worker_0":12}
+Running job [newSession20180405194609] at worker [1]
+LBServer {"LBServer":10, "Worker_0":12, "FSServer":27, "Worker_1":13, "FSNode_fJ8GO":13}
+Job [newSession20180405194609] finished
+LBServer {"Worker_0":12, "FSServer":27, "Worker_1":13, "FSNode_fJ8GO":13, "LBServer":11}
+Sending log [newSession20180405194609] at worker [1]
+LBServer {"Worker_1":15, "FSNode_fJ8GO":13, "LBServer":12, "Worker_0":12, "FSServer":27}
+Log [newSession20180405194609] sent
+LBServer {"Worker_1":15, "FSNode_fJ8GO":13, "LBServer":13, "Worker_0":12, "FSServer":27}
+Job [newSession20180405194609] complete
+FSServer {"FSServer":1}
+Initialization Complete
+FSServer {"FSServer":2, "Worker_0":2}
+Saving session [newSession] to file system
+FSServer {"Worker_0":2, "FSServer":3}
+Session [newSession] save started
+FSServer {"FSServer":4, "Worker_0":2}
+Saving session [newSession] to node [fJ8GO]
+FSServer {"FSServer":5, "Worker_0":2, "FSNode_fJ8GO":3}
+Session [newSession] saved
+FSServer {"Worker_0":4, "FSNode_fJ8GO":3, "FSServer":6}
+Saving log [newSession20180405194604] to file system
+FSServer {"FSServer":7, "Worker_0":4, "FSNode_fJ8GO":3}
+Log [newSession] save started
+FSServer {"FSNode_fJ8GO":3, "FSServer":8, "Worker_0":4}
+Saving log [newSession20180405194604] to node [fJ8GO]
+FSServer {"FSServer":9, "Worker_0":4, "FSNode_fJ8GO":5}
+Log [newSession20180405194604] saved
+FSServer {"Worker_0":6, "FSNode_fJ8GO":5, "Worker_1":3, "LBServer":3, "FSServer":10}
+Retrieving log [newSession20180405194604] from file system
+FSServer {"Worker_1":3, "LBServer":3, "FSServer":11, "Worker_0":6, "FSNode_fJ8GO":5}
+Retrieving log [newSession20180405194604] from node [fJ8GO]
+FSServer {"FSNode_fJ8GO":7, "Worker_1":3, "LBServer":3, "FSServer":12, "Worker_0":6}
+Log [newSession20180405194604] retrieved
+FSServer {"FSServer":13, "Worker_0":6, "FSNode_fJ8GO":7, "Worker_1":3, "LBServer":3}
+Sending log [newSession20180405194604] to worker
+FSServer {"Worker_0":6, "FSNode_fJ8GO":7, "Worker_1":5, "LBServer":3, "FSServer":14}
+Saving log [newSession20180405194604] to file system
+FSServer {"FSServer":15, "Worker_0":6, "FSNode_fJ8GO":7, "Worker_1":5, "LBServer":3}
+Log [newSession] save started
+FSServer {"FSServer":16, "Worker_0":6, "FSNode_fJ8GO":7, "Worker_1":5, "LBServer":3}
+Saving log [newSession20180405194604] to node [fJ8GO]
+FSServer {"LBServer":3, "FSServer":17, "Worker_0":6, "FSNode_fJ8GO":9, "Worker_1":5}
+Log [newSession20180405194604] saved
+FSServer {"FSNode_fJ8GO":9, "Worker_1":7, "LBServer":7, "FSServer":18, "Worker_0":10}
+Saving log [newSession20180405194609] to file system
+FSServer {"Worker_0":10, "FSNode_fJ8GO":9, "Worker_1":7, "LBServer":7, "FSServer":19}
+Log [newSession] save started
+FSServer {"Worker_0":10, "FSNode_fJ8GO":9, "Worker_1":7, "LBServer":7, "FSServer":20}
+Saving log [newSession20180405194609] to node [fJ8GO]
+FSServer {"LBServer":7, "FSServer":21, "Worker_0":10, "FSNode_fJ8GO":11, "Worker_1":7}
+Log [newSession20180405194609] saved
+FSServer {"FSServer":22, "Worker_0":12, "FSNode_fJ8GO":11, "Worker_1":9, "LBServer":9}
+Retrieving log [newSession20180405194609] from file system
+FSServer {"FSNode_fJ8GO":11, "Worker_1":9, "LBServer":9, "FSServer":23, "Worker_0":12}
+Retrieving log [newSession20180405194609] from node [fJ8GO]
+FSServer {"FSServer":24, "Worker_0":12, "FSNode_fJ8GO":13, "Worker_1":9, "LBServer":9}
+Log [newSession20180405194609] retrieved
+FSServer {"LBServer":9, "FSServer":25, "Worker_0":12, "FSNode_fJ8GO":13, "Worker_1":9}
+Sending log [newSession20180405194609] to worker
+FSServer {"FSServer":26, "Worker_0":12, "FSNode_fJ8GO":13, "Worker_1":11, "LBServer":9}
+Saving log [newSession20180405194609] to file system
+FSServer {"Worker_1":11, "LBServer":9, "FSServer":27, "Worker_0":12, "FSNode_fJ8GO":13}
+Log [newSession] save started
+FSServer {"Worker_1":11, "LBServer":9, "FSServer":28, "Worker_0":12, "FSNode_fJ8GO":13}
+Saving log [newSession20180405194609] to node [fJ8GO]
+FSServer {"Worker_0":12, "FSNode_fJ8GO":15, "Worker_1":11, "LBServer":9, "FSServer":29}
+Log [newSession20180405194609] saved
+FSNode_fJ8GO {"FSNode_fJ8GO":1}
+Initialization Complete
+FSNode_fJ8GO {"FSNode_fJ8GO":2, "Worker_0":2, "FSServer":4}
+Saving session [newSession] to disk
+FSNode_fJ8GO {"FSNode_fJ8GO":3, "Worker_0":2, "FSServer":4}
+Session [newSession] saved
+FSNode_fJ8GO {"FSNode_fJ8GO":4, "Worker_0":4, "FSServer":8}
+Saving log [newSession20180405194604] to disk
+FSNode_fJ8GO {"FSNode_fJ8GO":5, "Worker_0":4, "FSServer":8}
+Log [newSession20180405194604] saved
+FSNode_fJ8GO {"FSServer":11, "FSNode_fJ8GO":6, "Worker_0":6, "Worker_1":3, "LBServer":3}
+Retrieving log [newSession20180405194604] from disk
+FSNode_fJ8GO {"FSServer":11, "FSNode_fJ8GO":7, "Worker_0":6, "Worker_1":3, "LBServer":3}
+Sending log [newSession20180405194604] to server
+FSNode_fJ8GO {"LBServer":3, "FSServer":16, "FSNode_fJ8GO":8, "Worker_0":6, "Worker_1":5}
+Saving log [newSession20180405194604] to disk
+FSNode_fJ8GO {"FSServer":16, "FSNode_fJ8GO":9, "Worker_0":6, "Worker_1":5, "LBServer":3}
+Log [newSession20180405194604] saved
+FSNode_fJ8GO {"Worker_1":7, "LBServer":7, "FSServer":20, "FSNode_fJ8GO":10, "Worker_0":10}
+Saving log [newSession20180405194609] to disk
+FSNode_fJ8GO {"Worker_0":10, "Worker_1":7, "LBServer":7, "FSServer":20, "FSNode_fJ8GO":11}
+Log [newSession20180405194609] saved
+FSNode_fJ8GO {"FSNode_fJ8GO":12, "Worker_0":12, "Worker_1":9, "LBServer":9, "FSServer":23}
+Retrieving log [newSession20180405194609] from disk
+FSNode_fJ8GO {"FSNode_fJ8GO":13, "Worker_0":12, "Worker_1":9, "LBServer":9, "FSServer":23}
+Sending log [newSession20180405194609] to server
+FSNode_fJ8GO {"FSNode_fJ8GO":14, "Worker_0":12, "Worker_1":11, "LBServer":9, "FSServer":28}
+Saving log [newSession20180405194609] to disk
+FSNode_fJ8GO {"FSNode_fJ8GO":15, "Worker_0":12, "Worker_1":11, "LBServer":9, "FSServer":28}
+Log [newSession20180405194609] saved

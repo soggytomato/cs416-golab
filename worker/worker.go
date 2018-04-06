@@ -87,6 +87,11 @@ func (e NoCRDTError) Error() string {
 const TIME_BUFFER int = 500
 const ELEMENT_DELAY int = 2
 
+// Turn off AUTO_SAVE to disable auto saving of sessions to the file
+// system. This can be helpful for improving the comprehensibility of
+// ShiViz logs during certain workflows.
+const AUTO_SAVE bool = false
+
 const EXEC_DIR = "./execute"
 
 func main() {
@@ -148,7 +153,9 @@ func (w *Worker) sendLocalElements() error {
 	for {
 		time.Sleep(time.Second * time.Duration(ELEMENT_DELAY))
 
-		w.saveModifiedSessionsToFS()
+		if AUTO_SAVE {
+			w.saveModifiedSessionsToFS()
+		}
 
 		//w.getWorkers() // checks all workers, connects to more if needed
 		if len(w.localElements) > 0 {
@@ -657,10 +664,30 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(wr).Encode(logSettings)
 
 		// Sending with go routine to not wait for return value
-		var ignored bool
-		go w.loadBalancerConn.Call("LBServer.NewJob", jobID, &ignored)
-	}
+		go func() {
+			logMsg = "Sending job [" + jobID + "] to load balancer"
+			w.logger.Println(logMsg)
 
+			wrequest := new(WorkerRequest)
+			wrequest.Payload = make([]interface{}, 3)
+			wrequest.Payload[0] = jobID
+			wrequest.Payload[1] = strconv.Itoa(w.workerID)
+			wrequest.Payload[2] = w.golog.PrepareSend(logMsg, []byte{})
+			wresponse := new(WorkerResponse)
+
+			err = w.loadBalancerConn.Call("LBServer.NewJob", wrequest, wresponse)
+			w.checkError(err)
+			if err == nil && len(wresponse.Payload) > 0 {
+				logMsg = "Job [" + jobID + "] sent and finished"
+				var recbuf []byte
+				w.golog.UnpackReceive(logMsg, wresponse.Payload[0].([]byte), &recbuf)
+			} else {
+				logMsg = "Job [" + jobID + "] could not be finished"
+				w.golog.LogLocalEvent(logMsg)
+			}
+			w.logger.Println(logMsg)
+		}()
+	}
 }
 
 // Read function to always listen for messages from the browser
@@ -723,8 +750,12 @@ func (w *Worker) sendToClients(element Element) {
 //		- saves the log to File system
 //		- Acks back to Load Balancer that it is done
 func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error {
-	w.logger.Println("RunJob Request")
 	jobID := request.Payload[0].(string)
+	logMsg := "Running job [" + jobID + "]"
+
+	w.logger.Println(logMsg)
+	var recbuf []byte
+	w.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	// Gets log from File System
 	var log Log
@@ -748,9 +779,9 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 			break
 		} else {
 			logMsg = "Log [" + jobID + "] could not be retrieved"
-			w.logger.Println(logMsg)
 			w.golog.LogLocalEvent(logMsg)
 		}
+		w.logger.Println(logMsg)
 		time.Sleep(250 * time.Millisecond)
 	}
 
@@ -805,28 +836,37 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 		err := w.fsServerConn.Call("Server.SaveLog", fsRequest, fsResponse)
 		if err == nil && len(fsResponse.Payload) > 0 {
 			logMsg = "Log [" + jobID + "] sent"
-			w.logger.Println(logMsg)
 			var recbuf []byte
 			w.golog.UnpackReceive(logMsg, fsResponse.Payload[1].([]byte), &recbuf)
 		} else {
 			w.logger.Println("executeJob:", err)
 			logMsg = "Log [" + jobID + "] could not be sent"
-			w.logger.Println(logMsg)
 			w.golog.LogLocalEvent(logMsg)
 		}
+		w.logger.Println(logMsg)
 
 		os.Remove(filePath)
 	}
 
+	logMsg = "Job [" + jobID + "] finished"
+	w.logger.Println(logMsg)
+
 	// Acks back to Load Balancer that it is done
-	response.Payload = make([]interface{}, 1)
+	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = log
-	w.logger.Println("Done Job")
+	response.Payload[1] = w.golog.PrepareSend(logMsg, []byte{})
+
 	return nil
 }
 
-func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
+func (w *Worker) SendLog(request *WorkerRequest, response *WorkerResponse) error {
 	log := request.Payload[0].(Log)
+	logMsg := "Received log [" + log.Job.JobID + "] from load balancer"
+
+	w.logger.Println(logMsg)
+	var recbuf []byte
+	w.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	if _, exists := w.logs[log.Job.SessionID]; exists {
 		w.logs[log.Job.SessionID][log.Job.JobID] = log
 	} else {
@@ -846,6 +886,12 @@ func (w *Worker) SendLog(request *WorkerRequest, _ignored *bool) error {
 		}
 	}
 	w.deleteClients(log.Job.SessionID, clientsToDelete)
+
+	logMsg = "Log [" + log.Job.JobID + "] sent to clients"
+	w.logger.Println(logMsg)
+	response.Payload = make([]interface{}, 1)
+	response.Payload[0] = w.golog.PrepareSend(logMsg, []byte{})
+
 	return nil
 }
 

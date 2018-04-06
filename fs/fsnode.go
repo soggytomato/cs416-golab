@@ -26,12 +26,15 @@ const HEARTBEAT_INTERVAL = 500
 const VERBOSE_LOG = false
 
 // Setting TEMP_MODE to true will turn off persistence for
-// file server nodes. It will attempt to connect to the server as a
-// new node every time, and will generate new folders for sessions
-// and logs, allowing for multiple FSNodes to be run from the same
-// directory.
+// file server nodes. They will always attempt to connect to the
+// server as a new node every time and will generate new folders
+// for sessions and logs, allowing for multiple FSNodes to be run
+// from the same directory.
 //
-// To avoid clutter, you can run cleanup.go to remove temporary files.
+// TEMP_MODE will also cause the GoVector log file to be saved as
+// FSNode_<nodeid>-Log.txt instead of FSNode-Log.txt.
+//
+// To avoid clutter, run cleanup.go to remove temporary files.
 //
 const TEMP_MODE = true
 
@@ -146,7 +149,11 @@ func (f *FSNode) registerWithServer() {
 		go f.heartbeat()
 
 		f.logger.Println("Node [" + f.id + "] connected to server")
-		f.golog = govec.InitGoVector("FSNode_" + f.id, "FSNode_" + f.id)
+		if TEMP_MODE {
+			f.golog = govec.InitGoVector("FSNode_" + f.id, "FSNode_" + f.id)
+		} else {
+			f.golog = govec.InitGoVector("FSNode_" + f.id, "FSNode")
+		}
 	} else {
 		f.logger.Println("Rejected - failed to register with server")
 		f.logger.Println("Are you using an old nodeID? If you restarted the server, don't forget to remove it so that you can be assigned a new one. Alternatively, turn on TEMP_MODE.")

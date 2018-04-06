@@ -22,8 +22,10 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"strconv"
 
 	. "../lib/types"
+	"github.com/DistributedClocks/GoVector/govec"
 )
 
 // Errors that the server could return.
@@ -55,6 +57,7 @@ var (
 	unknownWorkerIDError UnknownWorkerIDError = errors.New("Load Balancer: unknown worker")
 	errLog               *log.Logger          = log.New(os.Stderr, "[serv] ", log.Lshortfile|log.LUTC|log.Lmicroseconds)
 	outLog               *log.Logger          = log.New(os.Stderr, "[serv] ", log.Lshortfile|log.LUTC|log.Lmicroseconds)
+	golog                *govec.GoLog         = govec.InitGoVector("LBServer", "LBServer")
 	// Workers in the system.
 	allWorkers              AllWorkers = AllWorkers{all: make(map[int]*Worker)}
 	HeartBeatInterval                  = 2000 // every two second
@@ -304,16 +307,23 @@ func (s *LBServer) HeartBeat(request WorkerRequest, _ignored *bool) error {
 
 // This function is called when a worker receives a run request by their client
 // The worker will save the job
-func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
+func (s *LBServer) NewJob(wrequest *WorkerRequest, wresponse *WorkerResponse) error {
 	allWorkers.Lock()
 	defer allWorkers.Unlock()
 
-	if len(allWorkers.all) == 0 {
+	if len(allWorkers.all) == 0 || len(wrequest.Payload) == 0 {
 		return nil
 	}
 
+	jobID := wrequest.Payload[0].(string)
+	workerID := wrequest.Payload[1].(string)
+	logMsg := "Got job [" + jobID + "] from worker [" + workerID + "]"
+	outLog.Println(logMsg)
+	var recbuf []byte
+	golog.UnpackReceive(logMsg, wrequest.Payload[2].([]byte), &recbuf)
+
 	response := new(WorkerResponse)
-	request := new(WorkerRequest)
+
 	workersList := sortWorkers()
 	for _, worker := range workersList {
 		nextWorkerIP := worker.RPCAddress.String()
@@ -321,28 +331,63 @@ func (s *LBServer) NewJob(jobID string, _ignored *bool) error {
 		workerCon, err := rpc.Dial("tcp", nextWorkerIP)
 		if err == nil {
 			defer workerCon.Close()
-			request.Payload = make([]interface{}, 1)
+
+			logMsg := "Running job [" + jobID + "] at worker [" + strconv.Itoa(worker.WorkerID) + "]"
+			outLog.Println(logMsg)
+
+			request := new(WorkerRequest)
+			request.Payload = make([]interface{}, 2)
 			request.Payload[0] = jobID
+			request.Payload[1] = golog.PrepareSend(logMsg, []byte{})
 			err := workerCon.Call("Worker.RunJob", request, response)
-			if err == nil && response.Payload[0] != nil {
+			if err == nil && len(response.Payload) > 0 {
+				logMsg = "Job [" + jobID + "] finished"
+				outLog.Println(logMsg)
+				var recbuf []byte
+				golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 				break
+			} else {
+				logMsg = "Job [" + jobID + "] failed"
+				outLog.Println(logMsg)
+				golog.LogLocalEvent(logMsg)
 			}
 		}
 	}
 
 	log := response.Payload[0].(Log)
-	// Send out the new log
-	request = new(WorkerRequest)
-	request.Payload = make([]interface{}, 1)
-	request.Payload[0] = log
-	var ignored bool
 
+	// Send out the new log
 	for _, worker := range allWorkers.all {
 		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
 		if err == nil {
-			workerCon.Call("Worker.SendLog", request, &ignored)
+			logMsg = "Sending log [" + jobID + "] at worker [" + strconv.Itoa(worker.WorkerID) + "]"
+			outLog.Println(logMsg)
+
+			request := new(WorkerRequest)
+			request.Payload = make([]interface{}, 2)
+			request.Payload[0] = log
+			request.Payload[1] = golog.PrepareSend(logMsg, []byte{})
+			response = new(WorkerResponse)
+
+			err = workerCon.Call("Worker.SendLog", request, response)
+			if err == nil && len(response.Payload) > 0 {
+				logMsg = "Log [" + jobID + "] sent"
+				outLog.Println(logMsg)
+				var recbuf []byte
+				golog.UnpackReceive(logMsg, response.Payload[0].([]byte), &recbuf)
+				break
+			} else {
+				logMsg = "Log [" + jobID + "] could not be sent"
+				outLog.Println(logMsg)
+				golog.LogLocalEvent(logMsg)
+			}
 		}
 	}
+
+	logMsg = "Job [" + jobID + "] complete"
+	outLog.Println(logMsg)
+	wresponse.Payload = make([]interface{}, 1)
+	wresponse.Payload[0] = golog.PrepareSend(logMsg, []byte{})
 
 	return nil
 }
