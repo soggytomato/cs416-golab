@@ -574,7 +574,6 @@ type test_struct struct {
 }
 
 func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
-
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
 		err := r.ParseForm()

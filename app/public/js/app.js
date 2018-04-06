@@ -9,6 +9,7 @@ sessionID = '';
 currentSessions = [];
 currentUsers = [];
 jobIDs = new Map();
+recoverLog = "";
 
 $(document).ready(function() {
     $('.input-wrapper').resizable({
@@ -200,6 +201,7 @@ function execute() {
     newForm.append(snippet);
     $("body").append(newForm);
 
+    recoverLog = $('#executeForm').serialize();
     $.ajax({
         type: 'post',
         url: "http://" + workerIP + '/execute',
@@ -209,6 +211,7 @@ function execute() {
             jobIDs.set(data.JobID, false);
             //jobIDs.push(data.JobID);
             $("#logList").prepend("<li><a href=# id=" + data.JobID + ">" + data.JobID + "</a></li>")
+            recoverLog = "";
         }
     })
     newForm.parentNode.removeChild(newForm);
