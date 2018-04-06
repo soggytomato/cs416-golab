@@ -660,8 +660,8 @@ func (w *Worker) sendToClient(clientID string, element Element) (sent bool, err 
 	sent = true
 
 	conn := w.clients[clientID]
-	err = conn.WriteJSON(element)
 	if conn != nil {
+		err = conn.WriteJSON(element)
 		if err != nil {
 			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
 			sent = false
