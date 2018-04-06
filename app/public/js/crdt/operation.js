@@ -67,12 +67,12 @@ $(document).ready(function() {
     editor.on('beforeChange',
         function(cm, change) {
             allowExecute = true;
-            
+
             if (escape(change.text[0]) == RETURN_ESCAPE) {
                 change.cancel();
                 return;
             }
-            
+
             if (change.origin == IGNORE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
@@ -128,7 +128,7 @@ function processOpPromise(init, end) {
 // Kicks off if the last Promise saw the end of changes
 function endOpPromise() {
     changesInProgress = false;
-    
+
     // It's possible that between kicking this off, a new
     // op has come in. If so, kick off a new Promise.
     if (changes.length > 0) {
@@ -153,8 +153,7 @@ function handleOperation(op) {
     var ch = op.from.ch;
 
     const origin = op.origin;
-    if (origin == INPUT_OP) 
-    {
+    if (origin == INPUT_OP) {
         var inputChar;
 
         // Is this a return case?
@@ -179,21 +178,15 @@ function handleOperation(op) {
         }
 
         handleLocalInput(line, ch, inputChar);
-    } 
-    else if (origin == DELETE_OP) 
-    {
+    } else if (origin == DELETE_OP) {
         // TODO deal with block deletion, or at least find a way to avoid it
 
         handleLocalDelete(line, ch);
-    } 
-    else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) 
-    {
+    } else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
         const id = origin.substring(REMOTE_INPUT_OP_PREFIX.length);
 
         mapping.update(line, ch, id);
-    } 
-    else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) 
-    {
+    } else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
         mapping.delete(line, ch);
     }
 }
@@ -300,7 +293,9 @@ function handleRemoteInput(id, prevId, val) {
     while (prevElem !== undefined) {
         next = prevElem.next;
 
-        if (next === undefined || next < id) {
+        if (next === undefined || parseInt(next) < parseInt(id)) {
+            break;
+        } else if (parseInt(next) == parseInt(id) && next < id) {
             break;
         } else {
             prevElem = CRDT.get(next);
@@ -422,8 +417,8 @@ function handleBulkInput(change) {
             const inputChar = lineChars[j];
 
             var text = null;
-            const from = {line: line + i, ch: ch + j};
-            var to = {line: line + i, ch: ch + j};
+            const from = { line: line + i, ch: ch + j };
+            var to = { line: line + i, ch: ch + j };
             if (inputChar == RETURN) {
                 text = ["", ""];
 
@@ -433,7 +428,7 @@ function handleBulkInput(change) {
                 text = [inputChar];
             }
 
-            const _change = {from: from, to: to, text: text, origin: INPUT_OP};
+            const _change = { from: from, to: to, text: text, origin: INPUT_OP };
             changes.push(_change);
         }
     }
@@ -448,7 +443,7 @@ function handleBulkInput(change) {
 function handleBulkDelete(change) {
     const ids = getEffectedIDs(change);
 
-    ids.forEach(function(id){
+    ids.forEach(function(id) {
         handleLocalDeleteByID(id);
     });
 }
@@ -459,7 +454,7 @@ function handleBulkDelete(change) {
 function isBulk(change) {
     // More than one line
     if (change.text.length > 1) return true;
-    
+
     // One line with length greater than 1
     if (change.text[0].length > 1) return true;
 
@@ -507,7 +502,7 @@ function getEffectedIDs(change) {
 */
 function cleanExtraCarriageReturns() {
     const $lines = $('.CodeMirror-line');
-    $lines.each(function(lineNum, line){
+    $lines.each(function(lineNum, line) {
         const $line = $(line);
         const $spans = $line.find('>span').children();
 
@@ -515,8 +510,8 @@ function cleanExtraCarriageReturns() {
             const lineTokens = editor.getLineTokens(lineNum);
             const token = lineTokens[lineTokens.length - 1];
 
-            const to = {line: lineNum, ch: token.end};
-            const from = {line: lineNum, ch: to.ch - 1};
+            const to = { line: lineNum, ch: token.end };
+            const from = { line: lineNum, ch: to.ch - 1 };
             editor.getDoc().replaceRange('', from, to, IGNORE_OP);
         }
     });
