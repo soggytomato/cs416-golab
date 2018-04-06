@@ -1,3 +1,5 @@
+outOfSync = false;
+
 /* =============================================================================
                             ELEMENT CLASS DEFINITION
    =============================================================================*/
@@ -120,9 +122,10 @@ class SeqCRDT {
         var _snippet = this.toSnippet();
 
         if (snippet != _snippet) {
-            alert('CRDT and editor fell out of sync! Check console for details.');
-            console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
+            if (!outOfSync) alert('CRDT and editor fell out of sync! Check console for details.');
+            outOfSync = true;
 
+            console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
             logOpsString();
 
             return false;
