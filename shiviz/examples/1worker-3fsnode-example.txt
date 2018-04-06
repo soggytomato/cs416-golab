@@ -6,27 +6,15 @@ TestWorker {"TestWorker":3, "FSServer":3}
 Session save started
 TestWorker {"TestWorker":4, "FSServer":3}
 Saving log
-TestWorker {"FSNode_QBARq":3, "FSNode_UcE9U":3, "TestWorker":5, "FSServer":11, "FSNode_NVpFt":3}
+TestWorker {"TestWorker":5, "FSServer":11, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "FSNode_H7mva":3}
 Log save started
-TestWorker {"FSServer":11, "FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":3, "TestWorker":6}
-Getting log
-TestWorker {"FSNode_UcE9U":7, "TestWorker":7, "FSServer":21, "FSNode_NVpFt":5, "FSNode_QBARq":5}
-Got log
-TestWorker {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":8, "FSServer":21, "FSNode_NVpFt":5}
+TestWorker {"TestWorker":6, "FSServer":11, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "FSNode_H7mva":3}
 Saving log
-TestWorker {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":9, "FSServer":23, "FSNode_NVpFt":5}
+TestWorker {"FSNode_H7mva":5, "TestWorker":7, "FSServer":17, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
 Log save started
-TestWorker {"TestWorker":10, "FSServer":23, "FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7}
-Saving log
-TestWorker {"TestWorker":11, "FSServer":28, "FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7}
-Log save started
-TestWorker {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":12, "FSServer":28, "FSNode_NVpFt":5}
-Saving log
-TestWorker {"FSServer":36, "FSNode_NVpFt":7, "FSNode_QBARq":7, "FSNode_UcE9U":9, "TestWorker":13}
-Log save started
-TestWorker {"TestWorker":14, "FSServer":36, "FSNode_NVpFt":7, "FSNode_QBARq":7, "FSNode_UcE9U":9}
+TestWorker {"FSNode_p6Eor":3, "FSNode_H7mva":5, "TestWorker":8, "FSServer":17, "FSNode_HRwoI":3}
 Getting session
-TestWorker {"TestWorker":15, "FSServer":55, "FSNode_NVpFt":11, "FSNode_QBARq":13, "FSNode_UcE9U":19}
+TestWorker {"FSServer":33, "FSNode_HRwoI":7, "FSNode_p6Eor":9, "FSNode_H7mva":11, "TestWorker":9}
 Got session
 FSServer {"FSServer":1}
 Initialization Complete
@@ -34,193 +22,117 @@ FSServer {"FSServer":2, "TestWorker":2}
 Saving session [session-0] to file system
 FSServer {"TestWorker":2, "FSServer":3}
 Session [session-0] save started
-FSServer {"TestWorker":2, "FSServer":4}
-Saving session [session-0] to node [NVpFt]
-FSServer {"TestWorker":2, "FSServer":5}
-Saving session [session-0] to node [QBARq]
+FSServer {"FSServer":4, "TestWorker":2}
+Saving session [session-0] to node [H7mva]
+FSServer {"FSServer":5, "TestWorker":2}
+Saving session [session-0] to node [p6Eor]
 FSServer {"TestWorker":2, "FSServer":6}
-Saving session [session-0] to node [UcE9U]
-FSServer {"TestWorker":2, "FSServer":7, "FSNode_NVpFt":3}
+Saving session [session-0] to node [HRwoI]
+FSServer {"TestWorker":2, "FSServer":7, "FSNode_H7mva":3}
 Session [session-0] saved
-FSServer {"TestWorker":2, "FSServer":8, "FSNode_NVpFt":3, "FSNode_QBARq":3}
+FSServer {"FSServer":8, "FSNode_H7mva":3, "FSNode_p6Eor":3, "TestWorker":2}
 Session [session-0] saved
-FSServer {"TestWorker":2, "FSServer":9, "FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":3}
+FSServer {"FSServer":9, "FSNode_H7mva":3, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":2}
 Session [session-0] saved
-FSServer {"TestWorker":4, "FSServer":10, "FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":3}
-Saving log [job-0] to file system
-FSServer {"FSNode_UcE9U":3, "TestWorker":4, "FSServer":11, "FSNode_NVpFt":3, "FSNode_QBARq":3}
-Log [session-0] save started
-FSServer {"FSServer":12, "FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":3, "TestWorker":4}
-Saving log [job-0] to node [UcE9U]
-FSServer {"TestWorker":4, "FSServer":13, "FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":3}
-Saving log [job-0] to node [QBARq]
-FSServer {"TestWorker":4, "FSServer":14, "FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":3}
-Saving log [job-0] to node [NVpFt]
-FSServer {"FSNode_NVpFt":3, "FSNode_QBARq":3, "FSNode_UcE9U":5, "TestWorker":4, "FSServer":15}
-Log [job-0] saved
-FSServer {"FSNode_QBARq":5, "FSNode_UcE9U":5, "TestWorker":4, "FSServer":16, "FSNode_NVpFt":3}
-Log [job-0] saved
-FSServer {"FSNode_UcE9U":5, "TestWorker":4, "FSServer":17, "FSNode_NVpFt":5, "FSNode_QBARq":5}
-Log [job-0] saved
-FSServer {"TestWorker":6, "FSServer":18, "FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":5}
-Retrieving log [job-0] from file system
-FSServer {"TestWorker":6, "FSServer":19, "FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":5}
-Retrieving log [job-0] from node [UcE9U]
-FSServer {"FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":6, "FSServer":20}
-Log [job-0] retrieved
-FSServer {"FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":6, "FSServer":21}
-Sending log [job-0] to worker
-FSServer {"FSNode_UcE9U":7, "TestWorker":8, "FSServer":22, "FSNode_NVpFt":5, "FSNode_QBARq":5}
+FSServer {"FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":4, "FSServer":10, "FSNode_H7mva":3}
 Saving log [job-1] to file system
-FSServer {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":8, "FSServer":23, "FSNode_NVpFt":5}
+FSServer {"FSNode_H7mva":3, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":4, "FSServer":11}
 Log [session-0] save started
-FSServer {"FSNode_UcE9U":7, "TestWorker":8, "FSServer":24, "FSNode_NVpFt":5, "FSNode_QBARq":5}
-Saving log [job-1] to node [QBARq]
-FSServer {"FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":8, "FSServer":25}
-Saving log [job-1] to node [NVpFt]
-FSServer {"FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":8, "FSServer":26}
-Saving log [job-1] to node [UcE9U]
-FSServer {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":10, "FSServer":27, "FSNode_NVpFt":5}
-Saving log [job-2] to file system
-FSServer {"FSNode_NVpFt":5, "FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":10, "FSServer":28}
-Log [session-1] save started
-FSServer {"FSNode_UcE9U":7, "TestWorker":10, "FSServer":29, "FSNode_NVpFt":5, "FSNode_QBARq":5}
-Saving log [job-2] to node [NVpFt]
-FSServer {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":10, "FSServer":30, "FSNode_NVpFt":5}
-Saving log [job-2] to node [QBARq]
-FSServer {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":10, "FSServer":31, "FSNode_NVpFt":5}
-Saving log [job-2] to node [UcE9U]
-FSServer {"FSNode_QBARq":5, "FSNode_UcE9U":7, "TestWorker":10, "FSServer":32, "FSNode_NVpFt":7}
+FSServer {"FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":4, "FSServer":12, "FSNode_H7mva":3}
+Saving log [job-1] to node [H7mva]
+FSServer {"FSNode_H7mva":3, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":4, "FSServer":13}
+Saving log [job-1] to node [HRwoI]
+FSServer {"TestWorker":4, "FSServer":14, "FSNode_H7mva":3, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
+Saving log [job-1] to node [p6Eor]
+FSServer {"TestWorker":4, "FSServer":15, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
 Log [job-1] saved
-FSServer {"TestWorker":10, "FSServer":33, "FSNode_NVpFt":7, "FSNode_QBARq":7, "FSNode_UcE9U":7}
-Log [job-1] saved
-FSServer {"FSServer":34, "FSNode_NVpFt":7, "FSNode_QBARq":7, "FSNode_UcE9U":9, "TestWorker":10}
-Log [job-1] saved
-FSServer {"TestWorker":12, "FSServer":35, "FSNode_NVpFt":7, "FSNode_QBARq":7, "FSNode_UcE9U":9}
+FSServer {"TestWorker":6, "FSServer":16, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
 Saving log [job-3] to file system
-FSServer {"FSNode_QBARq":7, "FSNode_UcE9U":9, "TestWorker":12, "FSServer":36, "FSNode_NVpFt":7}
+FSServer {"TestWorker":6, "FSServer":17, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
 Log [session-0] save started
-FSServer {"FSNode_QBARq":7, "FSNode_UcE9U":9, "TestWorker":12, "FSServer":37, "FSNode_NVpFt":7}
-Saving log [job-3] to node [QBARq]
-FSServer {"FSServer":38, "FSNode_NVpFt":7, "FSNode_QBARq":9, "FSNode_UcE9U":9, "TestWorker":12}
-Log [job-2] saved
-FSServer {"FSNode_NVpFt":7, "FSNode_QBARq":9, "FSNode_UcE9U":11, "TestWorker":12, "FSServer":39}
-Log [job-2] saved
-FSServer {"FSNode_NVpFt":9, "FSNode_QBARq":9, "FSNode_UcE9U":11, "TestWorker":12, "FSServer":40}
-Log [job-2] saved
-FSServer {"FSNode_NVpFt":9, "FSNode_QBARq":9, "FSNode_UcE9U":11, "TestWorker":12, "FSServer":41}
-Saving log [job-3] to node [UcE9U]
-FSServer {"FSNode_QBARq":9, "FSNode_UcE9U":11, "TestWorker":12, "FSServer":42, "FSNode_NVpFt":9}
-Saving log [job-3] to node [NVpFt]
-FSServer {"FSNode_UcE9U":11, "TestWorker":12, "FSServer":43, "FSNode_NVpFt":9, "FSNode_QBARq":11}
+FSServer {"FSServer":18, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":6}
+Saving log [job-3] to node [p6Eor]
+FSServer {"FSServer":19, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "TestWorker":6}
+Saving log [job-3] to node [H7mva]
+FSServer {"TestWorker":6, "FSServer":20, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
+Saving log [job-3] to node [HRwoI]
+FSServer {"FSNode_HRwoI":5, "FSNode_p6Eor":3, "TestWorker":6, "FSServer":21, "FSNode_H7mva":5}
+Log [job-1] saved
+FSServer {"TestWorker":6, "FSServer":22, "FSNode_H7mva":5, "FSNode_HRwoI":5, "FSNode_p6Eor":5}
+Log [job-1] saved
+FSServer {"FSNode_p6Eor":7, "TestWorker":6, "FSServer":23, "FSNode_H7mva":5, "FSNode_HRwoI":5}
 Log [job-3] saved
-FSServer {"FSNode_QBARq":11, "FSNode_UcE9U":13, "TestWorker":12, "FSServer":44, "FSNode_NVpFt":9}
+FSServer {"FSNode_HRwoI":5, "FSNode_p6Eor":7, "TestWorker":6, "FSServer":24, "FSNode_H7mva":7}
 Log [job-3] saved
-FSServer {"FSNode_NVpFt":11, "FSNode_QBARq":11, "FSNode_UcE9U":13, "TestWorker":12, "FSServer":45}
+FSServer {"FSNode_H7mva":7, "FSNode_HRwoI":7, "FSNode_p6Eor":7, "TestWorker":6, "FSServer":25}
 Log [job-3] saved
-FSServer {"FSNode_NVpFt":11, "FSNode_QBARq":11, "FSNode_UcE9U":13, "TestWorker":14, "FSServer":46}
+FSServer {"TestWorker":8, "FSServer":26, "FSNode_H7mva":7, "FSNode_HRwoI":7, "FSNode_p6Eor":7}
 Retrieving session [session-0] from file system
-FSServer {"FSServer":47, "FSNode_NVpFt":11, "FSNode_QBARq":11, "FSNode_UcE9U":13, "TestWorker":14}
-Retrieving session [session-0] from node [UcE9U]
-FSServer {"FSNode_NVpFt":11, "FSNode_QBARq":11, "FSNode_UcE9U":15, "TestWorker":14, "FSServer":48}
+FSServer {"FSNode_HRwoI":7, "FSNode_p6Eor":7, "TestWorker":8, "FSServer":27, "FSNode_H7mva":7}
+Retrieving session [session-0] from node [H7mva]
+FSServer {"TestWorker":8, "FSServer":28, "FSNode_H7mva":9, "FSNode_HRwoI":7, "FSNode_p6Eor":7}
 Session [session-0] retrieved
-FSServer {"FSNode_UcE9U":15, "TestWorker":14, "FSServer":49, "FSNode_NVpFt":11, "FSNode_QBARq":11}
-Retrieving log [job-1] from node [UcE9U]
-FSServer {"FSNode_QBARq":11, "FSNode_UcE9U":17, "TestWorker":14, "FSServer":50, "FSNode_NVpFt":11}
+FSServer {"FSServer":29, "FSNode_H7mva":9, "FSNode_HRwoI":7, "FSNode_p6Eor":7, "TestWorker":8}
+Retrieving log [job-1] from node [H7mva]
+FSServer {"TestWorker":8, "FSServer":30, "FSNode_H7mva":11, "FSNode_HRwoI":7, "FSNode_p6Eor":7}
 Log [job-1] retrieved
-FSServer {"FSServer":51, "FSNode_NVpFt":11, "FSNode_QBARq":11, "FSNode_UcE9U":17, "TestWorker":14}
-Retrieving log [job-3] from node [QBARq]
-FSServer {"FSNode_QBARq":13, "FSNode_UcE9U":17, "TestWorker":14, "FSServer":52, "FSNode_NVpFt":11}
+FSServer {"FSNode_p6Eor":7, "TestWorker":8, "FSServer":31, "FSNode_H7mva":11, "FSNode_HRwoI":7}
+Retrieving log [job-3] from node [p6Eor]
+FSServer {"FSNode_p6Eor":9, "TestWorker":8, "FSServer":32, "FSNode_H7mva":11, "FSNode_HRwoI":7}
 Log [job-3] retrieved
-FSServer {"FSServer":53, "FSNode_NVpFt":11, "FSNode_QBARq":13, "FSNode_UcE9U":17, "TestWorker":14}
-Retrieving log [job-0] from node [UcE9U]
-FSServer {"TestWorker":14, "FSServer":54, "FSNode_NVpFt":11, "FSNode_QBARq":13, "FSNode_UcE9U":19}
-Log [job-0] retrieved
-FSServer {"TestWorker":14, "FSServer":55, "FSNode_NVpFt":11, "FSNode_QBARq":13, "FSNode_UcE9U":19}
+FSServer {"FSNode_H7mva":11, "FSNode_HRwoI":7, "FSNode_p6Eor":9, "TestWorker":8, "FSServer":33}
 Sending session [session-0] to worker
-FSNode_NVpFt {"FSNode_NVpFt":1}
+FSNode_p6Eor {"FSNode_p6Eor":1}
 Initialization Complete
-FSNode_NVpFt {"FSNode_NVpFt":2, "TestWorker":2, "FSServer":4}
+FSNode_p6Eor {"FSNode_p6Eor":2, "FSServer":5, "TestWorker":2}
 Saving session [session-0] to disk
-FSNode_NVpFt {"FSServer":4, "FSNode_NVpFt":3, "TestWorker":2}
+FSNode_p6Eor {"FSNode_p6Eor":3, "FSServer":5, "TestWorker":2}
 Session [session-0] saved
-FSNode_NVpFt {"FSNode_NVpFt":4, "FSNode_UcE9U":3, "FSNode_QBARq":3, "TestWorker":4, "FSServer":14}
-Saving log [job-0] to disk
-FSNode_NVpFt {"FSServer":14, "FSNode_NVpFt":5, "FSNode_UcE9U":3, "FSNode_QBARq":3, "TestWorker":4}
-Log [job-0] saved
-FSNode_NVpFt {"FSNode_NVpFt":6, "FSNode_UcE9U":7, "FSNode_QBARq":5, "TestWorker":8, "FSServer":25}
+FSNode_p6Eor {"FSNode_p6Eor":4, "FSServer":14, "TestWorker":4, "FSNode_H7mva":3, "FSNode_HRwoI":3}
 Saving log [job-1] to disk
-FSNode_NVpFt {"FSNode_NVpFt":7, "FSNode_UcE9U":7, "FSNode_QBARq":5, "TestWorker":8, "FSServer":25}
+FSNode_p6Eor {"FSNode_HRwoI":3, "FSNode_p6Eor":5, "FSServer":14, "TestWorker":4, "FSNode_H7mva":3}
 Log [job-1] saved
-FSNode_NVpFt {"FSNode_QBARq":5, "TestWorker":10, "FSServer":29, "FSNode_NVpFt":8, "FSNode_UcE9U":7}
-Saving log [job-2] to disk
-FSNode_NVpFt {"FSNode_NVpFt":9, "FSNode_UcE9U":7, "FSNode_QBARq":5, "TestWorker":10, "FSServer":29}
-Log [job-2] saved
-FSNode_NVpFt {"FSNode_UcE9U":11, "FSNode_QBARq":9, "TestWorker":12, "FSServer":42, "FSNode_NVpFt":10}
+FSNode_p6Eor {"FSServer":18, "TestWorker":6, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":6}
 Saving log [job-3] to disk
-FSNode_NVpFt {"FSNode_QBARq":9, "TestWorker":12, "FSServer":42, "FSNode_NVpFt":11, "FSNode_UcE9U":11}
+FSNode_p6Eor {"FSServer":18, "TestWorker":6, "FSNode_H7mva":5, "FSNode_HRwoI":3, "FSNode_p6Eor":7}
 Log [job-3] saved
-FSNode_QBARq {"FSNode_QBARq":1}
-Initialization Complete
-FSNode_QBARq {"FSServer":5, "TestWorker":2, "FSNode_QBARq":2}
-Saving session [session-0] to disk
-FSNode_QBARq {"FSNode_QBARq":3, "FSServer":5, "TestWorker":2}
-Session [session-0] saved
-FSNode_QBARq {"FSNode_QBARq":4, "FSServer":13, "TestWorker":4, "FSNode_UcE9U":3, "FSNode_NVpFt":3}
-Saving log [job-0] to disk
-FSNode_QBARq {"FSNode_NVpFt":3, "FSNode_QBARq":5, "FSServer":13, "TestWorker":4, "FSNode_UcE9U":3}
-Log [job-0] saved
-FSNode_QBARq {"FSNode_UcE9U":7, "FSNode_NVpFt":5, "FSNode_QBARq":6, "FSServer":24, "TestWorker":8}
-Saving log [job-1] to disk
-FSNode_QBARq {"FSNode_UcE9U":7, "FSNode_NVpFt":5, "FSNode_QBARq":7, "FSServer":24, "TestWorker":8}
-Log [job-1] saved
-FSNode_QBARq {"FSNode_NVpFt":5, "FSNode_QBARq":8, "FSServer":30, "TestWorker":10, "FSNode_UcE9U":7}
-Saving log [job-2] to disk
-FSNode_QBARq {"FSNode_NVpFt":5, "FSNode_QBARq":9, "FSServer":30, "TestWorker":10, "FSNode_UcE9U":7}
-Log [job-2] saved
-FSNode_QBARq {"FSNode_NVpFt":7, "FSNode_QBARq":10, "FSServer":37, "TestWorker":12, "FSNode_UcE9U":9}
-Saving log [job-3] to disk
-FSNode_QBARq {"FSNode_QBARq":11, "FSServer":37, "TestWorker":12, "FSNode_UcE9U":9, "FSNode_NVpFt":7}
-Log [job-3] saved
-FSNode_QBARq {"FSNode_NVpFt":11, "FSNode_QBARq":12, "FSServer":51, "TestWorker":14, "FSNode_UcE9U":17}
+FSNode_p6Eor {"FSServer":31, "TestWorker":8, "FSNode_H7mva":11, "FSNode_HRwoI":7, "FSNode_p6Eor":8}
 Retrieving log [job-3] from disk
-FSNode_QBARq {"FSNode_NVpFt":11, "FSNode_QBARq":13, "FSServer":51, "TestWorker":14, "FSNode_UcE9U":17}
+FSNode_p6Eor {"FSNode_HRwoI":7, "FSNode_p6Eor":9, "FSServer":31, "TestWorker":8, "FSNode_H7mva":11}
 Sending log [job-3] to server
-FSNode_UcE9U {"FSNode_UcE9U":1}
+FSNode_HRwoI {"FSNode_HRwoI":1}
 Initialization Complete
-FSNode_UcE9U {"FSNode_UcE9U":2, "TestWorker":2, "FSServer":6}
+FSNode_HRwoI {"FSNode_HRwoI":2, "TestWorker":2, "FSServer":6}
 Saving session [session-0] to disk
-FSNode_UcE9U {"FSServer":6, "FSNode_UcE9U":3, "TestWorker":2}
+FSNode_HRwoI {"FSNode_HRwoI":3, "TestWorker":2, "FSServer":6}
 Session [session-0] saved
-FSNode_UcE9U {"TestWorker":4, "FSServer":12, "FSNode_UcE9U":4, "FSNode_NVpFt":3, "FSNode_QBARq":3}
-Saving log [job-0] to disk
-FSNode_UcE9U {"TestWorker":4, "FSServer":12, "FSNode_UcE9U":5, "FSNode_NVpFt":3, "FSNode_QBARq":3}
-Log [job-0] saved
-FSNode_UcE9U {"FSNode_QBARq":5, "TestWorker":6, "FSServer":19, "FSNode_UcE9U":6, "FSNode_NVpFt":5}
-Retrieving log [job-0] from disk
-FSNode_UcE9U {"TestWorker":6, "FSServer":19, "FSNode_UcE9U":7, "FSNode_NVpFt":5, "FSNode_QBARq":5}
-Sending log [job-0] to server
-FSNode_UcE9U {"FSNode_UcE9U":8, "FSNode_NVpFt":5, "FSNode_QBARq":5, "TestWorker":8, "FSServer":26}
+FSNode_HRwoI {"TestWorker":4, "FSServer":13, "FSNode_H7mva":3, "FSNode_p6Eor":3, "FSNode_HRwoI":4}
 Saving log [job-1] to disk
-FSNode_UcE9U {"TestWorker":8, "FSServer":26, "FSNode_UcE9U":9, "FSNode_NVpFt":5, "FSNode_QBARq":5}
+FSNode_HRwoI {"FSNode_H7mva":3, "FSNode_p6Eor":3, "FSNode_HRwoI":5, "TestWorker":4, "FSServer":13}
 Log [job-1] saved
-FSNode_UcE9U {"FSNode_UcE9U":10, "FSNode_NVpFt":5, "FSNode_QBARq":5, "TestWorker":10, "FSServer":31}
-Saving log [job-2] to disk
-FSNode_UcE9U {"FSNode_QBARq":5, "TestWorker":10, "FSServer":31, "FSNode_UcE9U":11, "FSNode_NVpFt":5}
-Log [job-2] saved
-FSNode_UcE9U {"TestWorker":12, "FSServer":41, "FSNode_UcE9U":12, "FSNode_NVpFt":9, "FSNode_QBARq":9}
+FSNode_HRwoI {"FSNode_H7mva":5, "FSNode_p6Eor":3, "FSNode_HRwoI":6, "TestWorker":6, "FSServer":20}
 Saving log [job-3] to disk
-FSNode_UcE9U {"FSNode_QBARq":9, "TestWorker":12, "FSServer":41, "FSNode_UcE9U":13, "FSNode_NVpFt":9}
+FSNode_HRwoI {"FSServer":20, "FSNode_H7mva":5, "FSNode_p6Eor":3, "FSNode_HRwoI":7, "TestWorker":6}
 Log [job-3] saved
-FSNode_UcE9U {"FSNode_QBARq":11, "TestWorker":14, "FSServer":47, "FSNode_UcE9U":14, "FSNode_NVpFt":11}
+FSNode_H7mva {"FSNode_H7mva":1}
+Initialization Complete
+FSNode_H7mva {"FSNode_H7mva":2, "FSServer":4, "TestWorker":2}
+Saving session [session-0] to disk
+FSNode_H7mva {"FSNode_H7mva":3, "FSServer":4, "TestWorker":2}
+Session [session-0] saved
+FSNode_H7mva {"FSNode_H7mva":4, "FSServer":12, "TestWorker":4, "FSNode_HRwoI":3, "FSNode_p6Eor":3}
+Saving log [job-1] to disk
+FSNode_H7mva {"FSServer":12, "TestWorker":4, "FSNode_HRwoI":3, "FSNode_p6Eor":3, "FSNode_H7mva":5}
+Log [job-1] saved
+FSNode_H7mva {"FSNode_p6Eor":3, "FSNode_H7mva":6, "FSServer":19, "TestWorker":6, "FSNode_HRwoI":3}
+Saving log [job-3] to disk
+FSNode_H7mva {"FSNode_HRwoI":3, "FSNode_p6Eor":3, "FSNode_H7mva":7, "FSServer":19, "TestWorker":6}
+Log [job-3] saved
+FSNode_H7mva {"TestWorker":8, "FSNode_HRwoI":7, "FSNode_p6Eor":7, "FSNode_H7mva":8, "FSServer":27}
 Retrieving session [session-0] from disk
-FSNode_UcE9U {"FSNode_QBARq":11, "TestWorker":14, "FSServer":47, "FSNode_UcE9U":15, "FSNode_NVpFt":11}
+FSNode_H7mva {"FSNode_p6Eor":7, "FSNode_H7mva":9, "FSServer":27, "TestWorker":8, "FSNode_HRwoI":7}
 Sending session [session-0] to server
-FSNode_UcE9U {"FSNode_UcE9U":16, "FSNode_NVpFt":11, "FSNode_QBARq":11, "TestWorker":14, "FSServer":49}
+FSNode_H7mva {"FSNode_p6Eor":7, "FSNode_H7mva":10, "FSServer":29, "TestWorker":8, "FSNode_HRwoI":7}
 Retrieving log [job-1] from disk
-FSNode_UcE9U {"FSNode_UcE9U":17, "FSNode_NVpFt":11, "FSNode_QBARq":11, "TestWorker":14, "FSServer":49}
+FSNode_H7mva {"TestWorker":8, "FSNode_HRwoI":7, "FSNode_p6Eor":7, "FSNode_H7mva":11, "FSServer":29}
 Sending log [job-1] to server
-FSNode_UcE9U {"FSNode_NVpFt":11, "FSNode_QBARq":13, "TestWorker":14, "FSServer":53, "FSNode_UcE9U":18}
-Retrieving log [job-0] from disk
-FSNode_UcE9U {"FSServer":53, "FSNode_UcE9U":19, "FSNode_NVpFt":11, "FSNode_QBARq":13, "TestWorker":14}
-Sending log [job-0] to server
