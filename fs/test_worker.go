@@ -8,11 +8,17 @@ import (
 	"os"
 	"time"
 
+	. "../lib/session"
 	. "../lib/types"
+
+	"github.com/DistributedClocks/GoVector/govec"
 )
 
 func main() {
 	RegisterGob()
+
+	golog := govec.InitGoVector("TestWorker", "TestWorker")
+	var recbuf []byte
 
 	// Connect to file server
 
@@ -57,15 +63,18 @@ func main() {
 		Deleted:  false}
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = session
+	request.Payload[1] = golog.PrepareSend("Saving session", []byte{})
+	response := new(FSResponse)
 
 	fmt.Println("Saving session:")
 	fmt.Println(session)
-	ignored := false
-	err = serverConn.Call("Server.SaveSession", request, &ignored)
-	checkError(err)
-	fmt.Println("Session (probably) saved.")
+	err = serverConn.Call("Server.SaveSession", request, response)
+	if checkError(err) != nil || len(response.Payload) == 0 {
+		return
+	}
+	golog.UnpackReceive("Session save started", response.Payload[1].([]byte), &recbuf)
 
 	fmt.Println("Sleeping for 1000 ms...\n")
 	time.Sleep(1000 * time.Millisecond)
@@ -82,14 +91,17 @@ func main() {
 		Output: `Hello World!`}
 
 	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = _log
+	request.Payload[1] = golog.PrepareSend("Saving log", []byte{})
+	response = new(FSResponse)
 
 	fmt.Println("Saving log...")
-	ignored = false
-	err = serverConn.Call("Server.SaveLog", request, &ignored)
-	checkError(err)
-	fmt.Println("Log (probably) saved.")
+	err = serverConn.Call("Server.SaveLog", request, response)
+	if checkError(err) != nil || len(response.Payload) == 0 {
+		return
+	}
+	golog.UnpackReceive("Log save started", response.Payload[1].([]byte), &recbuf)
 
 	fmt.Println("Sleeping for 1000 ms...\n")
 	time.Sleep(1000 * time.Millisecond)
@@ -99,9 +111,10 @@ func main() {
 
 	fmt.Println("Getting log from file server...")
 	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = _log.Job.JobID
-	response := new(FSResponse)
+	request.Payload[1] = golog.PrepareSend("Getting log", []byte{})
+	response = new(FSResponse)
 
 	err = serverConn.Call("Server.GetLog", request, response)
 	checkError(err)
@@ -110,6 +123,8 @@ func main() {
 		return
 	}
 	newLog := response.Payload[0].(Log)
+	golog.UnpackReceive("Got log", response.Payload[1].([]byte), &recbuf)
+
 	fmt.Println("Got log from file server:")
 	fmt.Println(newLog)
 
@@ -145,30 +160,39 @@ func main() {
 
 	fmt.Println("Saving log (job-1)...")
 	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = log1
-	ignored = false
-	err = serverConn.Call("Server.SaveLog", request, &ignored)
-	checkError(err)
-	fmt.Println("Log (probably) saved.")
+	request.Payload[1] = golog.PrepareSend("Saving log", []byte{})
+	response = new(FSResponse)
+	err = serverConn.Call("Server.SaveLog", request, response)
+	if checkError(err) != nil || len(response.Payload) == 0 {
+		return
+	}
+	golog.UnpackReceive("Log save started", response.Payload[1].([]byte), &recbuf)
 
 	fmt.Println("Saving log (job-2)...")
 	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = log2
-	ignored = false
-	err = serverConn.Call("Server.SaveLog", request, &ignored)
-	checkError(err)
-	fmt.Println("Log (probably) saved.")
+	request.Payload[1] = golog.PrepareSend("Saving log", []byte{})
+	response = new(FSResponse)
+	err = serverConn.Call("Server.SaveLog", request, response)
+	if checkError(err) != nil || len(response.Payload) == 0 {
+		return
+	}
+	golog.UnpackReceive("Log save started", response.Payload[1].([]byte), &recbuf)
 
 	fmt.Println("Saving log (job-3)...")
 	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = log3
-	ignored = false
-	err = serverConn.Call("Server.SaveLog", request, &ignored)
-	checkError(err)
-	fmt.Println("Log (probably) saved.")
+	request.Payload[1] = golog.PrepareSend("Saving log", []byte{})
+	response = new(FSResponse)
+	err = serverConn.Call("Server.SaveLog", request, response)
+	if checkError(err) != nil || len(response.Payload) == 0 {
+		return
+	}
+	golog.UnpackReceive("Log save started", response.Payload[1].([]byte), &recbuf)
 
 	fmt.Println("Sleeping for 1000 ms...\n")
 	time.Sleep(1000 * time.Millisecond)
@@ -178,8 +202,9 @@ func main() {
 
 	fmt.Println("Getting session from file server...")
 	request = new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = session.ID
+	request.Payload[1] = golog.PrepareSend("Getting session", []byte{})
 	response = new(FSResponse)
 
 	err = serverConn.Call("Server.GetSession", request, response)
@@ -198,6 +223,8 @@ func main() {
 	newLogs := response.Payload[1].([]Log)
 	fmt.Println("Got logs for the session:")
 	fmt.Println(newLogs)
+
+	golog.UnpackReceive("Got session", response.Payload[2].([]byte), &recbuf)
 }
 
 func checkError(err error) error {

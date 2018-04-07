@@ -17,12 +17,26 @@ import (
 
 	. "../lib/session"
 	. "../lib/types"
+
+	"github.com/DistributedClocks/GoVector/govec"
 )
 
-const SESS_DIR = "./session"
-const LOG_DIR = "./log"
 const NODE_ID_PATH = "nodeID"
 const HEARTBEAT_INTERVAL = 500
+const VERBOSE_LOG = false
+
+// Setting TEMP_MODE to true will turn off persistence for
+// file server nodes. They will always attempt to connect to the
+// server as a new node every time and will generate new folders
+// for sessions and logs, allowing for multiple FSNodes to be run
+// from the same directory.
+//
+// TEMP_MODE will also cause the GoVector log file to be saved as
+// FSNode_<nodeid>-Log.txt instead of FSNode-Log.txt.
+//
+// To avoid clutter, run cleanup.go to remove temporary files.
+//
+const TEMP_MODE = false
 
 type FSNode struct {
 	logger     *log.Logger
@@ -30,6 +44,9 @@ type FSNode struct {
 	serverAddr string
 	serverConn *rpc.Client
 	id         string
+	sessionDir string
+	logDir     string
+	golog      *govec.GoLog
 }
 
 func main() {
@@ -58,16 +75,10 @@ func (f *FSNode) init() {
 	f.logger = log.New(os.Stdout, "[Initializing] ", log.Lshortfile)
 	f.serverAddr = os.Args[1]
 
-	exists, err := checkFileOrDirectory(SESS_DIR)
-	checkError(err)
-	if !exists {
-		os.Mkdir(SESS_DIR, 0755)
-	}
-
-	exists, err = checkFileOrDirectory(LOG_DIR)
-	checkError(err)
-	if !exists {
-		os.Mkdir(LOG_DIR, 0755)
+	if !TEMP_MODE {
+		f.sessionDir = "./session"
+		f.logDir = "./log"
+		f.createDirectories()
 	}
 }
 
@@ -123,6 +134,12 @@ func (f *FSNode) registerWithServer() {
 			nodeID = response.Payload[1].(string)
 			storeNodeID(nodeID)
 			f.logger.Println("Registered as new node")
+
+			if TEMP_MODE {
+				f.sessionDir = "./session_" + nodeID
+				f.logDir = "./log_" + nodeID
+				f.createDirectories()
+			}
 		} else {
 			f.logger.Println("Registered as existing node")
 		}
@@ -132,9 +149,14 @@ func (f *FSNode) registerWithServer() {
 		go f.heartbeat()
 
 		f.logger.Println("Node [" + f.id + "] connected to server")
+		if TEMP_MODE {
+			f.golog = govec.InitGoVector("FSNode_" + f.id, "FSNode_" + f.id)
+		} else {
+			f.golog = govec.InitGoVector("FSNode_" + f.id, "FSNode")
+		}
 	} else {
 		f.logger.Println("Rejected - failed to register with server")
-		f.logger.Println("Are you using an old nodeID? If you restarted the server, don't forget to remove it so that you can be assigned a new one.")
+		f.logger.Println("Are you using an old nodeID? If you restarted the server, don't forget to remove it so that you can be assigned a new one. Alternatively, turn on TEMP_MODE.")
 		os.Exit(1)
 	}
 }
@@ -147,6 +169,20 @@ func (f *FSNode) heartbeat() {
 	}
 }
 
+func (f *FSNode) createDirectories() {
+	exists, err := checkFileOrDirectory(f.sessionDir)
+	checkError(err)
+	if !exists {
+		os.Mkdir(f.sessionDir, 0755)
+	}
+
+	exists, err = checkFileOrDirectory(f.logDir)
+	checkError(err)
+	if !exists {
+		os.Mkdir(f.logDir, 0755)
+	}
+}
+
 // </PRIVATE METHODS>
 ////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -155,16 +191,21 @@ func (f *FSNode) heartbeat() {
 ////////////////////////////////////////////////////////////////////////////////////////////
 // <RPC METHODS>
 
-func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
+func (f *FSNode) SaveSession(request *FSRequest, response *FSResponse) (_ error) {
 	session := request.Payload[0].(Session)
-	f.logger.Println("Saving session [" + session.ID + "] to disk")
+	logMsg := "Saving session [" + session.ID + "] to disk"
 
-	*ok = false
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(session)
 
-	filePath := path.Join(SESS_DIR, session.ID)
+	filePath := path.Join(f.sessionDir, session.ID)
 	file, err := openFile(filePath)
 	if checkError(err) != nil {
 		return
@@ -182,15 +223,30 @@ func (f *FSNode) SaveSession(request *FSRequest, ok *bool) (_ error) {
 	}
 
 	file.Sync()
-	*ok = true
+
+	logMsg = "Session [" + session.ID + "] saved"
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }
 
 func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) {
 	sessionID := request.Payload[0].(string)
-	f.logger.Println("Retrieving session [" + sessionID + "] from disk")
-	filePath := path.Join(SESS_DIR, sessionID)
+	logMsg := "Retrieving session [" + sessionID + "] from disk"
+
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
+	filePath := path.Join(f.sessionDir, sessionID)
 	sessionExists, err := checkFileOrDirectory(filePath)
 	if checkError(err) != nil || !sessionExists {
 		return
@@ -208,22 +264,33 @@ func (f *FSNode) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 		return
 	}
 
-	response.Payload = make([]interface{}, 1)
+	logMsg = "Sending session [" + sessionID + "] to server"
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+
+	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = *session
+	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }
 
-func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
+func (f *FSNode) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	_log := request.Payload[0].(Log)
-	f.logger.Println("Saving log [" + _log.Job.JobID + "] to disk")
+	logMsg := "Saving log [" + _log.Job.JobID + "] to disk"
 
-	*ok = false
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	err := enc.Encode(_log)
 
-	filePath := path.Join(LOG_DIR, _log.Job.JobID)
+	filePath := path.Join(f.logDir, _log.Job.JobID)
 	file, err := openFile(filePath)
 	if checkError(err) != nil {
 		return
@@ -240,15 +307,30 @@ func (f *FSNode) SaveLog(request *FSRequest, ok *bool) (_ error) {
 	}
 
 	file.Sync()
-	*ok = true
+
+	logMsg = "Log [" + _log.Job.JobID + "] saved"
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }
 
 func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	jobID := request.Payload[0].(string)
-	f.logger.Println("Retrieving log [" + jobID + "] from disk")
-	filePath := path.Join(LOG_DIR, jobID)
+	logMsg := "Retrieving log [" + jobID + "] from disk"
+
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+	var recbuf []byte
+	f.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
+	filePath := path.Join(f.logDir, jobID)
 	logExists, err := checkFileOrDirectory(filePath)
 	if checkError(err) != nil || !logExists {
 		return
@@ -265,8 +347,14 @@ func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 		return
 	}
 
-	response.Payload = make([]interface{}, 1)
+	logMsg = "Sending log [" + jobID + "] to server"
+	if VERBOSE_LOG {
+		f.logger.Println(logMsg)
+	}
+
+	response.Payload = make([]interface{}, 2)
 	response.Payload[0] = *_log
+	response.Payload[1] = f.golog.PrepareSend(logMsg, []byte{})
 
 	return
 }
@@ -280,6 +368,10 @@ func (f *FSNode) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 // <HELPER METHODS>
 
 func getNodeID() (nodeID string) {
+	if TEMP_MODE {
+		return ""
+	}
+
 	nodeIDExists, err := checkFileOrDirectory(NODE_ID_PATH)
 	checkError(err)
 
@@ -293,6 +385,10 @@ func getNodeID() (nodeID string) {
 }
 
 func storeNodeID(nodeID string) {
+	if TEMP_MODE {
+		return
+	}
+
 	f, err := openFile(NODE_ID_PATH)
 	checkError(err)
 	defer f.Close()

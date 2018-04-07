@@ -15,12 +15,15 @@ import (
 
 	. "../lib/session"
 	. "../lib/types"
+
+	"github.com/DistributedClocks/GoVector/govec"
 )
 
 // The maximum time in milliseconds since the most recent heartbeat
 // for a node to be considered disconnected.
 //
 const HEARTBEAT_INTERVAL = 2000
+const VERBOSE_LOG = false
 
 // nodes:    All known FS nodes, connected or not
 // sessions: All known sessions
@@ -33,6 +36,7 @@ type Server struct {
 	sessions *Sessions
 	logs     *Logs
 	index    *Index
+	golog    *govec.GoLog
 }
 
 // A map of node IDs to file system nodes.
@@ -102,6 +106,7 @@ func (s *Server) init() {
 	s.sessions = &Sessions{all: make(map[string]map[string]*FSNode)}
 	s.logs = &Logs{all: make(map[string]map[string]*FSNode)}
 	s.index = &Index{logs: make(map[string]map[string]bool)}
+	s.golog = govec.InitGoVector("FSServer", "FSServer")
 
 	rand.Seed(time.Now().Unix())
 }
@@ -147,44 +152,68 @@ func (s *Server) listenRPC() {
 // now has an outdated version).
 //
 func (s *Server) saveSessionToNode(session *Session, node *FSNode) {
-	s.logger.Println("Saving session [" + session.ID + "] to node [" + node.nodeID + "]")
+	logMsg := "Saving session [" + session.ID + "] to node [" + node.nodeID + "]"
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = *session
-	ok := false
-	err := node.nodeConn.Call("FSNode.SaveSession", request, &ok)
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
+	response := new(FSResponse)
+	err := node.nodeConn.Call("FSNode.SaveSession", request, response)
 	checkError(err)
 
-	if ok {
+	if len(response.Payload) > 0 {
 		s.sessions.addNode(session.ID, node)
-		s.logger.Println("Session [" + session.ID + "] saved")
+		logMsg = "Session [" + session.ID + "] saved"
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		s.sessions.removeNode(session.ID, node.nodeID)
-		s.logger.Println("Session [" + session.ID + "] could not be saved")
+		logMsg = "Session [" + session.ID + "] could not be saved"
+		s.golog.LogLocalEvent(logMsg)
+	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
 	}
 }
 
 // Attempts to retrieve a session from a specified node.
 //
-func (s *Server) getSessionFromNode(sessionID string, node *FSNode) *Session {
-	s.logger.Println("Retrieving session [" + sessionID + "] from node [" + node.nodeID + "]")
+func (s *Server) getSessionFromNode(sessionID string, node *FSNode) (sess *Session) {
+	logMsg := "Retrieving session [" + sessionID + "] from node [" + node.nodeID + "]"
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = sessionID
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	response := new(FSResponse)
 	err := node.nodeConn.Call("FSNode.GetSession", request, response)
 	checkError(err)
 
 	if len(response.Payload) == 0 {
-		s.logger.Println("Session [" + sessionID + "] could not be retrieved")
-		return nil
+		logMsg = "Session [" + sessionID + "] could not be retrieved"
+		s.golog.LogLocalEvent(logMsg)
+		sess = nil
 	} else {
-		s.logger.Println("Session [" + sessionID + "] retrieved")
+		logMsg = "Session [" + sessionID + "] retrieved"
 		session := response.Payload[0].(Session)
-		return &session
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
+		sess = &session
 	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
+
+	return
 }
 
 // A helper function for retrieving a single log specified by the
@@ -247,44 +276,68 @@ func (s *Server) getLogs(sessionID string) []Log {
 // version).
 //
 func (s *Server) saveLogToNode(_log *Log, node *FSNode) {
-	s.logger.Println("Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]")
+	logMsg := "Saving log [" + _log.Job.JobID + "] to node [" + node.nodeID + "]"
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = *_log
-	ok := false
-	err := node.nodeConn.Call("FSNode.SaveLog", request, &ok)
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
+	response := new(FSResponse)
+	err := node.nodeConn.Call("FSNode.SaveLog", request, response)
 	checkError(err)
 
-	if ok {
+	if len(response.Payload) > 0 && response.Payload[0].(bool) {
 		s.logs.addNode(_log.Job.JobID, node)
-		s.logger.Println("Log [" + _log.Job.JobID + "] saved")
+		logMsg = "Log [" + _log.Job.JobID + "] saved"
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 	} else {
 		s.logs.removeNode(_log.Job.JobID, node.nodeID)
-		s.logger.Println("Log [" + _log.Job.JobID + "] could not be saved")
+		logMsg = "Log [" + _log.Job.JobID + "] could not be saved"
+		s.golog.LogLocalEvent(logMsg)
+	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
 	}
 }
 
 // Attempts to retrieve a log from a specified node.
 //
-func (s *Server) getLogFromNode(jobID string, node *FSNode) *Log {
-	s.logger.Println("Retrieving log [" + jobID + "] from node [" + node.nodeID + "]")
+func (s *Server) getLogFromNode(jobID string, node *FSNode) (l *Log) {
+	logMsg := "Retrieving log [" + jobID + "] from node [" + node.nodeID + "]"
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
 
 	request := new(FSRequest)
-	request.Payload = make([]interface{}, 1)
+	request.Payload = make([]interface{}, 2)
 	request.Payload[0] = jobID
+	request.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	response := new(FSResponse)
 	err := node.nodeConn.Call("FSNode.GetLog", request, response)
 	checkError(err)
 
 	if len(response.Payload) == 0 {
-		s.logger.Println("Log [" + jobID + "] could not be retrieved")
-		return nil
+		logMsg = "Log [" + jobID + "] could not be retrieved"
+		s.golog.LogLocalEvent(logMsg)
+		l = nil
 	} else {
-		s.logger.Println("Log [" + jobID + "] retrieved")
+		logMsg = "Log [" + jobID + "] retrieved"
 		_log := response.Payload[0].(Log)
-		return &_log
+		var recbuf []byte
+		s.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
+		l = &_log
 	}
+
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
+
+	return
 }
 
 // </PRIVATE METHODS>
@@ -315,7 +368,7 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 
 	if len(nodeID) == 0 {
 		now := time.Now().UnixNano()
-		nodeID = generateNodeID(16)
+		nodeID = generateNodeID(5)
 		node := &FSNode{
 			nodeID: nodeID,
 			nodeAddr: nodeAddr,
@@ -348,8 +401,13 @@ func (s *Server) RegisterNode(request *FSRequest, response *FSResponse) (_ error
 // Save a session to the file system. The file server will attempt to
 // save the session to all connected file system nodes.
 //
-func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
+func (s *Server) SaveSession(request *FSRequest, response *FSResponse) (_ error) {
 	session := request.Payload[0].(Session)
+	logMsg := "Saving session [" + session.ID + "] to file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	nodes := s.nodes.getAll()
 	for _, node := range nodes {
@@ -360,6 +418,15 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 		}
 	}
 
+	logMsg = "Session [" + session.ID + "] save started"
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
+
 	return
 }
 
@@ -369,15 +436,28 @@ func (s *Server) SaveSession(request *FSRequest, _ *bool) (_ error) {
 //
 func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) {
 	sessionID := request.Payload[0].(string)
+	logMsg := "Retrieving session [" + sessionID + "] from file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	nodes := s.sessions.get(sessionID)
 
 	for _, node := range nodes {
 		if isConnected(node) {
 			session := s.getSessionFromNode(sessionID, node)
 			if session != nil {
-				response.Payload = make([]interface{}, 2)
+				logMsg = "Sending session [" + sessionID + "] to worker"
+				if VERBOSE_LOG {
+					s.logger.Println(logMsg)
+				}
+
+				response.Payload = make([]interface{}, 3)
 				response.Payload[0] = *session
 				response.Payload[1] = s.getLogs(sessionID)
+				response.Payload[2] = s.golog.PrepareSend(logMsg, []byte{})
+
 				break
 			} else {
 				s.sessions.removeNode(sessionID, node.nodeID)
@@ -391,8 +471,13 @@ func (s *Server) GetSession(request *FSRequest, response *FSResponse) (_ error) 
 // Save a log to the file system. The file server will attempt to save
 // the log to all connected file system nodes.
 //
-func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
+func (s *Server) SaveLog(request *FSRequest, response *FSResponse) (_ error) {
 	_log := request.Payload[0].(Log)
+	logMsg := "Saving log [" + _log.Job.JobID + "] to file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
 
 	nodes := s.nodes.getAll()
 	for _, node := range nodes {
@@ -405,6 +490,15 @@ func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
 
 	s.index.addLog(_log.Job.SessionID, _log.Job.JobID)
 
+	logMsg = "Log [" + _log.Job.SessionID + "] save started"
+	if VERBOSE_LOG {
+		s.logger.Println(logMsg)
+	}
+
+	response.Payload = make([]interface{}, 2)
+	response.Payload[0] = true
+	response.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
+
 	return
 }
 
@@ -412,10 +506,22 @@ func (s *Server) SaveLog(request *FSRequest, _ *bool) (_ error) {
 //
 func (s *Server) GetLog(request *FSRequest, response *FSResponse) (_ error) {
 	jobID := request.Payload[0].(string)
+	logMsg := "Retrieving log [" + jobID + "] from file system"
+
+	s.logger.Println(logMsg)
+	var recbuf []byte
+	s.golog.UnpackReceive(logMsg, request.Payload[1].([]byte), &recbuf)
+
 	_log := s.getLog(jobID)
 	if _log != nil {
-		response.Payload = make([]interface{}, 1)
+		logMsg = "Sending log [" + jobID + "] to worker"
+		if VERBOSE_LOG {
+			s.logger.Println(logMsg)
+		}
+
+		response.Payload = make([]interface{}, 2)
 		response.Payload[0] = *_log
+		response.Payload[1] = s.golog.PrepareSend(logMsg, []byte{})
 	}
 
 	return
