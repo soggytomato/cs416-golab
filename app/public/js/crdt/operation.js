@@ -76,27 +76,38 @@ $(document).ready(function() {
             if (change.origin == IGNORE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
-            if (change.origin == PASTE_OP) {
-                handleBulkInput(change);
-            } else if (change.origin == DELETE_OP && isBulk(change)) {
-                handleBulkDelete(change);
-            } else if ((change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP) && change.text.length == 1 && change.text[0] == EMPTY) {
-                if (isBulk(change)) {
+            if (isBulk(change) && !isCarriageReturn(change)) {
+                const effected = getEffectedIDs(change);
+
+                if (change.origin == DELETE_OP) {
                     handleBulkDelete(change);
-                } else {
+                } else if (change.text.length == 1 && change.text[0] == EMPTY && (change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP)) {
+                    handleBulkDelete(change);
+                } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
+                    handleBulkInput(change);
+                } else if (change.origin == INPUT_OP || change.origin == PASTE_OP) {
+                    if (effected.length > 0) {
+                        var _change = {};
+                        $.extend(_change, change);
+                        _change.origin = DELETE_OP;
+                        _change.text = [""];
+
+                        handleBulkDelete(_change);
+                    }
+
+                    handleBulkInput(change);
+               }
+            } else {
+                if (change.text.length == 1 && change.text[0] == EMPTY && (change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP)) {
                     changes.push(change);
                     change.origin = DELETE_OP;
-                }
-            } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
-                if (isBulk(change)) {
-                    handleBulkInput(change);
-                } else {
+                } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
                     changes.push(change);
                     change.origin = INPUT_OP;
+                } else {
+                    // Push to queue of changes
+                    changes.push(change);
                 }
-            } else {
-                // Push to queue of changes
-                changes.push(change);
             }
 
             // Init a new Promise
@@ -157,7 +168,7 @@ function handleOperation(op) {
         var inputChar;
 
         // Is this a return case?
-        if (op.text.length == 2 && op.text[0] == EMPTY && op.text[1] == EMPTY) {
+        if (isCarriageReturn(op)) {
             inputChar = RETURN;
         } // Is this an indent case?
         else if (op.text[0].includes(TAB) && op.text[0].length > 1) {
@@ -309,7 +320,7 @@ function handleRemoteInput(id, prevId, val) {
         prevElem.next = id;
     } else {
         nextElem = CRDT.head;
-        next = nextElem.id;
+        next = (nextElem != undefined && nextElem != null)? nextElem.id : undefined;
     }
 
     if (next !== undefined) {
@@ -460,7 +471,7 @@ function isBulk(change) {
     if (change.text[0].length > 1) return true;
 
     // By analysis of effected IDs
-    return getEffectedIDs(change).length > 1;
+    return getEffectedIDs(change).length > 0;
 }
 
 /*
@@ -495,6 +506,10 @@ function getEffectedIDs(change) {
 }
 
 /******************************* UTILITY *******************************/
+
+function isCarriageReturn(op) {
+    return op.text.length == 2 && op.text[0] == EMPTY && op.text[1] == EMPTY;
+}
 
 /*
     Removes extra carriage returns at the ends of lines
