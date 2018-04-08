@@ -2,11 +2,16 @@ socket = undefined;
 unload = false;
 disconnectAlerted = false
 
+/******************************* EVENT HANDLERS *******************************/
+
+
 $(window).on('beforeunload', function(event) {
     unload = true;
 
     closeSession();
 });
+
+/******************************* WEBSOCKET HANDLERS *******************************/
 
 function initWS() {
     socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID=' + sessionID);
@@ -104,6 +109,8 @@ function closeSession() {
 
     if (socket.readyState == 0 || socket.readyState == 1) socket.close();
 }
+
+/******************************* SETUP & RECOVERY *******************************/
 
 function getWorker(cb) {
     $.ajax({
