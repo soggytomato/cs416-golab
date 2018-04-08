@@ -15,6 +15,7 @@ PASTE_OP = 'paste';
 UNDO_OP = 'undo';
 REDO_OP = 'redo';
 CUT_OP = 'cut';
+SET_VALUE_OP = 'setValue';
 IGNORE_OP = 'ignore';
 REMOTE_INPUT_OP = '+remote_input';
 REMOTE_DELETE_OP = '+remote_delete';
@@ -73,30 +74,33 @@ $(document).ready(function() {
                 return;
             }
 
-            if (change.origin == IGNORE_OP) return;
+            if (change.origin == IGNORE_OP || change.origin == SET_VALUE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
-            if (change.origin == PASTE_OP) {
-                handleBulkInput(change);
-            } else if (change.origin == DELETE_OP && isBulk(change)) {
-                handleBulkDelete(change);
-            } else if ((change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP) && change.text.length == 1 && change.text[0] == EMPTY) {
-                if (isBulk(change)) {
+            if (isBulk(change) && !isCarriageReturn(change)) {
+                const effected = getEffectedIDs(change);
+
+                if (isDelete(change)) {
                     handleBulkDelete(change);
                 } else {
-                    changes.push(change);
-                    change.origin = DELETE_OP;
-                }
-            } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
-                if (isBulk(change)) {
+                    if (effected.length > 0) {
+                        var _change = {origin: DELETE_OP, text: [""]};
+                        handleBulkDelete($.extend(_change, change));
+                    }
+
                     handleBulkInput(change);
-                } else {
-                    changes.push(change);
-                    change.origin = INPUT_OP;
                 }
             } else {
-                // Push to queue of changes
-                changes.push(change);
+                if (isDelete(change) && (change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP)) {
+                    changes.push(change);
+                    change.origin = DELETE_OP;
+                } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
+                    changes.push(change);
+                    change.origin = INPUT_OP;
+                } else {
+                    // Push to queue of changes
+                    changes.push(change);
+                }
             }
 
             // Init a new Promise
@@ -157,7 +161,7 @@ function handleOperation(op) {
         var inputChar;
 
         // Is this a return case?
-        if (op.text.length == 2 && op.text[0] == EMPTY && op.text[1] == EMPTY) {
+        if (isCarriageReturn(op)) {
             inputChar = RETURN;
         } // Is this an indent case?
         else if (op.text[0].includes(TAB) && op.text[0].length > 1) {
@@ -309,7 +313,7 @@ function handleRemoteInput(id, prevId, val) {
         prevElem.next = id;
     } else {
         nextElem = CRDT.head;
-        next = nextElem.id;
+        next = (nextElem != undefined && nextElem != null)? nextElem.id : undefined;
     }
 
     if (next !== undefined) {
@@ -460,18 +464,20 @@ function isBulk(change) {
     if (change.text[0].length > 1) return true;
 
     // By analysis of effected IDs
-    return getEffectedIDs(change).length > 1;
+    return getEffectedIDs(change).length > 0;
 }
+
+/******************************* UTILITY *******************************/
 
 /*
     Gets all the element IDs in the mapping spanningthe 'from' 
     position to the 'to' position.
 */
-function getEffectedIDs(change) {
+function getEffectedIDs(op) {
     var ids = [];
 
-    const from = change.from;
-    const to = change.to;
+    const from = op.from;
+    const to = op.to;
 
     var line = from.line;
     var ch = from.ch;
@@ -494,7 +500,23 @@ function getEffectedIDs(change) {
     return ids;
 }
 
-/******************************* UTILITY *******************************/
+function hasInput(op) {
+    // More than one line
+    if (op.text.length > 1) return true;
+
+    // One line with length greater than 1
+    if (op.text[0].length > 1) return true;
+
+    return;
+}
+
+function isDelete(op) {
+    return op.text.length == 1 && op.text[0] == EMPTY;
+}
+
+function isCarriageReturn(op) {
+    return op.text.length == 2 && op.text[0] == EMPTY && op.text[1] == EMPTY;
+}
 
 /*
     Removes extra carriage returns at the ends of lines
