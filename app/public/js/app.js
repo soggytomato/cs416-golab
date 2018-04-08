@@ -35,7 +35,7 @@ $(document).ready(function() {
     formBindings();
 });
 
-/******************************* INITIALIZATION *******************************/
+/******************************* SESSION & MORE *******************************/
 
 function initSession() {
     $.ajax({
@@ -86,6 +86,15 @@ function initSession() {
             }
         }
     })
+}
+
+function closeSession() {
+    $.ajax({
+        type: 'post',
+        url: 'http://' + workerIP + '/session?userID=' + userID + '&sessionID=' + sessionID
+    });
+
+    if (socket.readyState == 0 || socket.readyState == 1) socket.close();
 }
 
 function getSessionAndUsernames() {
