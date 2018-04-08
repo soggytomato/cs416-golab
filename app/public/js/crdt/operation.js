@@ -15,6 +15,7 @@ PASTE_OP = 'paste';
 UNDO_OP = 'undo';
 REDO_OP = 'redo';
 CUT_OP = 'cut';
+SET_VALUE_OP = 'setValue';
 IGNORE_OP = 'ignore';
 REMOTE_INPUT_OP = '+remote_input';
 REMOTE_DELETE_OP = '+remote_delete';
@@ -73,32 +74,24 @@ $(document).ready(function() {
                 return;
             }
 
-            if (change.origin == IGNORE_OP) return;
+            if (change.origin == IGNORE_OP || change.origin == SET_VALUE_OP) return;
             if (change.origin == DELETE_OP && change.from.hitSide) return;
 
             if (isBulk(change) && !isCarriageReturn(change)) {
                 const effected = getEffectedIDs(change);
 
-                if (change.origin == DELETE_OP) {
+                if (isDelete(change)) {
                     handleBulkDelete(change);
-                } else if (change.text.length == 1 && change.text[0] == EMPTY && (change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP)) {
-                    handleBulkDelete(change);
-                } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
-                    handleBulkInput(change);
-                } else if (change.origin == INPUT_OP || change.origin == PASTE_OP) {
+                } else {
                     if (effected.length > 0) {
-                        var _change = {};
-                        $.extend(_change, change);
-                        _change.origin = DELETE_OP;
-                        _change.text = [""];
-
-                        handleBulkDelete(_change);
+                        var _change = {origin: DELETE_OP, text: [""]};
+                        handleBulkDelete($.extend(_change, change));
                     }
 
                     handleBulkInput(change);
-               }
+                }
             } else {
-                if (change.text.length == 1 && change.text[0] == EMPTY && (change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP)) {
+                if (isDelete(change) && (change.origin == UNDO_OP || change.origin == REDO_OP || change.origin == CUT_OP)) {
                     changes.push(change);
                     change.origin = DELETE_OP;
                 } else if (change.origin == UNDO_OP || change.origin == REDO_OP) {
@@ -474,15 +467,17 @@ function isBulk(change) {
     return getEffectedIDs(change).length > 0;
 }
 
+/******************************* UTILITY *******************************/
+
 /*
     Gets all the element IDs in the mapping spanningthe 'from' 
     position to the 'to' position.
 */
-function getEffectedIDs(change) {
+function getEffectedIDs(op) {
     var ids = [];
 
-    const from = change.from;
-    const to = change.to;
+    const from = op.from;
+    const to = op.to;
 
     var line = from.line;
     var ch = from.ch;
@@ -505,7 +500,19 @@ function getEffectedIDs(change) {
     return ids;
 }
 
-/******************************* UTILITY *******************************/
+function hasInput(op) {
+    // More than one line
+    if (op.text.length > 1) return true;
+
+    // One line with length greater than 1
+    if (op.text[0].length > 1) return true;
+
+    return;
+}
+
+function isDelete(op) {
+    return op.text.length == 1 && op.text[0] == EMPTY;
+}
 
 function isCarriageReturn(op) {
     return op.text.length == 2 && op.text[0] == EMPTY && op.text[1] == EMPTY;

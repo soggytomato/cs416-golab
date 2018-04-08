@@ -23,7 +23,7 @@ function onOpen() {
         sendCachedElements();
         recovering = false;
     } else {
-        initCRDT();
+        initSession();
     }
 }
 
