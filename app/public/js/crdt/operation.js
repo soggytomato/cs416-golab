@@ -140,7 +140,7 @@ function endOpPromise() {
         return;
     }
 
-    cleanExtraCarriageReturns();
+    cleanTokenCarriageReturns();
     if (debugMode) CRDT.verify();
 }
 
@@ -523,21 +523,20 @@ function isCarriageReturn(op) {
     by finding the invalid characters and deleting them from
     the editor.
 */
-function cleanExtraCarriageReturns() {
-    const $lines = $('.CodeMirror-line');
-    $lines.each(function(lineNum, line) {
-        const $line = $(line);
-        const $spans = $line.find('>span').children();
-
-        if ($spans.last().hasClass('cm-invalidchar')) {
-            const lineTokens = editor.getLineTokens(lineNum);
-            const token = lineTokens[lineTokens.length - 1];
-
+function cleanTokenCarriageReturns() {
+    const mLength = mapping.length();
+    var lineNum = 0;
+    while (lineNum < mLength) {
+        const line = editor.getLineTokens(lineNum);
+        const token = line[line.length - 1];
+        if (token != undefined && token.string == RETURN) {
             const to = { line: lineNum, ch: token.end };
             const from = { line: lineNum, ch: to.ch - 1 };
             editor.getDoc().replaceRange('', from, to, IGNORE_OP);
         }
-    });
+
+        lineNum++;
+    }
 }
 
 // Array of all changes -- only for debug purposing to replay until
