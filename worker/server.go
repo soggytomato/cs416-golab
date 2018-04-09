@@ -20,9 +20,9 @@ import (
 	"net/rpc"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
-	"strconv"
 
 	. "../lib/types"
 	"github.com/DistributedClocks/GoVector/govec"
@@ -355,7 +355,6 @@ func (s *LBServer) NewJob(wrequest *WorkerRequest, wresponse *WorkerResponse) er
 	}
 
 	log := response.Payload[0].(Log)
-
 	// Send out the new log
 	for _, worker := range allWorkers.all {
 		workerCon, err := rpc.Dial("tcp", worker.RPCAddress.String())
@@ -375,12 +374,13 @@ func (s *LBServer) NewJob(wrequest *WorkerRequest, wresponse *WorkerResponse) er
 				outLog.Println(logMsg)
 				var recbuf []byte
 				golog.UnpackReceive(logMsg, response.Payload[0].([]byte), &recbuf)
-				break
 			} else {
 				logMsg = "Log [" + jobID + "] could not be sent"
 				outLog.Println(logMsg)
 				golog.LogLocalEvent(logMsg)
 			}
+		} else {
+			outLog.Println(err)
 		}
 	}
 
