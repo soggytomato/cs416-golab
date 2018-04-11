@@ -3,6 +3,7 @@ package session
 import (
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // Flags whether to log the inputs and deletes
@@ -17,6 +18,8 @@ type Session struct {
 	CRDT map[string]*Element
 	Head string
 	Next int
+
+	mux sync.RWMutex
 }
 
 type Element struct {
@@ -118,9 +121,12 @@ func (s *Session) delete(element Element) bool {
 // <PUBLIC METHODS>
 
 func (s *Session) Add(element Element) bool {
+	s.mux.Lock()
+	defer s.mux.Unlock();
+
 	id := element.ID
 
-	// If the element already exists dont insert
+	// If the element already exists don't insert
 	if s.exists(id) {
 		return false
 	}
@@ -130,6 +136,9 @@ func (s *Session) Add(element Element) bool {
 }
 
 func (s *Session) Delete(element Element) bool {
+	s.mux.Lock()
+	defer s.mux.Unlock();
+
 	return s.delete(element)
 }
 
