@@ -70,7 +70,7 @@ $(document).ready(function() {
         function(cm, change) {
             allowExecute = true;
 
-            if (escape(change.text[0]) == RETURN_ESCAPE) {
+            if (escape(change.text[0]) == RETURN_ESCAPE_1) {
                 change.cancel();
                 return;
             }
