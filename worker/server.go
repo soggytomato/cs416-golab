@@ -324,8 +324,7 @@ func (s *LBServer) NewJob(wrequest *WorkerRequest, wresponse *WorkerResponse) er
 
 	response := new(WorkerResponse)
 
-	workersList := sortWorkers()
-	for _, worker := range workersList {
+	for _, worker := range allWorkers.all {
 		nextWorkerIP := worker.RPCAddress.String()
 
 		workerCon, err := rpc.Dial("tcp", nextWorkerIP)
