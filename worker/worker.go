@@ -218,7 +218,7 @@ func (w *Worker) sendLocalElements() error {
 
 			w.ackElements(numAckElements, numSuccess)
 
-			w.localElements = w.localElements[:numLocalElements]
+			w.localElements = w.localElements[numLocalElements:]
 		}
 	}
 	return nil
