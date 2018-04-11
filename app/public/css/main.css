@@ -5,7 +5,7 @@ html {
   html body {
     height: 98%;
     width: inherit;
-    overflow-y: hidden;
+    overflow-y: scroll;
     background-color: #333 !important; }
   html .btn-icon {
     width: 30px;

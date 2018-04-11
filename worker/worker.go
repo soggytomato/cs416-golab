@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"math"
 
 	. "../lib/cache"
 	. "../lib/session"
@@ -86,6 +87,7 @@ func (e NoCRDTError) Error() string {
 // Used to send heartbeat to the server just shy of 1 second each beat
 const TIME_BUFFER int = 500
 const ELEMENT_DELAY int = 2
+const CHUNK_SIZE int = 30
 
 // Turn off AUTO_SAVE to disable auto saving of sessions to the file
 // system. This can be helpful for improving the comprehensibility of
@@ -157,37 +159,69 @@ func (w *Worker) sendLocalElements() error {
 			w.saveModifiedSessionsToFS()
 		}
 
-		//w.getWorkers() // checks all workers, connects to more if needed
-		if len(w.localElements) > 0 || len(w.elementsToAck) > 0 {
+		numLocalElements := len(w.localElements)
+		numAckElements := len(w.elementsToAck)
+		if numLocalElements > 0 || numAckElements > 0 {
 			success := 0
+
+			elementQueue := append(w.localElements, w.elementsToAck...)
+			numChunks := int(math.Ceil(float64(len(elementQueue))/float64(CHUNK_SIZE)))
+			numElements := len(elementQueue)
 
 			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
 
 			request := new(WorkerRequest)
 			request.Payload = make([]interface{}, 1)
-			request.Payload[0] = append(w.localElements, w.elementsToAck...)
 			response := new(WorkerResponse)
 			for workerAddr, workerCon := range w.workers {
 				isConnected := false
+				
+				// Check if worker is connected
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
-				if isConnected {
-					workerCon.Call("Worker.ApplyIncomingElements", request, response)
-					success++
-				} else {
+				if !isConnected {
 					w.logger.Println("Lost worker: ", workerAddr)
+
 					delete(w.workers, workerAddr)
 					if len(w.workers) < w.settings.MinNumWorkerConnections {
 						w.getWorkers()
 					}
 				}
+
+				// Break elements into chunks and send to worker
+				sentSuccessfully := true
+				chunkNum := 0
+				for chunkNum < numChunks {
+					from := chunkNum * CHUNK_SIZE
+					to := from + CHUNK_SIZE
+					if to > numElements {
+						to = numElements
+					}
+
+					request.Payload[0] = elementQueue[from:to]
+					err := workerCon.Call("Worker.ApplyIncomingElements", request, response)
+					if err != nil {
+						w.logger.Println("Received error when trying to send chunk of elements to worker ", workerAddr, ": \n", err)
+
+						sentSuccessfully = false
+						break
+					}
+
+					chunkNum++
+				}
+
+				// If all elements were sent successfully, increment
+				// number of successes
+				if sentSuccessfully {
+					success++
+				}
 			}
 
 			// If the ACK elements sent to enough workers, we can ACK them
 			if success >= w.settings.MinNumWorkerConnections {
-				w.ackElements()
+				w.ackElements(numAckElements)
 			}
 
-			w.localElements = nil
+			w.localElements = w.localElements[:numLocalElements]
 		}
 	}
 	return nil
@@ -246,7 +280,7 @@ func (w *Worker) CreateNewSession(sessionID string, _ *bool) error {
 	w.logger.Println(logMsg)
 
 	request := new(FSRequest)
-	session := &Session{sessionID, make(map[string]*Element), "", 1}
+	session := &Session{ID: sessionID, CRDT: make(map[string]*Element)}
 
 	w.sessions[sessionID] = session
 	request.Payload = make([]interface{}, 2)
@@ -715,8 +749,7 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	}
 }
 
-func (w *Worker) ackElements() {
-	numAcks := len(w.elementsToAck)
+func (w *Worker) ackElements(numAcks int) {
 	for i := 0; i < numAcks; i++ {
 		element := w.elementsToAck[i]
 		clientID := element.ClientID

@@ -2,11 +2,16 @@ socket = undefined;
 unload = false;
 disconnectAlerted = false
 
+/******************************* EVENT HANDLERS *******************************/
+
+
 $(window).on('beforeunload', function(event) {
     unload = true;
 
     closeSession();
 });
+
+/******************************* WEBSOCKET HANDLERS *******************************/
 
 function initWS() {
     socket = new WebSocket("ws://" + workerIP + "/ws?userID=" + userID + '&sessionID=' + sessionID);
@@ -23,7 +28,7 @@ function onOpen() {
         sendCachedElements();
         recovering = false;
     } else {
-        initCRDT();
+        initSession();
     }
 }
 
@@ -96,14 +101,7 @@ function sendCachedElements() {
     });
 }
 
-function closeSession() {
-    $.ajax({
-        type: 'post',
-        url: 'http://' + workerIP + '/session?userID=' + userID + '&sessionID=' + sessionID
-    });
-
-    if (socket.readyState == 0 || socket.readyState == 1) socket.close();
-}
+/******************************* SETUP & RECOVERY *******************************/
 
 function getWorker(cb) {
     $.ajax({
