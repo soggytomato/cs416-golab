@@ -756,7 +756,7 @@ func (w *Worker) ackElements(numAcks int, numSuccess int) {
 			w.sendToClient(clientID, element)
 		}
 
-		w.elementsToAck = w.elementsToAck[numAcks+1:]
+		w.elementsToAck = w.elementsToAck[numAcks:]
 	} else { // Otherwise discard for diconnected workers
 		for i := 0; i < numAcks; i++ {
 			element := w.elementsToAck[i]
