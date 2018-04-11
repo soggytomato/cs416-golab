@@ -6,7 +6,8 @@ RETURN = '\n';
 TAB = '\t';
 SPACE = ' ';
 EMPTY = '';
-RETURN_ESCAPE = '%0A';
+RETURN_ESCAPE_1 = '%0A';
+RETURN_ESCAPE_2 = '%09%0A';
 
 // Operation constants
 INPUT_OP = '+input';
@@ -529,7 +530,7 @@ function cleanTokenCarriageReturns() {
     while (lineNum < mLength) {
         const line = editor.getLineTokens(lineNum);
         const token = line[line.length - 1];
-        if (token != undefined && token.string == RETURN) {
+        if (token != undefined && (token.string == RETURN || escape(token.string) == RETURN_ESCAPE_1 || escape(token.string) == RETURN_ESCAPE_2)) {
             const to = { line: lineNum, ch: token.end };
             const from = { line: lineNum, ch: to.ch - 1 };
             editor.getDoc().replaceRange('', from, to, IGNORE_OP);
