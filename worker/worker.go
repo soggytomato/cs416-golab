@@ -175,7 +175,7 @@ func (w *Worker) sendLocalElements() error {
 			response := new(WorkerResponse)
 			for workerAddr, workerCon := range w.workers {
 				isConnected := false
-				
+
 				// Check if worker is connected
 				workerCon.Call("Worker.PingWorker", "", &isConnected)
 				if !isConnected {
@@ -366,7 +366,7 @@ func (w *Worker) getSessionAndLogs(sessionID string) bool {
 			session := fsResponse.Payload[0].(Session)
 			logs := fsResponse.Payload[1].([]Log)
 			var recbuf []byte
-			w.golog.UnpackReceive(logMsg, response.Payload[2].([]byte), &recbuf)
+			w.golog.UnpackReceive(logMsg, fsResponse.Payload[2].([]byte), &recbuf)
 
 			if _, exists := w.logs[sessionID]; exists {
 				for _, log := range logs {
