@@ -162,7 +162,7 @@ func (w *Worker) sendLocalElements() error {
 		numLocalElements := len(w.localElements)
 		numAckElements := len(w.elementsToAck)
 		if numLocalElements > 0 || numAckElements > 0 {
-			success := 0
+			numSuccess := 0
 
 			elementQueue := append(w.localElements, w.elementsToAck...)
 			numChunks := int(math.Ceil(float64(len(elementQueue))/float64(CHUNK_SIZE)))
@@ -212,14 +212,11 @@ func (w *Worker) sendLocalElements() error {
 				// If all elements were sent successfully, increment
 				// number of successes
 				if sentSuccessfully {
-					success++
+					numSuccess++
 				}
 			}
 
-			// If the ACK elements sent to enough workers, we can ACK them
-			if success >= w.settings.MinNumWorkerConnections {
-				w.ackElements(numAckElements)
-			}
+			w.ackElements(numAckElements, numSuccess)
 
 			w.localElements = w.localElements[:numLocalElements]
 		}
@@ -749,15 +746,28 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	}
 }
 
-func (w *Worker) ackElements(numAcks int) {
-	for i := 0; i < numAcks; i++ {
-		element := w.elementsToAck[i]
-		clientID := element.ClientID
+func (w *Worker) ackElements(numAcks int, numSuccess int) {
+	// If we sent to minimum number of workers, ack all elements
+	if numSuccess >= w.settings.MinNumWorkerConnections {
+		for i := 0; i < numAcks; i++ {
+			element := w.elementsToAck[i]
+			clientID := element.ClientID
 
-		w.sendToClient(clientID, element)
+			w.sendToClient(clientID, element)
+		}
+
+		w.elementsToAck = w.elementsToAck[numAcks+1:]
+	} else { // Otherwise discard for diconnected workers
+		for i := 0; i < numAcks; i++ {
+			element := w.elementsToAck[i]
+			clientID := element.ClientID
+
+			conn := w.clients[clientID]
+			if conn == nil {
+				w.elementsToAck = append(w.elementsToAck[:i], w.elementsToAck[i+1:]...)
+			}
+		}
 	}
-
-	w.elementsToAck = w.elementsToAck[numAcks:]
 }
 
 func (w *Worker) sendToClients(element Element) {
