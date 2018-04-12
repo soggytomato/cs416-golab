@@ -122,14 +122,21 @@ class SeqCRDT {
         var _snippet = this.toSnippet();
 
         if (snippet != _snippet) {
-            if (!outOfSync) alert('CRDT and editor fell out of sync! Check console for details.');
-            outOfSync = true;
+            if (!outOfSync) {
+                showError('CRDT and editor fell out of sync!\nCheck console for details.', 6000);
+                outOfSync = true;
+            }
 
             console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
             logOpsString();
 
             return false;
         } else {
+            if (outOfSync) {
+                showSuccess('CRDT and editor back in sync!');
+                outOfSync = false;
+            }
+
             return true;
         }
     }
