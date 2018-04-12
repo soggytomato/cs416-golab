@@ -107,7 +107,7 @@ class Mapping {
             // Move all elements beyond this position down.
             const chars = _line.splice(ch, _line.length - ch);
             mapping.setLine(line + 1, chars);
-            mapping.stripWhitespace(line + 1);
+            //mapping.stripWhitespace(line + 1);
         }
 
         // Update mapping
@@ -163,16 +163,13 @@ class Mapping {
         var arr = [];
         var nextIndex = 0;
 
-        //const indented = editor.getTokenAt(editor.getCursor()).state.indented;
-        //if (indented > 0) indented = indented/4;
-
         mapping.getLine(line).forEach(function(id, i) {
             const elem = CRDT.get(id);
             const val = elem.val;
             if (val.trim().length > 0 || val == RETURN || val == SPACE ) {
                 arr[nextIndex] = id;
                 nextIndex++;
-            } else { //if (i > indented) {
+            } else {
                 elem.del = true;
             }
         });
