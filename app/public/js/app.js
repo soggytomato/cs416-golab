@@ -352,7 +352,7 @@ $(window).on('load', function() {
 
 function showMsg($msg, text, length) {
     $msg.find('.msg-text').text(text);
-    $msg.appendTo('.msgs-wrapper');
+    $msg.prependTo('.msgs-wrapper');
 
     setTimeout(function(){
         const iconHeight = $msg.find('.msg-icon').height();
