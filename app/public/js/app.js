@@ -1,7 +1,6 @@
 // Globals
 debugMode = true;
 recovering = false;
-allowExecute = true;
 
 workerIP = '';
 userID = '';
@@ -227,6 +226,10 @@ function openEditor() {
 
 /******************************* EXECUTION & LOGS *******************************/
 
+$(document).ready(function() {
+    $('.execute').on('click', _.throttle(execute, 1500));
+});
+
 function reset() {
     $('.log-selected').removeClass('log-selected');
 
@@ -244,14 +247,6 @@ function reset() {
 }
 
 function execute() {
-    if (!allowExecute) {
-        alert('No edits observed since last execution! See last log.');
-
-        return;
-    } else {
-        allowExecute = false;
-    }
-
     var newForm = document.createElement('form');
     newForm.setAttribute('id', 'executeForm');
     newForm.setAttribute('form', 'executeForm');
