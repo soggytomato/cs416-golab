@@ -68,8 +68,6 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
-            allowExecute = true;
-
             if (escape(change.text[0]) == RETURN_ESCAPE_1) {
                 change.cancel();
                 return;
