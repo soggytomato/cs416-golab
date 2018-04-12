@@ -158,6 +158,47 @@ html {
     bottom: 140px;
 }
 
+.msgs-wrapper {
+    position: fixed;
+    right: 10px;
+    top: 0px;
+
+    .msg {
+        font-size: small;
+        font-family: Consolas, monaco, monospace;
+        margin-top: 10px;
+        height: 70px;
+        width: 205px;
+        color: white;
+        text-align:  center;
+        border-radius:  5px;
+
+        .msg-icon {
+            width: 40px; 
+            padding-top: 7px;
+        }
+
+        .msg-text {
+            display: block;
+            padding: 5px;
+        }
+    }
+
+    .error-msg {
+        background-color: rgba(230, 74, 74, 0.79);
+    }
+
+    .success-msg {
+        background-color: rgba(69, 194, 113, 0.79);
+    }
+
+    span {
+        vertical-align: middle;
+    }
+}
+
+
+
 label,
 .subtitle {
     font-family: Consolas, monaco, monospace;
