@@ -151,7 +151,7 @@ class SeqCRDT {
             return false;
         } else {
             if (outOfSync) {
-                if (debugMode) showSuccess('CRDT and editor back in sync!');
+                if (debugMode) showSuccess('CRDT and editor back in sync!', 6000);
                 outOfSync = false;
             }
 
