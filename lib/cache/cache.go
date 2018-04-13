@@ -71,7 +71,7 @@ func (c *Cache) Maintain() {
 
 		for sessionID := range c.elements {
 			if pending, ok := c.pendingSessions[sessionID]; !ok || pending == false {
-				go c.clean(sessionID)
+				c.clean(sessionID)
 			}
 		}
 	}
