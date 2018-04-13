@@ -739,10 +739,10 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 		}
 
 		if w.addToSession(*element) {
-			w.elementsToAck = append(w.elementsToAck, *element)
-
 			w.sendToClients(*element)
 		}
+
+		w.elementsToAck = append(w.elementsToAck, *element)
 	}
 }
 
