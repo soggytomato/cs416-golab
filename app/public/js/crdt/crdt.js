@@ -72,20 +72,32 @@ class SeqCRDT {
     /*
     Converts CRDT to a snippet string.*/
     toSnippet() {
-        var _mapping = this.toMapping();
-        var snippet = _mapping.toSnippet();
-
-        return snippet;
+        const _mapping = this.toMapping();
+        if (_mapping != undefined) {
+            return _mapping.toSnippet();
+        } else {
+            return undefined;
+        }
     }
 
     /*
     Converts the CRDT to a mapping.*/
     toMapping() {
+        var fail = false;
+        const start = Date.now();
+
         var _mapping = new Mapping();
 
         var curElem = this.head;
         var lastVal, lastPos, lastLine;
         while (curElem != undefined) {
+            if (Date.now() - start > 10000) {
+                if (debugMode) showError('Failed to verify CRDT.');
+                fail = true;
+
+                break;
+            }
+
             if (curElem.del !== true) {
                 var curLine, curPos;
                 if (lastLine == undefined) {
@@ -112,7 +124,11 @@ class SeqCRDT {
             curElem = this.get(curElem.next);
         }
 
-        return _mapping;
+        if (fail) {
+            return undefined;
+        } else {
+            return _mapping;
+        }
     }
 
     /*
@@ -121,15 +137,24 @@ class SeqCRDT {
         var snippet = editor.getValue();
         var _snippet = this.toSnippet();
 
+        if (_snippet == undefined) return;
+
         if (snippet != _snippet) {
-            if (!outOfSync) showError('CRDT and editor fell out of sync! Check console for details.', 6000);
-            outOfSync = true;
+            if (!outOfSync) {
+                if (debugMode) showError('CRDT and editor fell out of sync! Check console for details.', 6000);
+                outOfSync = true;
+            }
 
             console.error('Snippet is not consistent!\n' + 'In editor: \n' + snippet + '\nFrom CRDT:\n' + _snippet);
             logOpsString();
 
             return false;
         } else {
+            if (outOfSync) {
+                if (debugMode) showSuccess('CRDT and editor back in sync!', 6000);
+                outOfSync = false;
+            }
+
             return true;
         }
     }
