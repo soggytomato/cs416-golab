@@ -1,7 +1,6 @@
 // Globals
 debugMode = true;
 recovering = false;
-allowExecute = true;
 
 workerIP = '';
 userID = '';
@@ -227,6 +226,9 @@ function openEditor() {
 
 /******************************* EXECUTION & LOGS *******************************/
 
+$(document).ready(function() {
+    $('.execute').on('click', _.throttle(execute, 1500));
+});
 
 function reset() {
     $('.log-selected').removeClass('log-selected');
@@ -245,14 +247,6 @@ function reset() {
 }
 
 function execute() {
-    if (!allowExecute) {
-        alert('No edits observed since last execution! See last log.');
-
-        return;
-    } else {
-        allowExecute = false;
-    }
-
     var newForm = document.createElement('form');
     newForm.setAttribute('id', 'executeForm');
     newForm.setAttribute('form', 'executeForm');
@@ -337,4 +331,44 @@ function logClicked(log) {
     document.getElementById('outputBox').innerHTML = str;
     document.getElementById("snipTitle").style.color = '#dd7000';
     document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY";
+}
+
+/******************************* POPUP MESSAGES *******************************/
+
+ERROR_MSG = undefined;
+SUCCESS_MSG = undefined;
+
+$(window).on('load', function() {
+  const links = $('link[rel=import]');
+
+    ERROR_MSG = $(links[0].import).find('.error-msg');
+    SUCCESS_MSG = $(links[1].import).find('.success-msg');
+});
+
+function showMsg($msg, text, length) {
+    $msg.find('.msg-text').text(text);
+    $msg.prependTo('.msgs-wrapper');
+
+    setTimeout(function(){
+        const iconHeight = $msg.find('.msg-icon').height();
+        const spanHeight = $msg.find('.msg-text').height();
+        $msg.height(iconHeight + spanHeight); 
+        $msg.css('display', 'none');
+        $msg.css('visibility', 'visible');
+        $msg.fadeIn('slow', function(){
+            setTimeout(function(){
+                $msg.fadeOut();
+           }, length);
+        });
+    }, 250);
+}
+
+function showError(text, length) {
+    const $msg = $(ERROR_MSG).clone();
+    showMsg($msg, text, length);
+}
+
+function showSuccess(text, length) {
+    const $msg = $(SUCCESS_MSG).clone();
+    showMsg($msg, text, length);
 }

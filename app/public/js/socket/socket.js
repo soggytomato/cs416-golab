@@ -116,7 +116,7 @@ function getWorker(cb) {
 function register() {
     getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
-            alert("No available Workers, please try again later")
+            alert("No available workers, please try again later.")
         } else {
             workerIP = data.WorkerIP;
 
@@ -198,13 +198,13 @@ function recover() {
 }
 
 function recoverSuccess() {
-    alert("Worker connection re-established!");
+    showSuccess("Worker connection re-established.", 3000);
     disconnectAlerted = false;
 }
 
 function recoverFail() {
     if (!disconnectAlerted) {
-        alert("Warning: Lost worker connection!\n Input operations will not be delivered until re-connected.")
+        showError("Lost worker connection!\n Input operations will not be delivered until re-connected.", 6000);
         disconnectAlerted = true;
     }
 }

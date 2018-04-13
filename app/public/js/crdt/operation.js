@@ -68,8 +68,6 @@ $(document).ready(function() {
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
         function(cm, change) {
-            allowExecute = true;
-
             if (escape(change.text[0]) == RETURN_ESCAPE_1) {
                 change.cancel();
                 return;
@@ -530,12 +528,24 @@ function cleanTokenCarriageReturns() {
     while (lineNum < mLength) {
         const line = editor.getLineTokens(lineNum);
         const token = line[line.length - 1];
-        if (token != undefined && (token.string == RETURN || escape(token.string) == RETURN_ESCAPE_1 || escape(token.string) == RETURN_ESCAPE_2)) {
-            const to = { line: lineNum, ch: token.end };
-            const from = { line: lineNum, ch: to.ch - 1 };
-            editor.getDoc().replaceRange('', from, to, IGNORE_OP);
-        }
 
+        if (token != undefined) {
+            const text = token.string;
+            if (text == RETURN || escape(text) == RETURN_ESCAPE_1 || escape(text) == RETURN_ESCAPE_2) {
+                const to = { line: lineNum, ch: token.end };
+                const from = { line: lineNum, ch: to.ch - 1 };
+                editor.getDoc().replaceRange('', from, to, IGNORE_OP);
+            } else {
+                const textLen = text.length;
+                const lastChar = text[textLen-1];
+
+                if (lastChar == RETURN || escape(lastChar) == RETURN_ESCAPE_1 || escape(lastChar) == RETURN_ESCAPE_2) {
+                    const from = { line: lineNum, ch: token.start };
+                    const to = { line: lineNum, ch: token.end };
+                    editor.getDoc().replaceRange(text.slice(0, textLen - 1), from, to, IGNORE_OP);
+                }
+            }
+        }
         lineNum++;
     }
 }
