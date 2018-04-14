@@ -231,6 +231,7 @@ $(document).ready(function() {
 });
 
 function reset() {
+    $('.line-error').removeClass('line-error');
     $('.log-selected').removeClass('log-selected');
 
     editor.setValue(CRDT.toSnippet());
@@ -331,6 +332,21 @@ function logClicked(log) {
     document.getElementById('outputBox').innerHTML = str;
     document.getElementById("snipTitle").style.color = '#dd7000';
     document.getElementById('snipTitle').innerHTML = "Snippet: READ ONLY";
+
+    findLineErrors();
+}
+
+function findLineErrors() {
+    const text = $('.output').html();
+    const regex = /\d+:\d+:/g;
+
+    var match = regex.exec(text);
+    while (match != null) {
+        const line = parseInt(match[0].split(':')[0]) - 1;
+        editor_readOnly.addLineClass(line, 'text', 'line-error');
+
+        match = regex.exec(text);
+    }
 }
 
 /******************************* POPUP MESSAGES *******************************/
