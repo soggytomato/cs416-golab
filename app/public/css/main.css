@@ -146,6 +146,9 @@ html {
   .msgs-wrapper span {
     vertical-align: middle; }
 
+.line-error {
+  background-color: rgba(255, 0, 0, 0.28) !important; }
+
 label,
 .subtitle {
   font-family: Consolas, monaco, monospace;
