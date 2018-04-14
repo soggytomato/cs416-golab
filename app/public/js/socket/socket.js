@@ -198,13 +198,15 @@ function recover() {
 }
 
 function recoverSuccess() {
-    showSuccess("Worker connection re-established.", 3000);
-    disconnectAlerted = false;
+    if (disconnectAlerted) {
+        showSuccess("Worker connection re-established.", 3000);
+        disconnectAlerted = false;
+    }
 }
 
 function recoverFail() {
     if (!disconnectAlerted) {
-        showError("Lost worker connection!\n Input operations will not be delivered until re-connected.", 6000);
+        showError("Lost worker connection!\nInput operations will not be delivered until re-connected.", 6000);
         disconnectAlerted = true;
     }
 }
