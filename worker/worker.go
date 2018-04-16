@@ -231,6 +231,11 @@ func (w *Worker) sendLocalElements() error {
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
 	elements := request.Payload[0].([]Element)
 	for _, element := range elements {
+		sessionID := element.SessionID
+		if w.sessions[sessionID] == nil {
+			w.getSessionAndLogs(sessionID)
+		}
+
 		w.cache.Add(element)
 
 		// Send to clients if we actually added to the CRDT
