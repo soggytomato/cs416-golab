@@ -748,6 +748,10 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 }
 
 func (w *Worker) ackElements(numAcks int, numSuccess int) {
+	if numAcks > len(w.elementsToAck) {
+		return
+	}
+
 	// If we sent to minimum number of workers, ack all elements
 	if numSuccess >= w.settings.MinNumWorkerConnections {
 		for i := 0; i < numAcks; i++ {
