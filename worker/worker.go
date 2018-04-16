@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -26,13 +27,12 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"math"
 
 	. "../lib/cache"
 	. "../lib/session"
 	. "../lib/types"
-	"github.com/gorilla/websocket"
 	"github.com/DistributedClocks/GoVector/govec"
+	"github.com/gorilla/websocket"
 )
 
 type WorkerInfo struct {
@@ -61,6 +61,7 @@ type Worker struct {
 	elementsToAck    []Element
 	cache            *Cache
 	golog            *govec.GoLog
+	mux              sync.Mutex
 }
 
 type LogSettings struct {
@@ -165,7 +166,7 @@ func (w *Worker) sendLocalElements() error {
 			numSuccess := 0
 
 			elementQueue := append(w.localElements, w.elementsToAck...)
-			numChunks := int(math.Ceil(float64(len(elementQueue))/float64(CHUNK_SIZE)))
+			numChunks := int(math.Ceil(float64(len(elementQueue)) / float64(CHUNK_SIZE)))
 			numElements := len(elementQueue)
 
 			w.logger.Println("Sending local elements -- Map of connected workers:", w.workers)
@@ -440,7 +441,7 @@ func (w *Worker) listenRPC() {
 func (w *Worker) listenHTTP() {
 	http.HandleFunc("/session", w.sessionHandler)
 	http.HandleFunc("/recover", w.recoveryHandler)
-	http.HandleFunc("/execute", w.executeJob)
+	http.HandleFunc("/execute", w.executeHandler)
 
 	http.HandleFunc("/ws", w.wsHandler)
 	httpAddr, err := net.ResolveTCPAddr("tcp", w.externalIP)
@@ -651,7 +652,7 @@ type test_struct struct {
 	Snippet   string `json:"Snippet"`
 }
 
-func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
+func (w *Worker) executeHandler(wr http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		w.logger.Println("Got a /execute POST Request")
 		err := r.ParseForm()
@@ -683,7 +684,7 @@ func (w *Worker) executeJob(wr http.ResponseWriter, r *http.Request) {
 			var recbuf []byte
 			w.golog.UnpackReceive(logMsg, response.Payload[1].([]byte), &recbuf)
 		} else {
-			w.logger.Println("executeJob:", err)
+			w.logger.Println("executeHandler:", err)
 			logMsg = "Log [" + jobID + "] could not be sent"
 			w.logger.Println(logMsg)
 			w.golog.LogLocalEvent(logMsg)
@@ -788,7 +789,9 @@ func (w *Worker) sendToClient(clientID string, element Element) (sent bool, err 
 
 	conn := w.clients[clientID]
 	if conn != nil {
+		w.mux.Lock()
 		err = conn.WriteJSON(element)
+		w.mux.Unlock()
 		if err != nil {
 			w.logger.Println("Failed to send message to client '"+clientID+"':", err)
 			sent = false
@@ -901,7 +904,7 @@ func (w *Worker) RunJob(request *WorkerRequest, response *WorkerResponse) error 
 			var recbuf []byte
 			w.golog.UnpackReceive(logMsg, fsResponse.Payload[1].([]byte), &recbuf)
 		} else {
-			w.logger.Println("executeJob:", err)
+			w.logger.Println("executeHandler:", err)
 			logMsg = "Log [" + jobID + "] could not be sent"
 			w.golog.LogLocalEvent(logMsg)
 		}

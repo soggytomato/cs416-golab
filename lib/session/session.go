@@ -122,7 +122,7 @@ func (s *Session) delete(element Element) bool {
 
 func (s *Session) Add(element Element) bool {
 	s.mux.Lock()
-	defer s.mux.Unlock();
+	defer s.mux.Unlock()
 
 	id := element.ID
 
@@ -137,7 +137,7 @@ func (s *Session) Add(element Element) bool {
 
 func (s *Session) Delete(element Element) bool {
 	s.mux.Lock()
-	defer s.mux.Unlock();
+	defer s.mux.Unlock()
 
 	return s.delete(element)
 }
