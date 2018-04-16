@@ -128,6 +128,7 @@ function register() {
 
 function recover() {
     recovering = true;
+    recoverFail();
 
     getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
