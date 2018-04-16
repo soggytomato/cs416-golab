@@ -747,7 +747,7 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	}
 }
 
-func cleanAcks(numAcks int) int {
+func (w *Worker) cleanAcks(numAcks int) int {
 	if numAcks > len(w.elementsToAck) {
 		numAcks = len(w.elementsToAck)
 	}
