@@ -35,6 +35,7 @@ function onOpen() {
 function onClose(e) {
     if (!unload) {
         closeSession();
+        recoverFail();
         setTimeout(recover, 3000);
     }
 }
@@ -42,6 +43,7 @@ function onClose(e) {
 function onError(e) {
     if (!unload) {
         closeSession();
+        recoverFail();
         setTimeout(recover, 3000);
     }
 }
@@ -128,7 +130,6 @@ function register() {
 
 function recover() {
     recovering = true;
-    recoverFail();
 
     getWorker(function(data) {
         if (data.WorkerIP.length == 0) {
