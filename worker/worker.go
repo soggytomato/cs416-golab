@@ -232,6 +232,7 @@ func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerR
 	elements := request.Payload[0].([]Element)
 	for _, element := range elements {
 		w.cache.Add(element)
+		w.localElements = append(w.localElements, element)
 
 		// Send to clients if we actually added to the CRDT
 		// if not, we already had it...
@@ -1048,8 +1049,6 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 }
 
 func (w *Worker) addToSession(element Element) (processed bool) {
-	_element := element
-
 	sessionID := element.SessionID
 	session := w.sessions[sessionID]
 	if session == nil {
@@ -1064,7 +1063,6 @@ func (w *Worker) addToSession(element Element) (processed bool) {
 
 	if processed {
 		w.modifiedSessions[sessionID] = session
-		w.localElements = append(w.localElements, _element)
 	}
 
 	return
