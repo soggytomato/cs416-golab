@@ -747,9 +747,38 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	}
 }
 
+func cleanAcks(numAcks int) int {
+	if numAcks > len(w.elementsToAck) {
+		numAcks = len(w.elementsToAck)
+	}
+	_numAcks := numAcks
+
+	for i := 0; i < _numAcks; i++ {
+		element := w.elementsToAck[i]
+		clientID := element.ClientID
+
+		conn := w.clients[clientID]
+		if conn == nil {
+			w.elementsToAck = append(w.elementsToAck[:i], w.elementsToAck[i+1:]...)
+
+			_numAcks--
+		}
+	}
+
+	return _numAcks
+}
+
 func (w *Worker) ackElements(numAcks int, numSuccess int) {
+	// Clean for non-existent clients
+	_numAcks := w.cleanAcks(numAcks)
+
+	// Exit if the original number of acks is too high
+	// something wasn't right...
+	// Otherwise update numAcks for new num
 	if numAcks > len(w.elementsToAck) {
 		return
+	} else {
+		numAcks = _numAcks
 	}
 
 	// If we sent to minimum number of workers, ack all elements
@@ -762,16 +791,6 @@ func (w *Worker) ackElements(numAcks int, numSuccess int) {
 		}
 
 		w.elementsToAck = w.elementsToAck[numAcks:]
-	} else { // Otherwise discard for diconnected workers
-		for i := 0; i < numAcks; i++ {
-			element := w.elementsToAck[i]
-			clientID := element.ClientID
-
-			conn := w.clients[clientID]
-			if conn == nil {
-				w.elementsToAck = append(w.elementsToAck[:i], w.elementsToAck[i+1:]...)
-			}
-		}
 	}
 }
 
