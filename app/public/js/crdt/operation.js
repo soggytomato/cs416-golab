@@ -54,16 +54,16 @@ $(document).ready(function() {
     });
 
     editor_readOnly = CodeMirror.fromTextArea(document.getElementById("code_readOnly"), {
-        theme: "dracula",
-        matchBrackets: true,
-        indentUnit: 4,
-        tabSize: 4,
-        indentWithTabs: true,
-        electricChars: true,
-        smartIndent: false,
-        mode: "text/x-go",
-        lineNumbers: true
-    });
+       theme: "dracula",
+       matchBrackets: true,
+       indentUnit: 4,
+       tabSize: 4,
+       indentWithTabs: true,
+       electricChars: true,
+       smartIndent: false,
+       mode: "text/x-go",
+       lineNumbers: true
+   });
 
     // Handles all user inputs before they are applied to the editor.
     editor.on('beforeChange',
@@ -182,15 +182,7 @@ function handleOperation(op) {
 
         handleLocalInput(line, ch, inputChar);
     } else if (origin == DELETE_OP) {
-        // TODO deal with block deletion, or at least find a way to avoid it
-
         handleLocalDelete(line, ch);
-    } else if (origin.startsWith(REMOTE_INPUT_OP_PREFIX)) {
-        const id = origin.substring(REMOTE_INPUT_OP_PREFIX.length);
-
-        mapping.update(line, ch, id);
-    } else if (origin.startsWith(REMOTE_DELETE_OP_PREFIX)) {
-        mapping.delete(line, ch);
     }
 }
 
@@ -362,7 +354,9 @@ function handleRemoteInput(id, prevId, val) {
         line: line,
         ch: ch
     };
-    editor.getDoc().replaceRange(val, pos, pos, REMOTE_INPUT_OP_PREFIX + id);
+    
+    editor.getDoc().replaceRange(val, pos, pos, IGNORE_OP);
+    mapping.update(line, ch, id);
 
     if (debugMode) console.log("Observed input at line: " + line + " pos: " + ch + " char: " + unescape(val));
 }
@@ -385,7 +379,10 @@ function handleRemoteDelete(id) {
         pos2.ch = pos1.ch + 1;
     }
 
-    if (pos1.line != undefined && pos1.ch !== undefined) editor.getDoc().replaceRange('', pos1, pos2, REMOTE_DELETE_OP_PREFIX + id);
+    if (pos1.line != undefined && pos1.ch !== undefined) {
+        editor.getDoc().replaceRange('', pos1, pos2, IGNORE_OP);
+        mapping.delete(pos1.line, pos1.ch);
+    }
 
     if (debugMode) console.log("Observed remove at line: " + pos1.line + " pos: " + pos1.ch);
 }
@@ -411,7 +408,7 @@ function handleBulkInput(change) {
         }
     }
 
-    // For every character in the line, construct a new 
+    // For every character in the line, construct a new
     // 'change' object and push to the cache
     for (var i = 0; i < numLines; i++) {
         if (i > 0) ch = 0;
@@ -469,7 +466,7 @@ function isBulk(change) {
 /******************************* UTILITY *******************************/
 
 /*
-    Gets all the element IDs in the mapping spanningthe 'from' 
+    Gets all the element IDs in the mapping spanningthe 'from'
     position to the 'to' position.
 */
 function getEffectedIDs(op) {

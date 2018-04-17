@@ -231,6 +231,11 @@ func (w *Worker) sendLocalElements() error {
 func (w *Worker) ApplyIncomingElements(request *WorkerRequest, response *WorkerResponse) error {
 	elements := request.Payload[0].([]Element)
 	for _, element := range elements {
+		sessionID := element.SessionID
+		if w.sessions[sessionID] == nil {
+			w.getSessionAndLogs(sessionID)
+		}
+
 		w.cache.Add(element)
 
 		// Send to clients if we actually added to the CRDT
@@ -747,7 +752,40 @@ func (w *Worker) onElement(conn *websocket.Conn, userID string) {
 	}
 }
 
+func (w *Worker) cleanAcks(numAcks int) int {
+	if numAcks > len(w.elementsToAck) {
+		numAcks = len(w.elementsToAck)
+	}
+	_numAcks := numAcks
+
+	for i := 0; i < _numAcks; i++ {
+		element := w.elementsToAck[i]
+		clientID := element.ClientID
+
+		conn := w.clients[clientID]
+		if conn == nil {
+			w.elementsToAck = append(w.elementsToAck[:i], w.elementsToAck[i+1:]...)
+
+			_numAcks--
+		}
+	}
+
+	return _numAcks
+}
+
 func (w *Worker) ackElements(numAcks int, numSuccess int) {
+	// Clean for non-existent clients
+	_numAcks := w.cleanAcks(numAcks)
+
+	// Exit if the original number of acks is too high
+	// something wasn't right...
+	// Otherwise update numAcks for new num
+	if numAcks > len(w.elementsToAck) {
+		return
+	} else {
+		numAcks = _numAcks
+	}
+
 	// If we sent to minimum number of workers, ack all elements
 	if numSuccess >= w.settings.MinNumWorkerConnections {
 		for i := 0; i < numAcks; i++ {
@@ -758,16 +796,6 @@ func (w *Worker) ackElements(numAcks int, numSuccess int) {
 		}
 
 		w.elementsToAck = w.elementsToAck[numAcks:]
-	} else { // Otherwise discard for diconnected workers
-		for i := 0; i < numAcks; i++ {
-			element := w.elementsToAck[i]
-			clientID := element.ClientID
-
-			conn := w.clients[clientID]
-			if conn == nil {
-				w.elementsToAck = append(w.elementsToAck[:i], w.elementsToAck[i+1:]...)
-			}
-		}
 	}
 }
 
@@ -1025,8 +1053,6 @@ func (w *Worker) addRight(prevID, content, sessionID string) error {
 }
 
 func (w *Worker) addToSession(element Element) (processed bool) {
-	_element := element
-
 	sessionID := element.SessionID
 	session := w.sessions[sessionID]
 	if session == nil {
@@ -1041,7 +1067,7 @@ func (w *Worker) addToSession(element Element) (processed bool) {
 
 	if processed {
 		w.modifiedSessions[sessionID] = session
-		w.localElements = append(w.localElements, _element)
+		w.localElements = append(w.localElements, element)
 	}
 
 	return

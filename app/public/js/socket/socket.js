@@ -35,6 +35,7 @@ function onOpen() {
 function onClose(e) {
     if (!unload) {
         closeSession();
+        recoverFail();
         setTimeout(recover, 3000);
     }
 }
@@ -42,6 +43,7 @@ function onClose(e) {
 function onError(e) {
     if (!unload) {
         closeSession();
+        recoverFail();
         setTimeout(recover, 3000);
     }
 }
@@ -143,7 +145,7 @@ function recover() {
                 success: function(data) {
                     recoverSuccess();
 
-                    if (data != null && data.length > 0) {
+                    if (data != null && data.Session != null) {
                         data.Session.forEach(function(element) {
                             handleRemoteOperation(element);
                         });
